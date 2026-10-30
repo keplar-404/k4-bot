@@ -1,0 +1,3 @@
+- Prefers Neon's serverless driver (HTTP) for database access over Cloudflare Hyperdrive + node-postgres. Confidence: 0.7
+- MCP configuration should live at the repository root, not inside an app workspace (e.g. `apps/web`). Confidence: 0.9
+- When installing skills or tools, prefer official sources/documentation over random websites or platforms. Confidence: 0.9
