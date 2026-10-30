@@ -2,9 +2,10 @@ import { Hono } from "hono";
 import health from "./health";
 import authRoutes from "./auth";
 
-const routes = new Hono<{ Bindings: CloudflareBindings }>();
+import type { Env } from "../lib/env";
 
-routes.route("/health", health);
-routes.route("/auth", authRoutes);
+const routes = new Hono<{ Bindings: Env }>()
+  .route("/health", health)
+  .route("/auth", authRoutes);
 
 export default routes;

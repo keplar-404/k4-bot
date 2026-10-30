@@ -1,10 +1,12 @@
-"use client"
+"use client";
 
+import { usePathname } from "next/navigation";
+import { ChevronRightIcon } from "lucide-react";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@/components/ui/collapsible"
+} from "@/components/ui/collapsible";
 import {
   SidebarGroup,
   SidebarGroupLabel,
@@ -14,29 +16,29 @@ import {
   SidebarMenuSub,
   SidebarMenuSubButton,
   SidebarMenuSubItem,
-} from "@/components/ui/sidebar"
-import { ChevronRightIcon } from "lucide-react"
+} from "@/components/ui/sidebar";
 
 export function NavMain({
   items,
   extraItems = [],
 }: {
   items: {
-    title: string
-    url: string
-    icon?: React.ReactNode
-    isActive?: boolean
+    title: string;
+    url: string;
+    icon?: React.ReactNode;
+    isActive?: boolean;
     items?: {
-      title: string
-      url: string
-    }[]
-  }[]
+      title: string;
+      url: string;
+    }[];
+  }[];
   extraItems?: {
-    title: string
-    url: string
-    icon?: React.ReactNode
-  }[]
+    title: string;
+    url: string;
+    icon?: React.ReactNode;
+  }[];
 }) {
+  const pathname = usePathname();
   return (
     <SidebarGroup>
       <SidebarGroupLabel>Platform</SidebarGroupLabel>
@@ -70,7 +72,11 @@ export function NavMain({
         ))}
         {extraItems.map((item) => (
           <SidebarMenuItem key={item.title}>
-            <SidebarMenuButton render={<a href={item.url} />} tooltip={item.title}>
+            <SidebarMenuButton
+              render={<a href={item.url} />}
+              tooltip={item.title}
+              isActive={pathname === item.url}
+            >
               {item.icon}
               <span>{item.title}</span>
             </SidebarMenuButton>
@@ -78,5 +84,5 @@ export function NavMain({
         ))}
       </SidebarMenu>
     </SidebarGroup>
-  )
+  );
 }

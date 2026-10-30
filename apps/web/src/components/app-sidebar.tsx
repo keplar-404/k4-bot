@@ -1,19 +1,32 @@
-"use client"
+"use client";
 
-import * as React from "react"
-
-import { NavMain } from "@/components/nav-main"
-import { NavProjects } from "@/components/nav-projects"
-import { NavUser } from "@/components/nav-user"
-import { TeamSwitcher } from "@/components/team-switcher"
+import {
+  AudioLinesIcon,
+  BookOpenIcon,
+  BotIcon,
+  GalleryVerticalEndIcon,
+  LayoutDashboardIcon,
+  MonitorIcon,
+  PuzzleIcon,
+  ServerIcon,
+  Settings2Icon,
+  UserIcon,
+  TerminalIcon,
+  TerminalSquareIcon,
+} from "lucide-react";
+import type * as React from "react";
+import { NavMain } from "@/components/nav-main";
+import { NavProjects } from "@/components/nav-projects";
+import { NavUser } from "@/components/nav-user";
+import { ThemeToggleButton } from "@/components/theme-toggle-button";
+import { TeamSwitcher } from "@/components/team-switcher";
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
   SidebarHeader,
   SidebarRail,
-} from "@/components/ui/sidebar"
-import { GalleryVerticalEndIcon, AudioLinesIcon, TerminalIcon, TerminalSquareIcon, BotIcon, BookOpenIcon, Settings2Icon, FrameIcon, PieChartIcon, MapIcon, LayoutDashboardIcon, ServerIcon, PuzzleIcon, MonitorIcon } from "lucide-react"
+} from "@/components/ui/sidebar";
 
 // This is sample data.
 const data = {
@@ -25,26 +38,17 @@ const data = {
   teams: [
     {
       name: "Acme Inc",
-      logo: (
-        <GalleryVerticalEndIcon
-        />
-      ),
+      logo: <GalleryVerticalEndIcon />,
       plan: "Enterprise",
     },
     {
       name: "Acme Corp.",
-      logo: (
-        <AudioLinesIcon
-        />
-      ),
+      logo: <AudioLinesIcon />,
       plan: "Startup",
     },
     {
       name: "Evil Corp.",
-      logo: (
-        <TerminalIcon
-        />
-      ),
+      logo: <TerminalIcon />,
       plan: "Free",
     },
   ],
@@ -52,10 +56,7 @@ const data = {
     {
       title: "Playground",
       url: "#",
-      icon: (
-        <TerminalSquareIcon
-        />
-      ),
+      icon: <TerminalSquareIcon />,
       isActive: false,
       items: [
         {
@@ -75,10 +76,7 @@ const data = {
     {
       title: "Models",
       url: "#",
-      icon: (
-        <BotIcon
-        />
-      ),
+      icon: <BotIcon />,
       items: [
         {
           title: "Genesis",
@@ -97,10 +95,7 @@ const data = {
     {
       title: "Documentation",
       url: "#",
-      icon: (
-        <BookOpenIcon
-        />
-      ),
+      icon: <BookOpenIcon />,
       items: [
         {
           title: "Introduction",
@@ -123,10 +118,7 @@ const data = {
     {
       title: "Settings",
       url: "#",
-      icon: (
-        <Settings2Icon
-        />
-      ),
+      icon: <Settings2Icon />,
       items: [
         {
           title: "General",
@@ -151,29 +143,20 @@ const data = {
     {
       name: "Helper Bot",
       url: "#",
-      icon: (
-        <BotIcon
-        />
-      ),
+      icon: <BotIcon />,
     },
     {
       name: "Code Bot",
       url: "#",
-      icon: (
-        <BotIcon
-        />
-      ),
+      icon: <BotIcon />,
     },
     {
       name: "Chat Bot",
       url: "#",
-      icon: (
-        <BotIcon
-        />
-      ),
+      icon: <BotIcon />,
     },
   ],
-}
+};
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
@@ -185,18 +168,28 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavMain
           items={data.navMain}
           extraItems={[
-            { title: "Dashboard", url: "/dashboard", icon: <LayoutDashboardIcon /> },
+            {
+              title: "Dashboard",
+              url: "/dashboard",
+              icon: <LayoutDashboardIcon />,
+            },
             { title: "MCP", url: "/dashboard/mcp", icon: <ServerIcon /> },
             { title: "Skills", url: "/dashboard/skills", icon: <PuzzleIcon /> },
-            { title: "VM machine", url: "/dashboard/vm", icon: <MonitorIcon /> },
+            {
+              title: "VM machine",
+              url: "/dashboard/vm",
+              icon: <MonitorIcon />,
+            },
+            { title: "Avatar", url: "/dashboard/avatar", icon: <UserIcon /> },
           ]}
         />
         <NavProjects projects={data.projects} />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={data.user} />
+        <ThemeToggleButton />
+        <NavUser />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>
-  )
+  );
 }
