@@ -1,0 +1,5 @@
+- MCP configuration should live at the repository root, not inside an app workspace (e.g. `apps/web`). Confidence: 0.9
+- When installing skills or tools, prefer official sources/documentation over random websites or platforms. Confidence: 0.9
+- Apply API base path at the app entry point (index.ts) via route mounting, rather than embedding the base path in individual route definitions. Confidence: 0.85
+- Don't wrap sidebar menu items in collapsible/expandable or separate labeled groups unless explicitly requested; add them as flat entries inside the existing group. Confidence: 0.85
+- Never commit or push environment files (`.env*`, `.dev.vars`) or dot-prefixed agent/tooling slug folders (`.agents/`, `.claude/`, `.commandcode/`); keep them gitignored. Confidence: 0.9
