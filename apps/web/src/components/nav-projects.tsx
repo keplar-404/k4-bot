@@ -1,22 +1,30 @@
 "use client"
 
+import * as React from "react"
+import { SearchIcon } from "lucide-react"
+import { Button } from "@/components/ui/button"
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
 import {
   SidebarGroup,
   SidebarGroupLabel,
   SidebarMenu,
-  SidebarMenuAction,
   SidebarMenuButton,
   SidebarMenuItem,
-  useSidebar,
 } from "@/components/ui/sidebar"
-import { MoreHorizontalIcon, FolderIcon, ArrowRightIcon, Trash2Icon } from "lucide-react"
 
 export function NavProjects({
   projects,
@@ -27,10 +35,48 @@ export function NavProjects({
     icon: React.ReactNode
   }[]
 }) {
-  const { isMobile } = useSidebar()
+  const [open, setOpen] = React.useState(false)
+
   return (
     <SidebarGroup className="group-data-[collapsible=icon]:hidden">
-      <SidebarGroupLabel>Projects</SidebarGroupLabel>
+      <div className="flex items-center justify-between">
+        <SidebarGroupLabel>Bots</SidebarGroupLabel>
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogTrigger
+            render={
+              <Button variant="ghost" size="icon-sm" className="mr-1" />
+            }
+          >
+            <SearchIcon />
+            <span className="sr-only">Search bots</span>
+          </DialogTrigger>
+          <DialogContent className="p-0">
+            <DialogHeader className="px-4 pt-4">
+              <DialogTitle>Search bots</DialogTitle>
+            </DialogHeader>
+            <Command>
+              <CommandInput placeholder="Search bots..." />
+              <CommandList>
+                <CommandEmpty>No bots found.</CommandEmpty>
+                <CommandGroup heading="Bots">
+                  {projects.map((item) => (
+                    <CommandItem
+                      key={item.name}
+                      onSelect={() => {
+                        window.location.href = item.url
+                        setOpen(false)
+                      }}
+                    >
+                      {item.icon}
+                      <span>{item.name}</span>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </DialogContent>
+        </Dialog>
+      </div>
       <SidebarMenu>
         {projects.map((item) => (
           <SidebarMenuItem key={item.name}>
@@ -38,50 +84,8 @@ export function NavProjects({
               {item.icon}
               <span>{item.name}</span>
             </SidebarMenuButton>
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                render={
-                  <SidebarMenuAction
-                    showOnHover
-                    className="aria-expanded:bg-muted"
-                  />
-                }
-              >
-                <MoreHorizontalIcon
-                />
-                <span className="sr-only">More</span>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                className="w-fit"
-                side={isMobile ? "bottom" : "right"}
-                align={isMobile ? "end" : "start"}
-              >
-                <DropdownMenuItem>
-                  <FolderIcon
-                  />
-                  <span>View Project</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <ArrowRightIcon
-                  />
-                  <span>Share Project</span>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem variant="destructive">
-                  <Trash2Icon
-                  />
-                  <span>Delete Project</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
           </SidebarMenuItem>
         ))}
-        <SidebarMenuItem>
-          <SidebarMenuButton className="text-sidebar-foreground/70">
-            <MoreHorizontalIcon className="text-sidebar-foreground/70" />
-            <span>More</span>
-          </SidebarMenuButton>
-        </SidebarMenuItem>
       </SidebarMenu>
     </SidebarGroup>
   )

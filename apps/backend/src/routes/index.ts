@@ -5,6 +5,6 @@ import authRoutes from "./auth";
 const routes = new Hono<{ Bindings: CloudflareBindings }>();
 
 routes.route("/health", health);
-routes.route("/api/auth", authRoutes);
+routes.route("/auth", authRoutes);
 
 export default routes;

@@ -12,6 +12,7 @@ export function createAuth(env: {
     database: drizzleAdapter(db, { provider: "pg" }),
     secret: env.BETTER_AUTH_SECRET,
     baseURL: env.BETTER_AUTH_URL,
+    basePath: "/api/v1/auth",
     emailAndPassword: { enabled: true },
   });
 }

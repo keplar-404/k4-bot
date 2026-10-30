@@ -5,6 +5,6 @@ import routes from "./routes";
 const app = new Hono<{ Bindings: CloudflareBindings }>();
 
 app.use("*", corsMiddleware);
-app.route("/", routes);
+app.route("/api/v1", routes);
 
 export default app;

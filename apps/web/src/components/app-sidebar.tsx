@@ -13,7 +13,7 @@ import {
   SidebarHeader,
   SidebarRail,
 } from "@/components/ui/sidebar"
-import { GalleryVerticalEndIcon, AudioLinesIcon, TerminalIcon, TerminalSquareIcon, BotIcon, BookOpenIcon, Settings2Icon, FrameIcon, PieChartIcon, MapIcon } from "lucide-react"
+import { GalleryVerticalEndIcon, AudioLinesIcon, TerminalIcon, TerminalSquareIcon, BotIcon, BookOpenIcon, Settings2Icon, FrameIcon, PieChartIcon, MapIcon, LayoutDashboardIcon, ServerIcon, PuzzleIcon, MonitorIcon } from "lucide-react"
 
 // This is sample data.
 const data = {
@@ -56,7 +56,7 @@ const data = {
         <TerminalSquareIcon
         />
       ),
-      isActive: true,
+      isActive: false,
       items: [
         {
           title: "History",
@@ -149,26 +149,26 @@ const data = {
   ],
   projects: [
     {
-      name: "Design Engineering",
+      name: "Helper Bot",
       url: "#",
       icon: (
-        <FrameIcon
+        <BotIcon
         />
       ),
     },
     {
-      name: "Sales & Marketing",
+      name: "Code Bot",
       url: "#",
       icon: (
-        <PieChartIcon
+        <BotIcon
         />
       ),
     },
     {
-      name: "Travel",
+      name: "Chat Bot",
       url: "#",
       icon: (
-        <MapIcon
+        <BotIcon
         />
       ),
     },
@@ -182,7 +182,15 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <TeamSwitcher teams={data.teams} />
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
+        <NavMain
+          items={data.navMain}
+          extraItems={[
+            { title: "Dashboard", url: "/dashboard", icon: <LayoutDashboardIcon /> },
+            { title: "MCP", url: "/dashboard/mcp", icon: <ServerIcon /> },
+            { title: "Skills", url: "/dashboard/skills", icon: <PuzzleIcon /> },
+            { title: "VM machine", url: "/dashboard/vm", icon: <MonitorIcon /> },
+          ]}
+        />
         <NavProjects projects={data.projects} />
       </SidebarContent>
       <SidebarFooter>

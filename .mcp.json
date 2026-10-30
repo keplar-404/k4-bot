@@ -12,6 +12,10 @@
     "better-auth": {
       "type": "http",
       "url": "https://mcp.better-auth.com/mcp"
+    },
+    "nextjs": {
+      "type": "http",
+      "url": "http://localhost:3000/_next/mcp"
     }
   }
 }

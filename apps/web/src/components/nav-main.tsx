@@ -19,6 +19,7 @@ import { ChevronRightIcon } from "lucide-react"
 
 export function NavMain({
   items,
+  extraItems = [],
 }: {
   items: {
     title: string
@@ -29,6 +30,11 @@ export function NavMain({
       title: string
       url: string
     }[]
+  }[]
+  extraItems?: {
+    title: string
+    url: string
+    icon?: React.ReactNode
   }[]
 }) {
   return (
@@ -61,6 +67,14 @@ export function NavMain({
               </SidebarMenuSub>
             </CollapsibleContent>
           </Collapsible>
+        ))}
+        {extraItems.map((item) => (
+          <SidebarMenuItem key={item.title}>
+            <SidebarMenuButton render={<a href={item.url} />} tooltip={item.title}>
+              {item.icon}
+              <span>{item.title}</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
         ))}
       </SidebarMenu>
     </SidebarGroup>
