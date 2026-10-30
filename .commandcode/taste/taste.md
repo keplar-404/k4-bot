@@ -2,4 +2,4 @@
 - When installing skills or tools, prefer official sources/documentation over random websites or platforms. Confidence: 0.9
 - Apply API base path at the app entry point (index.ts) via route mounting, rather than embedding the base path in individual route definitions. Confidence: 0.85
 - Don't wrap sidebar menu items in collapsible/expandable or separate labeled groups unless explicitly requested; add them as flat entries inside the existing group. Confidence: 0.85
-- Never commit or push real environment files (`.env`, `.env.local`, `.dev.vars`, etc.); `.env.example` is the only env file that should be committed/pushed. Keep dot-prefixed agent/tooling slug folders (`.agents/`, `.claude/`, `.commandcode/`) gitignored. Confidence: 0.9
+- Never commit or push real environment files (`.env`, `.env.local`, `.dev.vars`, etc.); `.env.example` is the only env file that should be committed/pushed. Commit and push dot-prefixed agent/tooling slug folders (`.agents/`, `.claude/`, `.commandcode/`); do not gitignore them. Confidence: 0.9
