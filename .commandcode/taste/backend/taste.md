@@ -1,0 +1,3 @@
+- DB-related code (client + schema) lives under `src/db/`; third-party library initialization lives under `src/lib/<name>/` (e.g. `src/lib/auth/`); follow industry-standard folder structure. Confidence: 0.85
+- Environment variables must be validated with Zod and centralized in `src/lib/env.ts` (schema, inferred `Env` type, `parseEnv`); all env-related values in the backend must be imported from there. Confidence: 0.85
+- Prefer Hono RPC (`hc`) for type-safe calls to custom backend endpoints defined as chained Hono handlers; do not default to untyped fetch/manual clients when Hono RPC is applicable (Better Auth's own endpoints still use the Better Auth client). Confidence: 0.75

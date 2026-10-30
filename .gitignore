@@ -37,8 +37,3 @@ yarn-error.log*
 # Misc
 .DS_Store
 *.pem
-
-# Agent/tooling slug folders (keep local, never commit)
-.agents/
-.claude/
-.commandcode/
