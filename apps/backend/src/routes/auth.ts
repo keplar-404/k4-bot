@@ -1,13 +1,12 @@
 import { Hono } from "hono";
-import { createAuth } from "../lib/auth";
-import { parseEnv } from "../lib/env";
+import { getRequestContext } from "../lib/context";
 import type { Env } from "../lib/env";
 
 const authRoutes = new Hono<{ Bindings: Env }>().on(
   ["GET", "POST"],
   "/*",
   (c) => {
-    const auth = createAuth(parseEnv(c.env));
+    const { auth } = getRequestContext(c);
     return auth.handler(c.req.raw);
   },
 );

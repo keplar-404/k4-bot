@@ -10,16 +10,16 @@ import {
   PuzzleIcon,
   ServerIcon,
   Settings2Icon,
-  UserIcon,
   TerminalIcon,
   TerminalSquareIcon,
+  UserIcon,
 } from "lucide-react";
 import type * as React from "react";
 import { NavMain } from "@/components/nav-main";
 import { NavProjects } from "@/components/nav-projects";
 import { NavUser } from "@/components/nav-user";
-import { ThemeToggleButton } from "@/components/theme-toggle-button";
 import { TeamSwitcher } from "@/components/team-switcher";
+import { ThemeToggleButton } from "@/components/theme-toggle-button";
 import {
   Sidebar,
   SidebarContent,
@@ -139,23 +139,6 @@ const data = {
       ],
     },
   ],
-  projects: [
-    {
-      name: "Helper Bot",
-      url: "#",
-      icon: <BotIcon />,
-    },
-    {
-      name: "Code Bot",
-      url: "#",
-      icon: <BotIcon />,
-    },
-    {
-      name: "Chat Bot",
-      url: "#",
-      icon: <BotIcon />,
-    },
-  ],
 };
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
@@ -183,7 +166,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             { title: "Avatar", url: "/dashboard/avatar", icon: <UserIcon /> },
           ]}
         />
-        <NavProjects projects={data.projects} />
+        <NavProjects />
       </SidebarContent>
       <SidebarFooter>
         <ThemeToggleButton />

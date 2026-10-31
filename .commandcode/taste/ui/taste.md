@@ -1,1 +1,0 @@
-- Use only shadcn/ui components for UI; do not build custom UI components when a shadcn equivalent exists. Confidence: 0.85

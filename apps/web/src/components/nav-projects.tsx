@@ -2,7 +2,10 @@
 
 import { PlusIcon, SearchIcon } from "lucide-react";
 import * as React from "react";
+import { toast } from "sonner";
 import { AvatarCreateDialog } from "@/components/avatar-create-dialog";
+import { BloubAvatar } from "@/components/bloub-avatar";
+import { BotList, BotListSkeleton } from "@/components/bot-list";
 import { Button } from "@/components/ui/button";
 import {
   Command,
@@ -19,32 +22,54 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  SidebarGroup,
-  SidebarGroupLabel,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-} from "@/components/ui/sidebar";
+import { SidebarGroup, SidebarGroupLabel } from "@/components/ui/sidebar";
+import type { Bot } from "@/lib/bots";
+import { useBots } from "@/lib/use-bots";
 
-export function NavProjects({
-  projects,
-}: {
-  projects: {
-    name: string;
-    url: string;
-    icon: React.ReactNode;
-  }[];
-}) {
-  const [open, setOpen] = React.useState(false);
+export function NavProjects() {
+  const [searchOpen, setSearchOpen] = React.useState(false);
+  const [dialogOpen, setDialogOpen] = React.useState(false);
+  const [editingBot, setEditingBot] = React.useState<Bot | null>(null);
+  const { bots, isInitialLoading, createBot, updateBot, deleteBot } = useBots();
+
+  const openEdit = React.useCallback((bot: Bot) => {
+    setEditingBot(bot);
+    setDialogOpen(true);
+  }, []);
+
+  const openCreate = React.useCallback(() => {
+    setEditingBot(null);
+    setDialogOpen(true);
+  }, []);
+
+  const handleDialogOpenChange = React.useCallback((next: boolean) => {
+    setDialogOpen(next);
+    if (!next) setEditingBot(null);
+  }, []);
+
+  const handleDelete = React.useCallback(
+    (id: string) => {
+      deleteBot(id).catch((e: unknown) => {
+        toast.error(e instanceof Error ? e.message : "Failed to delete bot.");
+      });
+    },
+    [deleteBot],
+  );
 
   return (
     <SidebarGroup className="group-data-[collapsible=icon]:hidden">
       <div className="flex items-center justify-between">
         <SidebarGroupLabel>Bots</SidebarGroupLabel>
         <div className="flex items-center gap-1">
-          <AvatarCreateDialog trigger />
-          <Dialog open={open} onOpenChange={setOpen}>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={openCreate}
+            aria-label="Create avatar"
+          >
+            <PlusIcon />
+          </Button>
+          <Dialog open={searchOpen} onOpenChange={setSearchOpen}>
             <DialogTrigger
               render={
                 <Button variant="ghost" size="icon-sm" className="mr-1" />
@@ -62,16 +87,22 @@ export function NavProjects({
                 <CommandList>
                   <CommandEmpty>No bots found.</CommandEmpty>
                   <CommandGroup heading="Bots">
-                    {projects.map((item) => (
+                    {bots.map((bot) => (
                       <CommandItem
-                        key={item.name}
+                        key={bot.id}
+                        value={bot.name}
                         onSelect={() => {
-                          window.location.href = item.url;
-                          setOpen(false);
+                          window.location.href = `/dashboard/bot/${bot.id}`;
+                          setSearchOpen(false);
                         }}
                       >
-                        {item.icon}
-                        <span>{item.name}</span>
+                        <BloubAvatar
+                          size={18}
+                          shape={bot.shape}
+                          color={bot.color}
+                          expression={bot.expression}
+                        />
+                        <span>{bot.name}</span>
                       </CommandItem>
                     ))}
                   </CommandGroup>
@@ -81,16 +112,19 @@ export function NavProjects({
           </Dialog>
         </div>
       </div>
-      <SidebarMenu>
-        {projects.map((item) => (
-          <SidebarMenuItem key={item.name}>
-            <SidebarMenuButton render={<a href={item.url} />}>
-              {item.icon}
-              <span>{item.name}</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        ))}
-      </SidebarMenu>
+      {isInitialLoading ? (
+        <BotListSkeleton />
+      ) : (
+        <BotList bots={bots} onEdit={openEdit} onDelete={handleDelete} />
+      )}
+      <AvatarCreateDialog
+        open={dialogOpen}
+        onOpenChange={handleDialogOpenChange}
+        bot={editingBot ?? undefined}
+        onSubmit={(input) =>
+          editingBot ? updateBot(editingBot.id, input) : createBot(input)
+        }
+      />
     </SidebarGroup>
   );
 }

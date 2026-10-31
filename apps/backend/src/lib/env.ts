@@ -8,6 +8,8 @@ export const envSchema = z.object({
   WEB_ORIGIN: z.string().url("WEB_ORIGIN must be a valid URL").optional(),
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
+  RESEND_API_KEY: z.string().optional(),
+  MAIL_FROM: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

@@ -10,7 +10,7 @@ const PUBLIC_PATHS = [
   "/verify-email",
 ];
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   if (
     PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))
@@ -20,7 +20,7 @@ export function middleware(request: NextRequest) {
   if (pathname.startsWith("/dashboard")) {
     const hasSession = request.cookies
       .getAll()
-      .some((c) => c.name.includes("session_token"));
+      .some((c) => c.name === "better-auth.session_token");
     if (!hasSession) {
       const url = request.nextUrl.clone();
       url.pathname = "/sign-in";

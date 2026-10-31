@@ -10,11 +10,16 @@
     "format": "biome format --write"
   },
   "dependencies": {
+    "@ai-sdk/react": "^4.0.163",
     "@base-ui/react": "^1.9.0",
+    "@shadcn/helpers": "^0.3.0",
+    "@shadcn/react": "^0.3.1",
+    "ai": "^7.0.159",
     "better-auth": "^1.7.14",
     "class-variance-authority": "^0.7.1",
     "cmdk": "^1.1.1",
     "cn": "^0.5.1",
+    "glimm": "^0.3.1",
     "hono": "^4.13.14",
     "lucide-react": "^1.65.0",
     "next": "16.4.3",

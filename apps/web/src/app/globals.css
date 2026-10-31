@@ -46,6 +46,22 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+  /* PromptBar (components/prompt-bar.tsx) — its own design system */
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-surface: var(--surface);
+  --color-hover: var(--hover);
+  --color-field: var(--field);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-green: var(--green);
+  --color-accent-tint: var(--accent-tint);
+  --color-accent-ink: var(--accent-ink);
+  --shadow-raised: var(--shadow-raised-pb);
+  --shadow-card: var(--shadow-card-pb);
+  --shadow-hairline: var(--shadow-hairline-pb);
+  --radius-chip: 8px;
 }
 
 :root {
@@ -81,6 +97,23 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+
+  /* PromptBar tokens — driven by the shadcn theme combination */
+  --ink: var(--foreground);
+  --ink-2: var(--muted-foreground);
+  --ink-3: color-mix(in oklab, var(--muted-foreground) 75%, transparent);
+  --surface: var(--card);
+  --hover: var(--accent);
+  --field: var(--muted);
+  --line: var(--border);
+  --line-strong: var(--ring);
+  --green: #16a34a;
+  --accent-tint: color-mix(in oklab, var(--primary) 10%, transparent);
+  --accent-ink: var(--primary);
+  --shadow-raised-pb:
+    0 8px 24px rgb(0 0 0 / 8%), 0 2px 6px rgb(0 0 0 / 6%);
+  --shadow-card-pb: 0 1px 2px rgb(0 0 0 / 5%);
+  --shadow-hairline-pb: inset 0 0 0 1px var(--border);
 }
 
 .dark {
@@ -126,5 +159,28 @@
   }
   html {
     @apply font-sans;
+  }
+}
+
+/* PromptBar menus/chips entrance */
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* voice equalizer bars for the prompt bar's dictation button */
+@keyframes eq-bounce {
+  0%,
+  100% {
+    transform: scaleY(0.3);
+  }
+  50% {
+    transform: scaleY(1);
   }
 }

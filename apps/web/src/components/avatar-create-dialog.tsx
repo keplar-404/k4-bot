@@ -1,7 +1,8 @@
 "use client";
 
 import { PlusIcon } from "lucide-react";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { BloubAvatar } from "@/components/bloub-avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,27 +16,50 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { COLORS, SHAPES } from "@/lib/bloub/bot/skins";
+import type { ExpressionId } from "@/lib/bloub/bot/expressions";
+import {
+  COLORS,
+  type ColorId,
+  SHAPES,
+  type ShapeId,
+} from "@/lib/bloub/bot/skins";
 import { COLOR_LABELS, SHAPE_LABELS } from "@/lib/bloub/labels";
+import type { Bot, CreateBotInput } from "@/lib/bots";
 
 export function AvatarCreateDialog({
   open: openProp,
   onOpenChange,
   trigger,
+  bot,
+  onSubmit,
 }: {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   trigger?: boolean;
-} = {}) {
+  bot?: Bot;
+  onSubmit: (input: CreateBotInput) => Promise<unknown>;
+}) {
   const [internalOpen, setInternalOpen] = useState(false);
   const open = openProp ?? internalOpen;
   const setOpen = onOpenChange ?? setInternalOpen;
+  const isEditing = Boolean(bot);
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [shape, setShape] = useState(SHAPES[0].id);
-  const [color, setColor] = useState("encre");
-  const [expression, setExpression] = useState("neutre");
+  const [shape, setShape] = useState<ShapeId>(SHAPES[0].id);
+  const [color, setColor] = useState<ColorId>("encre");
+  const [expression, setExpression] = useState<ExpressionId>("neutre");
+  const [submitting, setSubmitting] = useState(false);
+
+  // Reset fields each time the dialog opens (edit mode pre-fills from the bot).
+  useEffect(() => {
+    if (!open) return;
+    setName(bot?.name ?? "");
+    setDescription(bot?.description ?? "");
+    setShape((bot?.shape as ShapeId) ?? SHAPES[0].id);
+    setColor((bot?.color as ColorId) ?? "encre");
+    setExpression("neutre");
+  }, [open, bot]);
   const [lookAt, setLookAt] = useState<{ nx: number; ny: number } | null>({
     nx: 0,
     ny: 0.6,
@@ -72,12 +96,31 @@ export function AvatarCreateDialog({
     };
   }, []);
 
-  const handleCreate = useCallback(() => {
+  const handleSubmit = useCallback(async () => {
+    if (submitting) return;
+    setSubmitting(true);
     setExpression("heureux");
-    setTimeout(() => setExpression("neutre"), 1500);
-    console.log("create", { name, description, shape, color });
-    setOpen(false);
-  }, [name, description, shape, color, setOpen]);
+    try {
+      await onSubmit({
+        name: name || "Untitled bot",
+        description,
+        shape,
+        color,
+        expression: "neutre",
+      });
+      setOpen(false);
+    } catch (e) {
+      console.error("bot submit failed", e);
+      toast.error(
+        e instanceof Error
+          ? e.message
+          : "Something went wrong. Please try again.",
+      );
+    } finally {
+      setSubmitting(false);
+      setTimeout(() => setExpression("neutre"), 1500);
+    }
+  }, [name, description, shape, color, setOpen, onSubmit, submitting]);
 
   const handleCancel = useCallback(() => {
     setOpen(false);
@@ -93,9 +136,11 @@ export function AvatarCreateDialog({
       )}
       <DialogContent className="max-w-3xl gap-4 p-5">
         <DialogHeader className="items-center text-center">
-          <DialogTitle>Create Avatar</DialogTitle>
+          <DialogTitle>{isEditing ? "Edit Bot" : "Create Avatar"}</DialogTitle>
           <DialogDescription>
-            Configure your bot's identity and appearance.
+            {isEditing
+              ? "Update your bot's identity and appearance."
+              : "Configure your bot's identity and appearance."}
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col items-center gap-6">
@@ -212,10 +257,25 @@ export function AvatarCreateDialog({
             />
           </div>
           <div className="flex w-full gap-2">
-            <Button className="flex-1" onClick={handleCreate}>
-              Create
+            <Button
+              className="flex-1"
+              disabled={submitting}
+              onClick={handleSubmit}
+            >
+              {submitting
+                ? isEditing
+                  ? "Saving…"
+                  : "Creating…"
+                : isEditing
+                  ? "Save changes"
+                  : "Create"}
             </Button>
-            <Button variant="outline" className="flex-1" onClick={handleCancel}>
+            <Button
+              variant="outline"
+              className="flex-1"
+              disabled={submitting}
+              onClick={handleCancel}
+            >
               Cancel
             </Button>
           </div>

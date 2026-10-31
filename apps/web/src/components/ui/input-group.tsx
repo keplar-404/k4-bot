@@ -1,5 +1,8 @@
 "use client";
 
+// From shadcn/ui AI Elements — Prompt Input / Model Selector pattern — field with addons.
+// Docs: .agents/skills/ai-elements/SKILL.md · https://ui.shadcn.com/docs/ai-elements/base;
+
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "cn";
 import type * as React from "react";
@@ -10,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 
 function InputGroup({ className, ...props }: React.ComponentProps<"div">) {
   return (
+    // biome-ignore lint/a11y/useSemanticElements: shadcn/ui registry code — do not modify
     <div
       data-slot="input-group"
       role="group"
@@ -49,6 +53,8 @@ function InputGroupAddon({
   ...props
 }: React.ComponentProps<"div"> & VariantProps<typeof inputGroupAddonVariants>) {
   return (
+    // biome-ignore lint/a11y/useSemanticElements: shadcn/ui registry code — do not modify
+    // biome-ignore lint/a11y/useKeyWithClickEvents: shadcn/ui registry code — do not modify
     <div
       role="group"
       data-slot="input-group-addon"
