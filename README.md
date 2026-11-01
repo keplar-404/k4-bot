@@ -1,159 +1,93 @@
-# Turborepo starter
+# K4 Bot
 
-This Turborepo starter is maintained by the Turborepo core team.
+Create AI bots with a generated avatar and chat with them. Each bot is backed by a
+[LangChain Deep Agent](https://docs.langchain.com/oss/javascript/deepagents/overview)
+that can plan with todos, search the web, and write files (writes pause for your approval).
 
-## Using this example
+## Architecture
 
-Run the following command:
-
-```sh
-npx create-turbo@latest
+```
+apps/
+  web/       Next.js 16 (Cache Components, React Compiler), Tailwind 4, shadcn/ui
+  backend/   Hono on a Cloudflare Worker
 ```
 
-## What's inside?
-
-This Turborepo includes the following packages/apps:
-
-### Apps and Packages
-
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `@next/eslint-plugin-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
-
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
-
-### Utilities
-
-This Turborepo has some additional tools already setup for you:
-
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
-
-### Build
-
-To build all apps and packages, run the following command:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo build
+```
+browser ──HTTP──▶ Worker (Hono) ──▶ ChatRunWorkflow ──▶ Deep Agent ──▶ OpenRouter
+   ▲                  │                    │
+   │                  │                    └─ checkpoints ─▶ Neon Postgres
+   └──WebSocket── ChatRelay Durable Object ◀── events (gap-free seq, saved to Postgres)
 ```
 
-Without global `turbo`, use your package manager:
+- **Send:** `POST /api/v1/chat/threads/:id/messages` starts a durable workflow and returns `202`.
+- **Stream:** the workflow publishes agent events to the thread's `ChatRelay` Durable Object, which
+  numbers them, saves them, and broadcasts over a WebSocket. A client resumes from its last
+  `seq`; if it is too far behind it reloads history over HTTP.
+- **Approval:** a paused run publishes `run.waiting_approval`; `POST /chat/runs/:id/resume`
+  continues it from the saved checkpoint.
+- **Data:** Neon Postgres (Drizzle) holds users, bots, threads, messages, events, usage and agent checkpoints.
+
+- **Cleanup:** a daily Cron Trigger (03:00 UTC) deletes stream events older than 7 days, keeping each
+  thread's newest one. Messages and usage are kept.
+
+Cloudflare services used: Workers, Durable Objects, Workflows, Rate Limiting, Cron Triggers.
+Everything else is external: Neon, OpenRouter, Tavily (search), Resend (email), Better Auth.
+
+## Run locally
+
+Needs Node 24+ and Bun. No Cloudflare account is required for local development.
 
 ```sh
-cd my-turborepo
-npx turbo build
-bun exec turbo build
-bun exec turbo build
+bun install
+cp .env.example apps/backend/.dev.vars     # then fill it in
+bun run --cwd apps/backend db:push         # create the tables
+bun run dev                                # web :3000, API :8787
 ```
 
-You can build a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
+Without `RESEND_API_KEY`, verification and reset links are printed in the API log.
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
+### Environment
 
-```sh
-turbo build --filter=docs
+| Variable | Required | Purpose |
+|---|---|---|
+| `DATABASE_URL` | yes | Neon connection string |
+| `BETTER_AUTH_SECRET` | yes | 32+ chars; signs sessions |
+| `BETTER_AUTH_URL` | yes | Public API URL |
+| `WEB_ORIGIN` | yes | Web app URL (CORS, trusted origin) |
+| `OPENROUTER_API_KEY` | yes | The agent's only model provider |
+| `TAVILY_API_KEY` | no | Enables the web-search tool |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | no | Google sign-in |
+| `RESEND_API_KEY`, `MAIL_FROM` | no | Email delivery |
+| `WS_TOKEN_SECRET` | no | 32+ chars; separate secret for socket tokens |
+| `COOKIE_DOMAIN` | no | Share the session cookie across sibling subdomains (production) |
+| `MAX_RUNS_PER_USER` | no | Messages per user per day (default 50) |
+| `MAX_DAILY_TOKENS_PER_USER` | no | Token budget per user per day (default 2,000,000) |
+| `RUN_TIMEOUT_SECONDS` | no | Agent step timeout (default 900) |
+| `NEXT_PUBLIC_AUTH_URL` | web | API URL for the browser (default `http://localhost:8787`) |
+
+Models are listed in `apps/backend/src/agent/models.json`. Free OpenRouter models are
+rate-limited upstream and some are gated; paid models are the reliable choice.
+
+## Scripts
+
+| Command | What it does |
+|---|---|
+| `bun run dev` | Web and API together |
+| `bun run --cwd apps/backend agent:chat [modelId]` | Talk to the agent in the terminal (no web app or database) |
+| `bun run check-types` | `tsc` for both apps |
+| `bun run --cwd apps/backend check` | Relay-token and stream-parser checks |
+| `bun run --cwd apps/web check:chat` | Chat reducer and outbox checks |
+| `bun run --cwd apps/backend db:generate` / `db:migrate` / `db:push` | Drizzle migrations (`push` for dev) |
+
+## Backend layout
+
 ```
-
-Without global `turbo`:
-
-```sh
-npx turbo build --filter=docs
-bun exec turbo build --filter=docs
-bun exec turbo build --filter=docs
+src/
+  agent/        Deep Agent factory, model catalog, checkpointer, middleware, tools, stream parser
+  db/           Drizzle client and schema
+  durable/      ChatRelay Durable Object
+  lib/          env, auth, request context, schemas, shared helpers
+  middleware/   auth guard, CORS, rate limits
+  routes/       bots, models, auth, chat/{threads,runs,realtime}
+  workflows/    ChatRunWorkflow
 ```
-
-### Develop
-
-To develop all apps and packages, run the following command:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo dev
-```
-
-Without global `turbo`, use your package manager:
-
-```sh
-cd my-turborepo
-npx turbo dev
-bun exec turbo dev
-bun exec turbo dev
-```
-
-You can develop a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo dev --filter=web
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo dev --filter=web
-bun exec turbo dev --filter=web
-bun exec turbo dev --filter=web
-```
-
-### Remote Caching
-
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
-
-Turborepo can use a technique known as [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
-
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo login
-```
-
-Without global `turbo`, use your package manager:
-
-```sh
-cd my-turborepo
-npx turbo login
-bun exec turbo login
-bun exec turbo login
-```
-
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
-
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo link
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo link
-bun exec turbo link
-bun exec turbo link
-```
-
-## Useful Links
-
-Learn more about the power of Turborepo:
-
-- [Tasks](https://turborepo.dev/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.dev/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.dev/docs/reference/configuration)
-- [CLI Usage](https://turborepo.dev/docs/reference/command-line-reference)

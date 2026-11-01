@@ -7,14 +7,15 @@
     "build": "next build",
     "start": "next start",
     "lint": "biome check",
-    "format": "biome format --write"
+    "format": "biome format --write",
+    "check-types": "tsc --noEmit",
+    "check:chat": "bun run src/lib/chat/outbox.check.ts && bun run src/lib/chat/stream.check.ts"
   },
   "dependencies": {
-    "@ai-sdk/react": "^4.0.163",
     "@base-ui/react": "^1.9.0",
-    "@shadcn/helpers": "^0.3.0",
     "@shadcn/react": "^0.3.1",
-    "ai": "^7.0.159",
+    "@swc/helpers": "^0.5.23",
+    "agentation": "^3.1.2",
     "better-auth": "^1.7.14",
     "class-variance-authority": "^0.7.1",
     "cmdk": "^1.1.1",
@@ -36,7 +37,6 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "agentation": "^3.1.2",
     "babel-plugin-react-compiler": "1.0.0",
     "tailwindcss": "^4",
     "typescript": "^5"

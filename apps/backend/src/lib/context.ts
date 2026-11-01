@@ -1,48 +1,36 @@
-import type { Context } from "hono";
 import { createAuth } from "./auth";
 import { createDb, type Db } from "../db";
 import { parseEnv, type Env } from "./env";
 
 type Auth = ReturnType<typeof createAuth>;
 
-const authCache = new Map<string, Auth>();
-const dbCache = new Map<string, Db>();
+export type RequestContext = { env: Env; auth: Auth; db: Db };
 
-function contextKey(env: Env): string {
-  return [
-    env.DATABASE_URL,
-    env.BETTER_AUTH_SECRET,
-    env.BETTER_AUTH_URL,
-    env.WEB_ORIGIN ?? "",
-    env.GOOGLE_CLIENT_ID ?? "",
-    env.GOOGLE_CLIENT_SECRET ?? "",
-  ].join("|");
-}
-
-export type RequestContext = {
-  env: Env;
-  auth: Auth;
-  db: Db;
-};
-
-export function getRequestContext(c: {
+type HonoLikeContext = {
   env: Env;
   executionCtx: { waitUntil: (promise: Promise<unknown>) => void };
-}): RequestContext {
+  req: { raw: Request };
+};
+
+// Better Auth gets this request's waitUntil, so it is built per request (the
+// documented Workers pattern) and memoised so one request builds it once.
+// The db handle is stateless over HTTP and safe to share.
+const perRequest = new WeakMap<Request, RequestContext>();
+const dbs = new Map<string, Db>();
+
+export function getRequestContext(c: HonoLikeContext): RequestContext {
+  const hit = perRequest.get(c.req.raw);
+  if (hit) return hit;
+
   const env = parseEnv(c.env);
-  const key = contextKey(env);
+  let db = dbs.get(env.DATABASE_URL);
+  if (!db) dbs.set(env.DATABASE_URL, (db = createDb(env.DATABASE_URL)));
 
-  let auth = authCache.get(key);
-  if (!auth) {
-    auth = createAuth(env, (promise) => c.executionCtx.waitUntil(promise));
-    authCache.set(key, auth);
-  }
-
-  let db = dbCache.get(key);
-  if (!db) {
-    db = createDb(env.DATABASE_URL);
-    dbCache.set(key, db);
-  }
-
-  return { env, auth, db };
+  const ctx = {
+    env,
+    db,
+    auth: createAuth(env, (promise) => c.executionCtx.waitUntil(promise)),
+  };
+  perRequest.set(c.req.raw, ctx);
+  return ctx;
 }

@@ -36,6 +36,7 @@ export function createAuth(
     },
     emailVerification: {
       sendOnSignUp: true,
+      autoSignInAfterVerification: true,
       sendVerificationEmail: async ({ user, url }) => {
         await sendEmail(
           env,
@@ -80,6 +81,10 @@ export function createAuth(
     },
     advanced: {
       useSecureCookies: env.BETTER_AUTH_URL.startsWith("https"),
+      // Web and API on sibling subdomains: share the session cookie across them.
+      ...(env.COOKIE_DOMAIN
+        ? { crossSubDomainCookies: { enabled: true, domain: env.COOKIE_DOMAIN } }
+        : {}),
       backgroundTasks: {
         handler: (promise) => waitUntil(promise),
       },

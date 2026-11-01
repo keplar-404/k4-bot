@@ -1,81 +1,92 @@
 [
   {
-    "provider": "openai",
-    "modelId": "gpt-4o"
-  },
-  {
-    "provider": "openai",
-    "modelId": "gpt-4o-mini"
-  },
-  {
-    "provider": "openai",
-    "modelId": "gpt-4.1"
-  },
-  {
-    "provider": "openai",
-    "modelId": "gpt-4.1-mini"
-  },
-  {
-    "provider": "openai",
-    "modelId": "o3-mini"
-  },
-  {
-    "provider": "anthropic",
-    "modelId": "claude-sonnet-4-20250514"
-  },
-  {
-    "provider": "anthropic",
-    "modelId": "claude-haiku-4-20250514"
-  },
-  {
-    "provider": "anthropic",
-    "modelId": "claude-opus-4-20250514"
-  },
-  {
-    "provider": "google",
-    "modelId": "gemini-2.0-flash"
-  },
-  {
-    "provider": "google",
-    "modelId": "gemini-2.5-pro"
-  },
-  {
-    "provider": "google",
-    "modelId": "gemini-2.5-flash"
+    "provider": "openrouter",
+    "modelId": "anthropic/claude-sonnet-4.6",
+    "vision": true,
+    "reasoning": true,
+    "reasoningEfforts": [
+      "high",
+      "medium",
+      "low"
+    ]
   },
   {
     "provider": "openrouter",
-    "modelId": "meta-llama/llama-3.3-70b-instruct:free",
-    "free": true
+    "modelId": "google/gemini-2.5-pro",
+    "vision": true,
+    "reasoning": true,
+    "reasoningEfforts": [
+      "high",
+      "medium",
+      "low"
+    ]
   },
   {
     "provider": "openrouter",
-    "modelId": "google/gemma-3-27b-it:free",
-    "free": true
+    "modelId": "openai/gpt-4o",
+    "vision": true,
+    "reasoning": false,
+    "reasoningEfforts": []
   },
   {
     "provider": "openrouter",
-    "modelId": "mistralai/mistral-small-3.1-24b-instruct:free",
-    "free": true
+    "modelId": "anthropic/claude-haiku-4.5",
+    "vision": true,
+    "reasoning": true,
+    "reasoningEfforts": [
+      "high",
+      "medium",
+      "low"
+    ]
   },
   {
     "provider": "openrouter",
-    "modelId": "deepseek/deepseek-chat-v3-0324:free",
-    "free": true
+    "modelId": "google/gemini-2.5-flash",
+    "vision": true,
+    "reasoning": true,
+    "reasoningEfforts": [
+      "high",
+      "medium",
+      "low"
+    ]
   },
   {
     "provider": "openrouter",
-    "modelId": "qwen/qwen3-235b-a22b:free",
-    "free": true
+    "modelId": "openai/gpt-4o-mini",
+    "vision": true,
+    "reasoning": false,
+    "reasoningEfforts": []
   },
   {
     "provider": "openrouter",
-    "modelId": "openai/gpt-oss-120b:free",
-    "free": true
+    "modelId": "google/gemma-4-31b-it:free",
+    "vision": true,
+    "reasoning": true,
+    "free": true,
+    "reasoningEfforts": []
   },
   {
-    "provider": "beam",
-    "modelId": "beam-1.0",
-    "free": true
+    "provider": "openrouter",
+    "modelId": "google/gemma-4-26b-a4b-it:free",
+    "vision": true,
+    "reasoning": true,
+    "free": true,
+    "reasoningEfforts": []
+  },
+  {
+    "provider": "openrouter",
+    "modelId": "nvidia/nemotron-3.5-super-vl:free",
+    "vision": true,
+    "reasoning": true,
+    "free": true,
+    "reasoningEfforts": []
+  },
+  {
+    "provider": "openrouter",
+    "modelId": "liquid/lfm-2.5-2.6b:free",
+    "vision": false,
+    "reasoning": false,
+    "free": true,
+    "reasoningEfforts": []
   }
 ]

@@ -2,7 +2,6 @@
 
 import { Loader2Icon } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,7 +17,7 @@ import { Separator } from "@/components/ui/separator";
 import { signIn, signUp } from "@/lib/auth-client";
 
 export default function SignUpPage() {
-  const router = useRouter();
+  const [notice, setNotice] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -34,12 +33,22 @@ export default function SignUpPage() {
     setLoading(true);
     setError(null);
     try {
-      const { error } = await signUp.email({ name, email, password });
+      // Accounts must verify their email before they get a session, so there is
+      // nothing to redirect to yet. The emailed link verifies, signs in, and
+      // lands on callbackURL.
+      const { error } = await signUp.email({
+        name,
+        email,
+        password,
+        callbackURL: `${window.location.origin}/dashboard`,
+      });
       if (error) {
         setError(error.message ?? "Sign up failed");
         return;
       }
-      router.push("/dashboard");
+      setNotice(
+        `We sent a verification link to ${email}. Open it to finish signing up.`,
+      );
     } finally {
       setLoading(false);
       submittingRef.current = false;
@@ -94,6 +103,7 @@ export default function SignUpPage() {
             />
           </div>
           {error && <p className="text-sm text-destructive">{error}</p>}
+          {notice && <p className="text-sm text-muted-foreground">{notice}</p>}
           <Button
             type="submit"
             className="w-full cursor-pointer"

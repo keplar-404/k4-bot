@@ -2,6 +2,7 @@
 
 import { PlusIcon, SearchIcon } from "lucide-react";
 import * as React from "react";
+import { useRouter, usePathname } from "next/navigation";
 import { toast } from "sonner";
 import { AvatarCreateDialog } from "@/components/avatar-create-dialog";
 import { BloubAvatar } from "@/components/bloub-avatar";
@@ -27,6 +28,8 @@ import type { Bot } from "@/lib/bots";
 import { useBots } from "@/lib/use-bots";
 
 export function NavProjects() {
+  const router = useRouter();
+  const pathname = usePathname();
   const [searchOpen, setSearchOpen] = React.useState(false);
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [editingBot, setEditingBot] = React.useState<Bot | null>(null);
@@ -49,11 +52,17 @@ export function NavProjects() {
 
   const handleDelete = React.useCallback(
     (id: string) => {
-      deleteBot(id).catch((e: unknown) => {
-        toast.error(e instanceof Error ? e.message : "Failed to delete bot.");
-      });
+      deleteBot(id)
+        .then(() => {
+          if (pathname === `/dashboard/bot/${id}`) {
+            router.replace("/dashboard");
+          }
+        })
+        .catch((e: unknown) => {
+          toast.error(e instanceof Error ? e.message : "Failed to delete bot.");
+        });
     },
-    [deleteBot],
+    [deleteBot, pathname, router],
   );
 
   return (

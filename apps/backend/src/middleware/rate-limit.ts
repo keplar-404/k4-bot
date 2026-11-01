@@ -1,65 +1,43 @@
-import type { Next } from "hono";
-import { getRequestContext } from "../lib/context";
+import { createMiddleware } from "hono/factory";
+import type { Context, Env as HonoEnv } from "hono";
 import type { Env } from "../lib/env";
-import { apiRateLimit } from "../db/schema";
-import { and, eq, gt, lt } from "drizzle-orm";
+import type { AuthGuardEnv } from "./auth-guard";
 
-type Options = {
-  window: number; // seconds
-  max: number;
-};
+const warned = new Set<string>();
 
-const DEFAULTS: Options = { window: 60, max: 100 };
-
-type RateLimitContext = {
-  env: Env;
-  executionCtx: { waitUntil: (promise: Promise<unknown>) => void };
-  req: {
-    header: (name: string) => string | undefined;
-    path: string;
-  };
-  json: (body: unknown, status?: number) => Response;
-};
-
-export function rateLimitMiddleware(options: Partial<Options> = {}) {
-  const opts = { ...DEFAULTS, ...options };
-  return async (c: RateLimitContext, next: Next) => {
-    const { db } = getRequestContext(c);
-    const ip =
-      c.req.header("cf-connecting-ip") ??
-      c.req.header("x-forwarded-for") ??
-      c.req.header("x-real-ip") ??
-      "unknown";
-    const key = `${c.req.path}:${ip}`;
-    const now = new Date();
-    const windowStart = new Date(now.getTime() - opts.window * 1000);
-
-    const [existing] = await db
-      .select()
-      .from(apiRateLimit)
-      .where(and(eq(apiRateLimit.key, key), gt(apiRateLimit.windowStart, windowStart)))
-      .limit(1);
-
-    if (existing && existing.count >= opts.max) {
-      return c.json({ error: "Too many requests" }, 429);
-    }
-
-    if (existing) {
-      await db
-        .update(apiRateLimit)
-        .set({ count: existing.count + 1 })
-        .where(eq(apiRateLimit.id, existing.id));
-    } else {
-      // Clean up expired rows opportunistically, then start a new window.
-      await db.delete(apiRateLimit).where(lt(apiRateLimit.windowStart, windowStart));
-      await db.insert(apiRateLimit).values({
-        id: crypto.randomUUID(),
-        key,
-        count: 1,
-        windowStart: now,
+/**
+ * Cloudflare's native Rate Limiting binding (see `ratelimits` in
+ * wrangler.jsonc): no database round trips, counters live at the edge.
+ */
+const limiter = <E extends HonoEnv & { Bindings: Env }>(
+  binding: "RL" | "RL_WRITE",
+  keyOf: (c: Context<E>) => string,
+) =>
+  createMiddleware<E>(async (c, next) => {
+    // A limiter outage must not take the API down: log it and let the request through.
+    const outcome = await c.env[binding].limit({ key: keyOf(c) }).catch((error: unknown) => {
+      if (!warned.has(binding)) {
+        warned.add(binding);
+        console.error(`[rate-limit] ${binding} unavailable, allowing requests`, error);
+      }
+      return { success: true };
+    });
+    if (!outcome.success) {
+      return c.json({ error: "RATE_LIMITED", message: "Too many requests." }, 429, {
+        "Retry-After": "60",
       });
     }
-
     await next();
-  };
-}
+  });
+
+/** Every API request, per client IP. */
+export const ipLimit = limiter<{ Bindings: Env }>(
+  "RL",
+  (c) => c.req.header("cf-connecting-ip") ?? "unknown",
+);
+
+/** Mutating and expensive routes, per signed-in user. Mount after authGuard. */
+export const userLimit = limiter<AuthGuardEnv>(
+  "RL_WRITE",
+  (c) => c.get("session").user.id,
+);

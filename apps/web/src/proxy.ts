@@ -1,34 +1,20 @@
+import { getSessionCookie } from "better-auth/cookies";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
-const PUBLIC_PATHS = [
-  "/",
-  "/sign-in",
-  "/sign-up",
-  "/forgot-password",
-  "/reset-password",
-  "/verify-email",
-];
-
+/**
+ * Optimistic redirect only: it checks that a session cookie exists, not that it
+ * is valid. Every API route re-validates the session; this just keeps signed-out
+ * visitors off the dashboard shell. `getSessionCookie` knows the cookie prefix
+ * Better Auth uses on https (`__Secure-`), which a hard-coded name misses.
+ */
 export function proxy(request: NextRequest) {
-  const { pathname } = request.nextUrl;
-  if (
-    PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))
-  ) {
-    return NextResponse.next();
-  }
-  if (pathname.startsWith("/dashboard")) {
-    const hasSession = request.cookies
-      .getAll()
-      .some((c) => c.name === "better-auth.session_token");
-    if (!hasSession) {
-      const url = request.nextUrl.clone();
-      url.pathname = "/sign-in";
-      url.searchParams.set("callbackUrl", pathname);
-      return NextResponse.redirect(url);
-    }
-  }
-  return NextResponse.next();
+  if (getSessionCookie(request)) return NextResponse.next();
+
+  const url = request.nextUrl.clone();
+  url.pathname = "/sign-in";
+  url.searchParams.set("callbackUrl", request.nextUrl.pathname);
+  return NextResponse.redirect(url);
 }
 
 export const config = {

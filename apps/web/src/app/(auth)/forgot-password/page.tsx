@@ -24,7 +24,8 @@ export default function ForgotPasswordPage() {
     setLoading(true);
     await authClient.requestPasswordReset({
       email,
-      redirectTo: "/reset-password",
+      // Absolute: a relative path would resolve against the API origin.
+      redirectTo: `${window.location.origin}/reset-password`,
     });
     setLoading(false);
     setMessage("If an account exists, a reset link has been sent.");
