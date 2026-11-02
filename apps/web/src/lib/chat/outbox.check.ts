@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { mapHttpError, networkError } from "./protocol";
 import {
   backoffMs,
   canRetry,
@@ -8,9 +7,10 @@ import {
   markFailed,
   markSending,
   markSent,
-  requeue,
   type OutboxItem,
+  requeue,
 } from "./outbox";
+import { mapHttpError, networkError } from "./protocol";
 
 const base: OutboxItem = {
   id: "m1",
@@ -22,7 +22,11 @@ const base: OutboxItem = {
 };
 
 // enqueue is idempotent
-assert.equal(enqueue([base], { ...base }).length, 1, "duplicate enqueue must not double-send");
+assert.equal(
+  enqueue([base], { ...base }).length,
+  1,
+  "duplicate enqueue must not double-send",
+);
 
 // lifecycle
 let items = enqueue([], base);
@@ -68,7 +72,11 @@ const cases: Array<[number, string, boolean]> = [
 for (const [status, kind, retryable] of cases) {
   const info = mapHttpError(status, null);
   assert.equal(info.kind, kind, `status ${status} should map to ${kind}`);
-  assert.equal(info.retryable, retryable, `status ${status} retryable should be ${retryable}`);
+  assert.equal(
+    info.retryable,
+    retryable,
+    `status ${status} retryable should be ${retryable}`,
+  );
 }
 
 // Retry-After is honoured

@@ -59,34 +59,11 @@
   },
   {
     "provider": "openrouter",
-    "modelId": "google/gemma-4-31b-it:free",
-    "vision": true,
-    "reasoning": true,
+    "modelId": "openrouter/free",
+    "name": "Free (auto-routed)",
     "free": true,
-    "reasoningEfforts": []
-  },
-  {
-    "provider": "openrouter",
-    "modelId": "google/gemma-4-26b-a4b-it:free",
     "vision": true,
-    "reasoning": true,
-    "free": true,
-    "reasoningEfforts": []
-  },
-  {
-    "provider": "openrouter",
-    "modelId": "nvidia/nemotron-3.5-super-vl:free",
-    "vision": true,
-    "reasoning": true,
-    "free": true,
-    "reasoningEfforts": []
-  },
-  {
-    "provider": "openrouter",
-    "modelId": "liquid/lfm-2.5-2.6b:free",
-    "vision": false,
     "reasoning": false,
-    "free": true,
     "reasoningEfforts": []
   }
 ]

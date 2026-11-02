@@ -5,6 +5,11 @@
  * `bun run src/lib/chat/*.check.ts` instead of by clicking around.
  */
 
+import type { Part } from "@backend/agent/parts";
+
+/** One piece of an assistant turn: text, reasoning, or a tool call (shared with the server). */
+export type MessagePart = Part;
+
 export type DeliveryState = "queued" | "sending" | "sent" | "failed";
 
 export type ChatErrorKind =
@@ -33,7 +38,10 @@ export interface ChatMessageView {
   /** Client-generated and stable across retries. */
   id: string;
   role: "user" | "assistant";
+  /** All text of the message. For an assistant message, the concatenated text parts. */
   text: string;
+  /** Assistant messages: text, reasoning and tool calls in the order they happened. */
+  parts?: MessagePart[];
   state: DeliveryState;
   createdAt: number;
   seq?: number;
@@ -44,12 +52,15 @@ export type RunState =
   | "idle"
   | "running"
   | "waiting_approval"
+  | "waiting_input"
+  | "sleeping"
   | "done"
   | "failed"
   | "resyncing";
 
 export const errorCopy: Record<ChatErrorKind, string> = {
-  network: "Connection lost. Your message is saved and will send when you're back.",
+  network:
+    "Connection lost. Your message is saved and will send when you're back.",
   auth: "Your session expired. Sign in again to continue.",
   forbidden: "You don't have access to this conversation.",
   not_found: "This conversation no longer exists.",

@@ -1,4 +1,4 @@
-import type { ChatMessageView, RunState } from "./protocol";
+import type { ChatMessageView, MessagePart, RunState } from "./protocol";
 
 /**
  * Event reducer for the thread stream.
@@ -24,6 +24,13 @@ export interface ApprovalAction {
   args: Record<string, unknown>;
 }
 
+/** A question the agent asked (`ask_user`) and is waiting on, possibly for days. */
+export interface Prompt {
+  runId: string;
+  kind: string;
+  question: string;
+}
+
 export interface StreamState {
   cursor: number;
   run: RunState;
@@ -32,6 +39,9 @@ export interface StreamState {
   draftId: string | null;
   /** Set while the run is paused for approval; one entry per paused action. */
   approval: { runId: string; actions: ApprovalAction[] } | null;
+  prompt: Prompt | null;
+  /** The agent chose to wait (`wait_for`); the run resumes by itself at `until`. */
+  sleeping: { until: number; reason: string } | null;
 }
 
 export type StreamEffect = "none" | "resync";
@@ -40,7 +50,15 @@ export function initialStreamState(
   messages: ChatMessageView[] = [],
   cursor = 0,
 ): StreamState {
-  return { cursor, run: "idle", messages, draftId: null, approval: null };
+  return {
+    cursor,
+    run: "idle",
+    messages,
+    draftId: null,
+    approval: null,
+    prompt: null,
+    sleeping: null,
+  };
 }
 
 /**
@@ -96,27 +114,79 @@ function payloadOf(event: WireEvent): Record<string, unknown> {
     : {};
 }
 
+/** The assistant message of a run has a fixed id, the same one the server stores it under. */
+export const assistantId = (runId: string) => `${runId || "run"}:assistant`;
+
+/** One tool call can be stored twice (before and after an `ask_user` pause): keep the latest, in place. */
+export function mergeToolParts(parts: MessagePart[]): MessagePart[] {
+  const out: MessagePart[] = [];
+  for (const part of parts) {
+    const at =
+      part.type === "tool"
+        ? out.findIndex((p) => p.type === "tool" && p.id === part.id)
+        : -1;
+    if (at >= 0) out[at] = part;
+    else out.push(part);
+  }
+  return out;
+}
+
+export const textOfParts = (parts: MessagePart[]): string =>
+  parts.map((p) => (p.type === "text" ? p.text : "")).join("");
+
 function ensureDraft(state: StreamState, runId: string): StreamState {
   if (state.draftId) return state;
-  const id = `draft-${runId || "run"}`;
+  const id = assistantId(runId);
+  // A reload in the middle of a run already holds the part of this message that was saved.
+  if (state.messages.some((m) => m.id === id)) {
+    return {
+      ...state,
+      draftId: id,
+      messages: state.messages.map((m) =>
+        m.id === id ? { ...m, state: "sending" } : m,
+      ),
+    };
+  }
   const draft: ChatMessageView = {
     id,
     role: "assistant",
     text: "",
+    parts: [],
     state: "sending",
     createdAt: Date.now(),
   };
   return { ...state, draftId: id, messages: [...state.messages, draft] };
 }
 
-const textOf = (parts: unknown): string =>
-  (Array.isArray(parts) ? parts : [])
-    .map((p) =>
-      p && typeof p === "object" && (p as { type?: string }).type === "text"
-        ? String((p as { text?: unknown }).text ?? "")
-        : "",
-    )
-    .join("");
+/** Applies `change` to the parts of the message being streamed and keeps `text` in step. */
+function editDraft(
+  state: StreamState,
+  runId: string,
+  change: (parts: MessagePart[]) => MessagePart[],
+): StreamState {
+  const next = ensureDraft(state, runId);
+  return {
+    ...next,
+    messages: next.messages.map((m) => {
+      if (m.id !== next.draftId) return m;
+      const parts = change(m.parts ?? []);
+      return { ...m, parts, text: textOfParts(parts) };
+    }),
+  };
+}
+
+/** Streams a delta into the last part when it has the same type, otherwise starts a new part. */
+const appendDelta =
+  (type: "text" | "reasoning", delta: string) =>
+  (parts: MessagePart[]): MessagePart[] => {
+    const last = parts.at(-1);
+    if (last && last.type === type)
+      return [...parts.slice(0, -1), { type, text: last.text + delta }];
+    return [...parts, { type, text: delta }];
+  };
+
+/** The run is going again: nothing is being waited for. */
+const going = { approval: null, prompt: null, sleeping: null } as const;
 
 export function reduceEvent(
   state: StreamState,
@@ -134,19 +204,78 @@ export function reduceEvent(
   let next: StreamState = { ...state, cursor: event.seq };
 
   switch (event.type) {
-    case "agent.token": {
-      next = ensureDraft(next, runId);
+    case "agent.token":
+    case "agent.reasoning": {
       const chunk = typeof payload.text === "string" ? payload.text : "";
+      const type = event.type === "agent.token" ? "text" : "reasoning";
       next = {
-        ...next,
+        ...editDraft(next, runId, appendDelta(type, chunk)),
         run: "running",
-        approval: null,
-        messages: next.messages.map((m) =>
-          m.id === next.draftId ? { ...m, text: m.text + chunk } : m,
-        ),
+        ...going,
       };
       break;
     }
+    case "tool.start": {
+      const part: MessagePart = {
+        type: "tool",
+        id: String(payload.id ?? ""),
+        name: String(payload.name ?? "tool"),
+        input:
+          typeof payload.input === "string"
+            ? payload.input
+            : JSON.stringify(payload.input ?? ""),
+        status: "running",
+      };
+      next = {
+        ...editDraft(next, runId, (parts) => mergeToolParts([...parts, part])),
+        run: "running",
+        ...going,
+      };
+      break;
+    }
+    case "tool.end": {
+      const id = String(payload.id ?? "");
+      const status = payload.status === "error" ? "error" : "done";
+      next = editDraft(next, runId, (parts) =>
+        parts.map((p) =>
+          p.type === "tool" && p.id === id
+            ? {
+                ...p,
+                status,
+                output:
+                  typeof payload.output === "string"
+                    ? payload.output
+                    : p.output,
+              }
+            : p,
+        ),
+      );
+      break;
+    }
+    case "run.resumed":
+      next = { ...next, run: "running", ...going };
+      break;
+    case "run.waiting_input":
+      next = {
+        ...next,
+        run: "waiting_input",
+        prompt: {
+          runId,
+          kind: String(payload.kind ?? "info"),
+          question: String(payload.question ?? "The bot needs your input."),
+        },
+      };
+      break;
+    case "run.sleeping":
+      next = {
+        ...next,
+        run: "sleeping",
+        sleeping: {
+          until: Number(payload.until) || Date.now(),
+          reason: String(payload.reason ?? ""),
+        },
+      };
+      break;
     case "run.waiting_approval": {
       const actions = Array.isArray(payload.actions)
         ? (payload.actions as ApprovalAction[])
@@ -158,17 +287,14 @@ export function reduceEvent(
       // A repeated terminal event must not create a second assistant bubble.
       if (state.run === "done" && state.draftId === null) break;
       next = ensureDraft(next, runId);
-      const authoritative = textOf(payload.parts);
       const draftId = next.draftId;
       next = {
         ...next,
         run: "done",
         draftId: null,
-        approval: null,
+        ...going,
         messages: next.messages.map((m) =>
-          m.id === draftId
-            ? { ...m, state: "sent", text: authoritative || m.text }
-            : m,
+          m.id === draftId ? { ...m, state: "sent" } : m,
         ),
       };
       break;
@@ -184,11 +310,16 @@ export function reduceEvent(
         ...next,
         run: "failed",
         draftId: null,
-        approval: null,
+        ...going,
         messages: next.messages.map((m) =>
           m.id === failedId
             ? {
                 ...m,
+                parts: m.parts?.map((p) =>
+                  p.type === "tool" && p.status === "running"
+                    ? { ...p, status: "error" as const }
+                    : p,
+                ),
                 state: "failed",
                 error: {
                   kind: "server",
@@ -205,10 +336,26 @@ export function reduceEvent(
       break;
     }
     default:
-      // tool.call / tool.result: advance the cursor so replay stays correct,
-      // but they do not change the transcript.
+      // Unknown events still advance the cursor, so replay stays correct.
       break;
   }
 
   return { state: next, effect: "none" };
+}
+
+/**
+ * Seeds the state from the run's open question/approval/sleep reported with the history
+ * (those events happened before the stream cursor, so the socket will not replay them).
+ */
+export function applyPending(
+  state: StreamState,
+  pending: { type: string; payload: unknown } | null | undefined,
+): StreamState {
+  if (!pending) return state;
+  const applied = reduceEvent(state, {
+    seq: state.cursor + 1,
+    type: pending.type,
+    payload: pending.payload,
+  }).state;
+  return { ...applied, cursor: state.cursor };
 }

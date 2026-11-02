@@ -1,4 +1,9 @@
-import { type ChatErrorInfo, mapHttpError, networkError } from "./protocol";
+import {
+  type ChatErrorInfo,
+  type MessagePart,
+  mapHttpError,
+  networkError,
+} from "./protocol";
 
 const BASE = process.env.NEXT_PUBLIC_AUTH_URL ?? "http://localhost:8787";
 
@@ -41,7 +46,7 @@ export interface ThreadRow {
 export interface MessageRow {
   id: string;
   role: string;
-  parts: Array<{ type?: string; text?: string }>;
+  parts: MessagePart[];
   runId: string | null;
   seq: number;
   createdAt: string;
@@ -62,6 +67,7 @@ export function listThreads(botId: string): Promise<{ threads: ThreadRow[] }> {
 
 export interface ModelRow {
   id: string;
+  name: string;
   free: boolean;
   vision: boolean;
   reasoning: boolean;
@@ -76,11 +82,20 @@ export function listModels(): Promise<{
   return request("/api/v1/models");
 }
 
-/** `lastSeq` is the stream cursor to resume live events from. */
+/**
+ * `lastSeq` is the stream cursor to resume live events from. `pending` is the
+ * run's open question, approval or sleep (if any), which the live stream will
+ * not replay because it happened before the cursor.
+ */
 export function getMessages(
   threadId: string,
   limit = 50,
-): Promise<{ messages: MessageRow[]; hasMore: boolean; lastSeq: number }> {
+): Promise<{
+  messages: MessageRow[];
+  hasMore: boolean;
+  lastSeq: number;
+  pending: { type: string; payload: unknown } | null;
+}> {
   return request(`/api/v1/chat/threads/${threadId}/messages?limit=${limit}`);
 }
 
@@ -112,15 +127,21 @@ export function mintToken(
   });
 }
 
-/** One decision per paused action, in order. */
+/** Answers a paused run: one decision per paused action, or the text answer to a question. */
 export function resumeRun(
   runId: string,
   threadId: string,
-  decisions: Array<{ type: "approve" } | { type: "reject"; message?: string }>,
+  answer:
+    | {
+        decisions: Array<
+          { type: "approve" } | { type: "reject"; message?: string }
+        >;
+      }
+    | { answer: string },
 ): Promise<{ ok: boolean }> {
   return request(`/api/v1/chat/runs/${runId}/resume`, {
     method: "POST",
-    body: JSON.stringify({ threadId, decisions }),
+    body: JSON.stringify({ threadId, ...answer }),
   });
 }
 

@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import {
+  applyPending,
   friendlyProviderError,
   initialStreamState,
+  mergeToolParts,
   reduceEvent,
   type StreamState,
 } from "./stream";
@@ -40,20 +42,124 @@ assert.equal(
   "a hole must not render",
 );
 
-// 4. run.done finalises with authoritative parts
+// 4. run.done finalises the streamed message
 const done = reduceEvent(s, {
   seq: 3,
   type: "run.done",
-  payload: { runId: "r1", parts: [{ type: "text", text: "Hello world" }] },
+  payload: { runId: "r1" },
 });
 assert.equal(done.state.run, "done");
 assert.equal(done.state.draftId, null);
 assert.equal(done.state.messages[0]!.state, "sent");
+assert.equal(done.state.messages[0]!.text, "Hello");
 assert.equal(
-  done.state.messages[0]!.text,
-  "Hello world",
-  "final text comes from the run",
+  done.state.messages[0]!.id,
+  "r1:assistant",
+  "the draft has the id the server stores the message under",
 );
+
+// 4b. reasoning, tool calls and text keep their order inside one message
+let t: StreamState = initialStreamState();
+const feed = (type: string, payload: object) => {
+  t = reduceEvent(t, {
+    seq: t.cursor + 1,
+    type,
+    payload: { runId: "r2", ...payload },
+  }).state;
+};
+feed("agent.reasoning", { text: "I should " });
+feed("agent.reasoning", { text: "search." });
+feed("tool.start", {
+  id: "c1",
+  name: "internet_search",
+  input: '{"query":"x"}',
+});
+feed("tool.end", { id: "c1", status: "done", output: "results" });
+feed("agent.token", { text: "Found " });
+feed("agent.token", { text: "it." });
+const parts = t.messages[0]!.parts!;
+assert.deepEqual(
+  parts.map((p) => p.type),
+  ["reasoning", "tool", "text"],
+  "deltas of the same kind join; a different kind starts a new part",
+);
+assert.equal(
+  parts[0]!.type === "reasoning" && parts[0]!.text,
+  "I should search.",
+);
+assert.deepEqual(parts[1], {
+  type: "tool",
+  id: "c1",
+  name: "internet_search",
+  input: '{"query":"x"}',
+  status: "done",
+  output: "results",
+});
+assert.equal(t.messages[0]!.text, "Found it.", "text is only the text parts");
+
+// 4c. a failed run ends tool calls that were still running
+feed("tool.start", { id: "c2", name: "computer", input: "{}" });
+feed("run.failed", { error: "boom" });
+const lastTool = t.messages[0]!.parts!.at(-1)!;
+assert.equal(lastTool.type === "tool" && lastTool.status, "error");
+
+// 4d. a question parks the run, a resume clears it, on the same message
+let q: StreamState = initialStreamState();
+q = reduceEvent(q, {
+  seq: 1,
+  type: "tool.start",
+  payload: { runId: "r3", id: "a", name: "ask_user", input: "{}" },
+}).state;
+q = reduceEvent(q, {
+  seq: 2,
+  type: "run.waiting_input",
+  payload: { runId: "r3", kind: "login", question: "Log in please" },
+}).state;
+assert.equal(q.run, "waiting_input");
+assert.deepEqual(q.prompt, {
+  runId: "r3",
+  kind: "login",
+  question: "Log in please",
+});
+q = reduceEvent(q, {
+  seq: 3,
+  type: "run.resumed",
+  payload: { runId: "r3" },
+}).state;
+assert.equal(q.run, "running");
+assert.equal(q.prompt, null);
+assert.equal(q.messages.length, 1);
+
+// 4e. the question that began before the page loaded is restored from history
+const restored = applyPending(initialStreamState([], 40), {
+  type: "run.waiting_input",
+  payload: { runId: "r4", kind: "info", question: "Still there?" },
+});
+assert.equal(restored.run, "waiting_input");
+assert.equal(restored.cursor, 40, "restoring must not move the cursor");
+
+// 4f. a tool call stored twice (before and after a pause) shows once, latest wins
+const merged = mergeToolParts([
+  {
+    type: "tool",
+    id: "a",
+    name: "ask_user",
+    input: "{}",
+    status: "done",
+    output: "",
+  },
+  { type: "text", text: "x" },
+  {
+    type: "tool",
+    id: "a",
+    name: "ask_user",
+    input: "{}",
+    status: "done",
+    output: "purple",
+  },
+]);
+assert.equal(merged.length, 2);
+assert.equal(merged[0]!.type === "tool" && merged[0]!.output, "purple");
 
 // 5. failure with no prior token still shows a bubble
 const failed = reduceEvent(initialStreamState(), {
@@ -73,7 +179,7 @@ const withReason = reduceEvent(initialStreamState(), {
   payload: {
     runId: "r9",
     error:
-      "429 gemma-4-31b-it:free is temporarily rate-limited upstream\nDetails: …",
+      "429 openrouter/free is temporarily rate-limited upstream\nDetails: …",
   },
 });
 assert.equal(

@@ -29,9 +29,13 @@ function BotItem({
 }) {
   return (
     <SidebarMenuItem>
-      <SidebarMenuButton render={<a href={`/dashboard/bot/${bot.id}`} />}>
+      <SidebarMenuButton
+        size="lg"
+        className="[&_svg]:size-8"
+        render={<a href={`/dashboard/bot/${bot.id}`} />}
+      >
         <BloubAvatar
-          size={28}
+          size={32}
           shape={bot.shape}
           color={bot.color}
           expression={bot.expression}

@@ -3,14 +3,15 @@
  *
  *   bun run agent:chat [modelId]      e.g. bun run agent:chat anthropic/claude-haiku-4.5
  *
- * Uses the same `buildAgent` and stream parser as the app, with in-memory
- * state. Type `exit` to quit. A paused write/edit asks you to approve it.
+ * Uses the same `buildAgent` and `consumeRun` as the app, with in-memory
+ * state and no computer. Type `exit` to quit. A paused write/edit asks you to approve it.
  */
 import { createInterface } from "node:readline";
 import { Command, MemorySaver } from "@langchain/langgraph";
 import { buildAgent } from "./agent";
 import { DEFAULT_MODEL_ID } from "./models";
-import { parseChunk, type ApprovalAction } from "./stream";
+import type { Part } from "./parts";
+import { consumeRun, type RunStream } from "./run-stream";
 
 const rl = createInterface({ input: process.stdin });
 const lines = rl[Symbol.asyncIterator]();
@@ -21,15 +22,14 @@ async function ask(prompt: string): Promise<string> {
   if (next.done) throw new Error("input closed");
   return next.value;
 }
-const config = { configurable: { thread_id: "cli" } };
+const config = { version: "v3", configurable: { thread_id: "cli" }, durability: "sync" };
 const agent = buildAgent({
-  bot: { name: "CLI", description: null },
+  bot: { id: crypto.randomUUID(), name: "CLI", description: null },
   modelId: process.argv[2] ?? DEFAULT_MODEL_ID,
   openrouterApiKey: process.env.OPENROUTER_API_KEY,
   tavilyApiKey: process.env.TAVILY_API_KEY,
   checkpointer: new MemorySaver(),
-  emit: ({ kind, name }) => console.log(`\n[${kind} ${name}]`),
-});
+}) as unknown as { streamEvents(input: unknown, config: object): Promise<RunStream> };
 
 let input: unknown;
 for (;;) {
@@ -41,29 +41,27 @@ for (;;) {
       input = { messages: [{ role: "user", content: line }] };
     }
 
-    const stream = await agent.stream(input as never, {
-      ...config,
-      streamMode: ["updates", "messages"],
-      durability: "sync",
-    } as never);
+    const stream = await agent.streamEvents(input, config);
     input = undefined;
 
     process.stdout.write("bot> ");
-    let approval: ApprovalAction[] | undefined;
-    let tokens = 0;
-    for await (const chunk of stream as AsyncIterable<unknown>) {
-      const parsed = parseChunk(chunk);
-      if (parsed.text) process.stdout.write(parsed.text);
-      tokens += (parsed.usage?.input ?? 0) + (parsed.usage?.output ?? 0);
-      approval ??= parsed.approval;
-    }
-    console.log(`\n(${tokens} tokens)`);
+    const acc = { parts: [] as Part[], usage: { input: 0, output: 0 } };
+    const { interrupt } = await consumeRun(
+      stream,
+      {
+        text: (delta) => void process.stdout.write(delta),
+        toolStart: (part) => void console.log(`\n[tool ${part.name}]`),
+      },
+      acc,
+    );
+    console.log(`\n(${acc.usage.input + acc.usage.output} tokens)`);
 
-    if (approval) {
-      const names = approval.map((a) => `${a.name} ${JSON.stringify(a.args)}`).join(", ");
+    const actions = (interrupt?.payload as { actionRequests?: Array<{ name: string; args: unknown }> } | undefined)?.actionRequests;
+    if (actions) {
+      const names = actions.map((a) => `${a.name} ${JSON.stringify(a.args)}`).join(", ");
       const ok = (await ask(`approve ${names}? [y/N] `)).trim().toLowerCase() === "y";
       input = new Command({
-        resume: { decisions: approval.map(() => (ok ? { type: "approve" } : { type: "reject" })) },
+        resume: { decisions: actions.map(() => (ok ? { type: "approve" } : { type: "reject" })) },
       });
     }
   } catch (error) {

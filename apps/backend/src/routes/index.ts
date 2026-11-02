@@ -3,6 +3,7 @@ import health from "./health";
 import authRoutes from "./auth";
 import bots from "./bots";
 import chat from "./chat";
+import computer from "./computer";
 import models from "./models";
 
 import type { Env } from "../lib/env";
@@ -12,6 +13,7 @@ const routes = new Hono<{ Bindings: Env }>()
   .route("/auth", authRoutes)
   .route("/bots", bots)
   .route("/chat", chat)
+  .route("/computer", computer)
   .route("/models", models);
 
 export default routes;

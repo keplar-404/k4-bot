@@ -4,7 +4,10 @@ import rawModels from "./models.json";
 const modelConfigSchema = z.object({
   provider: z.string(),
   modelId: z.string(),
-  free: z.boolean().optional(),
+  /** Picker label. Defaults to the last part of the model id. */
+  name: z.string().optional(),
+  /** Free tier. The only free entry is `openrouter/free`, which routes across OpenRouter's free models. */
+  free: z.boolean().default(false),
   vision: z.boolean().default(false),
   reasoning: z.boolean().default(false),
   reasoningEfforts: z.array(z.string()).default([]),
@@ -14,6 +17,7 @@ const modelConfigSchema = z.object({
 
 export type ModelConfig = {
   id: string;
+  name: string;
   free: boolean;
   vision: boolean;
   reasoning: boolean;
@@ -30,19 +34,15 @@ export const models: ModelConfig[] = z
   .parse(rawModels)
   .filter((m) => m.provider === "openrouter")
   .sort((a, b) => Number(b.modelId === DEFAULT_MODEL_ID) - Number(a.modelId === DEFAULT_MODEL_ID))
-  .map((m) => {
-    // Some entries carry ":free" without the flag; trust either signal so a
-    // free model is never labelled as billable.
-    const free = m.free ?? m.modelId.endsWith(":free");
-    return {
-      id: m.modelId,
-      free,
-      vision: m.vision,
-      reasoning: m.reasoning,
-      reasoningEfforts: m.reasoningEfforts,
-      tag: m.tag ?? (free ? "Free" : m.reasoning ? "Reasoning" : "Standard"),
-    };
-  });
+  .map((m) => ({
+    id: m.modelId,
+    name: m.name ?? m.modelId.split("/").pop() ?? m.modelId,
+    free: m.free,
+    vision: m.vision,
+    reasoning: m.reasoning,
+    reasoningEfforts: m.reasoningEfforts,
+    tag: m.tag ?? (m.free ? "Free" : m.reasoning ? "Reasoning" : "Standard"),
+  }));
 
 export const resolveModel = (modelId: string) =>
   models.find((m) => m.id === modelId);

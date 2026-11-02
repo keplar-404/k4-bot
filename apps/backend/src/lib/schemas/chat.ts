@@ -17,19 +17,25 @@ export const sendMessageSchema = z.object({
   reasoningEffort: z.string().min(1).max(32).optional(),
 });
 
-/** Mirrors LangChain's HITL `Decision` type, one entry per paused action. */
-export const resumeRunSchema = z.object({
-  threadId: z.string().min(1),
-  decisions: z
-    .array(
-      z.discriminatedUnion("type", [
-        z.object({ type: z.literal("approve") }),
-        z.object({ type: z.literal("reject"), message: z.string().max(2000).optional() }),
-        z.object({
-          type: z.literal("edit"),
-          editedAction: z.object({ name: z.string(), args: z.record(z.string(), z.unknown()) }),
-        }),
-      ]),
-    )
-    .min(1),
-});
+/**
+ * Answer to a paused run: HITL decisions (mirrors LangChain's `Decision`, one per paused action)
+ * or the text answer to an `ask_user` question.
+ */
+export const resumeRunSchema = z.union([
+  z.object({
+    threadId: z.string().min(1),
+    decisions: z
+      .array(
+        z.discriminatedUnion("type", [
+          z.object({ type: z.literal("approve") }),
+          z.object({ type: z.literal("reject"), message: z.string().max(2000).optional() }),
+          z.object({
+            type: z.literal("edit"),
+            editedAction: z.object({ name: z.string(), args: z.record(z.string(), z.json()) }),
+          }),
+        ]),
+      )
+      .min(1),
+  }),
+  z.object({ threadId: z.string().min(1), answer: z.string().max(8000) }),
+]);

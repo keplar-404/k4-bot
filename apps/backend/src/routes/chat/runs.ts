@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { getRequestContext } from "../../lib/context";
 import { getOwnedThread, quotaExceeded } from "../../lib/threads";
 import { validate } from "../../lib/validate";
@@ -7,7 +7,7 @@ import { resumeRunSchema, sendMessageSchema } from "../../lib/schemas/chat";
 import { userLimit } from "../../middleware/rate-limit";
 import type { AuthGuardEnv } from "../../middleware/auth-guard";
 import { resolveModel } from "../../agent/models";
-import { chatThread } from "../../db/schema";
+import { chatMessage, chatThread } from "../../db/schema";
 import type { ChatRunParams } from "../../workflows/chat-run";
 
 const runs = new Hono<AuthGuardEnv>()
@@ -73,8 +73,8 @@ const runs = new Hono<AuthGuardEnv>()
     },
   )
 
-  // Answer a paused run (human-in-the-loop). Starts a new workflow instance
-  // that resumes the checkpointed agent with the user's decisions.
+  // Answer a paused run: approval decisions or the answer to a question. The run's workflow is
+  // waiting for this event (and keeps an early one), so no new run is started.
   .post(
     "/runs/:runId/resume",
     userLimit,
@@ -83,20 +83,23 @@ const runs = new Hono<AuthGuardEnv>()
       const { db, env } = getRequestContext(c);
       const userId = c.get("session").user.id;
       const runId = c.req.param("runId");
-      const { threadId, decisions } = c.req.valid("json");
+      const body = c.req.valid("json");
 
-      if (!(await getOwnedThread(db, threadId, userId))) {
+      if (!(await getOwnedThread(db, body.threadId, userId))) {
         return c.json({ error: "NOT_FOUND" }, 404);
       }
+      // The run must belong to that thread, or one user's thread would unlock another user's run.
+      const [owned] = await db
+        .select({ id: chatMessage.id })
+        .from(chatMessage)
+        .where(and(eq(chatMessage.threadId, body.threadId), eq(chatMessage.runId, runId)))
+        .limit(1);
+      if (!owned) return c.json({ error: "NOT_FOUND" }, 404);
 
-      await env.CHAT_RUN.create({
-        params: {
-          runId,
-          threadId,
-          userId,
-          resume: { decisions },
-        } satisfies ChatRunParams,
-      });
+      const instance = await env.CHAT_RUN.get(runId).catch(() => null);
+      if (!instance) return c.json({ error: "NOT_FOUND" }, 404);
+      const { threadId: _threadId, ...payload } = body;
+      await instance.sendEvent({ type: "user-input", payload });
       return c.json({ ok: true, runId }, 202);
     },
   );

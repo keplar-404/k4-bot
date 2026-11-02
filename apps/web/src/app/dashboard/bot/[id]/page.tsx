@@ -3,6 +3,7 @@
 import { useParams } from "next/navigation";
 import { Suspense } from "react";
 import { ChatView } from "@/components/chat-view";
+import { ComputerSidebar } from "@/components/computer/computer-sidebar";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -20,7 +21,15 @@ function BotChat() {
       <p className="p-4 text-sm text-muted-foreground">No bot selected.</p>
     );
   }
-  return <ChatView botId={botId} />;
+  return (
+    // The chat keeps its own column exactly as before; the computer is a side bar next to it.
+    <div className="flex min-h-0 flex-1">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <ChatView botId={botId} />
+      </div>
+      <ComputerSidebar botId={botId} />
+    </div>
+  );
 }
 
 export default function BotChatPage() {

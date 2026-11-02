@@ -23,9 +23,12 @@ import {
 } from "./protocol";
 import {
   type ApprovalAction,
+  applyPending,
   initialStreamState,
+  mergeToolParts,
   reduceEvent,
   type StreamState,
+  textOfParts,
   type WireEvent,
 } from "./stream";
 
@@ -42,16 +45,19 @@ const outboxKey = (threadId: string) => `k4:outbox:${threadId}`;
 const FATAL = new Set(["auth", "forbidden", "not_found"]);
 
 function rowsToViews(rows: MessageRow[]): ChatMessageView[] {
-  return rows.map((r) => ({
-    id: r.id,
-    role: r.role === "user" ? "user" : "assistant",
-    text: (r.parts ?? [])
-      .map((p) => (p.type === "text" ? String(p.text ?? "") : ""))
-      .join(""),
-    state: "sent",
-    createdAt: new Date(r.createdAt).getTime() || Date.now(),
-    seq: r.seq,
-  }));
+  return rows.map((r) => {
+    const assistant = r.role !== "user";
+    const parts = assistant ? mergeToolParts(r.parts ?? []) : (r.parts ?? []);
+    return {
+      id: r.id,
+      role: assistant ? "assistant" : "user",
+      text: textOfParts(parts),
+      ...(assistant ? { parts } : {}),
+      state: "sent",
+      createdAt: new Date(r.createdAt).getTime() || Date.now(),
+      seq: r.seq,
+    };
+  });
 }
 
 const toInfo = (err: unknown): ChatErrorInfo =>
@@ -78,6 +84,8 @@ export function useChat(botId: string) {
   const [messages, setMessages] = useState<ChatMessageView[]>([]);
   const [run, setRun] = useState<RunState>("idle");
   const [approval, setApproval] = useState<StreamState["approval"]>(null);
+  const [prompt, setPrompt] = useState<StreamState["prompt"]>(null);
+  const [sleeping, setSleeping] = useState<StreamState["sleeping"]>(null);
   const [connection, setConnection] = useState<Connection>("idle");
   const [error, setError] = useState<ChatErrorInfo | null>(null);
   // True until the first history fetch settles: "0 messages" and "not loaded
@@ -104,6 +112,8 @@ export function useChat(botId: string) {
     setMessages(streamRef.current.messages);
     setRun(streamRef.current.run);
     setApproval(streamRef.current.approval);
+    setPrompt(streamRef.current.prompt);
+    setSleeping(streamRef.current.sleeping);
   }, []);
 
   const persistOutbox = useCallback((threadId: string) => {
@@ -124,7 +134,7 @@ export function useChat(botId: string) {
    */
   const loadHistory = useCallback(
     async (threadId: string) => {
-      const { messages: rows, lastSeq } = await getMessages(threadId);
+      const { messages: rows, lastSeq, pending } = await getMessages(threadId);
       const stored = new Set(rows.map((r) => r.id));
 
       outboxRef.current = readOutbox(threadId).filter((i) => !stored.has(i.id));
@@ -138,9 +148,10 @@ export function useChat(botId: string) {
       }));
       persistOutbox(threadId);
 
-      streamRef.current = initialStreamState(
-        [...rowsToViews(rows), ...unsent],
-        lastSeq,
+      // A question, approval or sleep that began before this page loaded is not replayed by the socket.
+      streamRef.current = applyPending(
+        initialStreamState([...rowsToViews(rows), ...unsent], lastSeq),
+        pending,
       );
       sync();
     },
@@ -474,15 +485,35 @@ export function useChat(botId: string) {
       const pending = streamRef.current.approval;
       if (!threadId || !pending) return;
       try {
-        await resumeRun(
-          pending.runId,
-          threadId,
-          pending.actions.map(() => ({ type })),
-        );
+        await resumeRun(pending.runId, threadId, {
+          decisions: pending.actions.map(() => ({ type })),
+        });
         streamRef.current = {
           ...streamRef.current,
           run: "running",
           approval: null,
+        };
+        sync();
+      } catch (e) {
+        setError(toInfo(e));
+      }
+    },
+    [sync],
+  );
+
+  /** The text answer to a question the agent asked; the run then goes on by itself. */
+  const answer = useCallback(
+    async (text: string) => {
+      const threadId = threadRef.current;
+      const pending = streamRef.current.prompt;
+      const reply = text.trim();
+      if (!threadId || !pending || !reply) return;
+      try {
+        await resumeRun(pending.runId, threadId, { answer: reply });
+        streamRef.current = {
+          ...streamRef.current,
+          run: "running",
+          prompt: null,
         };
         sync();
       } catch (e) {
@@ -536,6 +567,9 @@ export function useChat(botId: string) {
     isLoading,
     run,
     approval: approval as { runId: string; actions: ApprovalAction[] } | null,
+    prompt,
+    sleeping,
+    answer,
     connection,
     error,
     models,

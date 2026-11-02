@@ -1,11 +1,14 @@
 import { Hono } from "hono";
-import { and, desc, eq, lt, max } from "drizzle-orm";
+import { and, desc, eq, inArray, lt, max } from "drizzle-orm";
 import { getRequestContext } from "../../lib/context";
 import { getOwnedThread } from "../../lib/threads";
 import { validate } from "../../lib/validate";
 import { createThreadSchema } from "../../lib/schemas/chat";
 import type { AuthGuardEnv } from "../../middleware/auth-guard";
 import { bot, chatEvent, chatMessage, chatThread } from "../../db/schema";
+
+const RUN_LIFECYCLE = ["run.waiting_approval", "run.waiting_input", "run.sleeping", "run.resumed", "run.done", "run.failed"];
+const PENDING = new Set(["run.waiting_approval", "run.waiting_input", "run.sleeping"]);
 
 const threads = new Hono<AuthGuardEnv>()
   // List a user's threads, newest first, cursor-paginated by updatedAt.
@@ -68,7 +71,7 @@ const threads = new Hono<AuthGuardEnv>()
 
     // Both reads are issued together; the socket replays from lastSeq, so any
     // event landing in between is delivered there rather than lost.
-    const [[last], rows] = await Promise.all([
+    const [[last], rows, [lifecycle]] = await Promise.all([
       db.select({ lastSeq: max(chatEvent.seq) }).from(chatEvent).where(eq(chatEvent.threadId, threadId)),
       db
         .select()
@@ -81,13 +84,22 @@ const threads = new Hono<AuthGuardEnv>()
         )
         .orderBy(desc(chatMessage.seq))
         .limit(limit + 1),
+      // Where the run stands, so a reloaded page still shows an open question, approval or sleep.
+      db
+        .select({ type: chatEvent.type, payload: chatEvent.payload })
+        .from(chatEvent)
+        .where(and(eq(chatEvent.threadId, threadId), inArray(chatEvent.type, RUN_LIFECYCLE)))
+        .orderBy(desc(chatEvent.seq))
+        .limit(1),
     ]);
+    const pending = lifecycle && PENDING.has(lifecycle.type) ? lifecycle : null;
 
     c.header("Cache-Control", "no-store");
     return c.json({
       messages: rows.slice(0, limit).reverse(),
       hasMore: rows.length > limit,
       lastSeq: Number(last?.lastSeq ?? 0),
+      pending,
     });
   });
 

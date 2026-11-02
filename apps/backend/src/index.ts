@@ -13,14 +13,19 @@ import type { Env } from "./lib/env";
 // Wrangler resolves the Durable Object and Workflow bindings from these exports.
 export { ChatRelayDurableObject } from "./durable/chat-relay";
 export { ChatRunWorkflow } from "./workflows/chat-run";
+export { UserComputerDurableObject } from "./computer/user-computer";
+
+// The live view of the computer: token-gated, framed by the web app, and ~60 asset requests per page load.
+const isStream = (path: string) => path.startsWith("/api/v1/computer/stream/");
 
 const app = new Hono<{ Bindings: Env }>()
   .use("*", corsMiddleware)
-  .use("*", secureHeaders())
+  // The stream route sets its own framing headers (secureHeaders would forbid the iframe).
+  .use("*", (c, next) => (isStream(c.req.path) ? next() : secureHeaders()(c, next)))
   .use("*", bodyLimit({ maxSize: 1024 * 1024 }))
   // /auth/* is rate limited by Better Auth itself (database-backed rules).
   .use("/api/v1/*", (c, next) =>
-    c.req.path.startsWith("/api/v1/auth/") ? next() : ipLimit(c, next),
+    c.req.path.startsWith("/api/v1/auth/") || isStream(c.req.path) ? next() : ipLimit(c, next),
   )
   .route("/api/v1", routes);
 

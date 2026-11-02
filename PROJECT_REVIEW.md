@@ -115,8 +115,9 @@ On Windows, a stale `workerd` process can hold port 8787 and make requests hang.
 - **Cloudflare**: only Workers, Durable Objects, Workflows, Rate Limiting and Cron Triggers are used.
   Everything runs locally without a Cloudflare account. A deploy needs `wrangler login` or
   `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
-- **Free models in production**: they are a shared pool and will return 429. Production should use paid models
-  (the default is Sonnet 4.6). Remove `:free` entries from `models.json` to offer only reliable ones.
+- **Free models**: all individual `:free` models were removed. The only free entry is `openrouter/free`, which
+  OpenRouter routes across its free models. It still shares the free pool and can return 429, so production should
+  default to paid models (the default is Sonnet 4.6).
   Automatic fallback to a paid model (`modelFallbackMiddleware`) was deliberately not added, because it would
   spend money without the user choosing it.
 - **Queues**: not needed. Workflows give durable execution and retries; a Cron Trigger handles cleanup.
@@ -129,7 +130,27 @@ On Windows, a stale `workerd` process can hold port 8787 and make requests hang.
   in project code around them. `prompt-bar.tsx` is a large custom component with demo leftovers; its
   attachments and microphone buttons are not connected.
 
-## 6. Open items
+## 6. The computer (one E2B desktop per user)
+
+Added after the review. See the README ("The computer") and `.agents/skills/e2b-computer/SKILL.md`.
+
+- **Backend**: `src/computer/` (Durable Object, sandbox backend for Deep Agents, `computer`/`ask_user`/`wait_for`
+  tools, guards), `routes/computer.ts`, and a rewritten `ChatRunWorkflow` that runs long tasks as durable slices.
+- **Frontend**: the right side bar on the bot page (`components/computer/`), step rendering of every agent event
+  (`components/agent-parts.tsx`), and the question/approval/sleep prompts in `chat-view.tsx`.
+- **Verified against real services** (E2B, OpenRouter, Neon, headless Chrome on the web app): per-bot isolation,
+  internet access with private ranges denied, a bot reading a page through screenshots, the live view and
+  read-only/take-control views, the activity feed, idle auto-pause, `ask_user` pause and resume, and a reload
+  restoring the open question.
+- **Not verified**: a run that lasts days (the pieces are Workflow `sleep`/`waitForEvent`, which are
+  documented for 7 days each, but a multi-day run was not executed), and any production Cloudflare deploy.
+- **Not built**: the "Routines" area of the reference screenshot (scheduled bot tasks). The side bar has an
+  Activity feed in that place. Scheduled tasks would use Workflow sleeps or Cron Triggers.
+- **Security still to do at deploy time**: Cloudflare WAF and Turnstile are dashboard settings, not code. Put a WAF
+  rate rule on `/api/v1/auth/*`, and add Turnstile to sign-up (Better Auth has a `captcha` plugin) if bots
+  can register accounts freely, since each account can start a computer.
+
+## 7. Open items
 
 1. Run `bun run --cwd apps/backend db:push` to drop the unused `api_rate_limit` and `bot_task` tables and the
    `cost_usd_est` column from an existing database.

@@ -44,9 +44,12 @@ export async function signRelayToken(args: {
   userId: string;
   threadId: string;
   nowMs?: number;
+  /** Defaults to RELAY_TOKEN_TTL_SECONDS. */
+  ttlSeconds?: number;
 }): Promise<string> {
   const exp =
-    Math.floor((args.nowMs ?? Date.now()) / 1000) + RELAY_TOKEN_TTL_SECONDS;
+    Math.floor((args.nowMs ?? Date.now()) / 1000) +
+    (args.ttlSeconds ?? RELAY_TOKEN_TTL_SECONDS);
   const mac = await hmacHex(
     args.secret,
     payload(args.userId, args.threadId, exp),

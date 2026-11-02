@@ -5,9 +5,17 @@
   "compatibility_date": "2026-10-30",
   "compatibility_flags": ["nodejs_compat"],
   "durable_objects": {
-    "bindings": [{ "name": "CHAT_RELAY", "class_name": "ChatRelayDurableObject" }]
+    "bindings": [
+      { "name": "CHAT_RELAY", "class_name": "ChatRelayDurableObject" },
+      { "name": "USER_COMPUTER", "class_name": "UserComputerDurableObject" }
+    ]
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ChatRelayDurableObject"] }],
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["ChatRelayDurableObject"] },
+    { "tag": "v2", "new_sqlite_classes": ["UserComputerDurableObject"] }
+  ],
+  // An agent step is mostly waiting on the network, but a slice of tool calls can use real CPU.
+  "limits": { "cpu_ms": 300000 },
   "workflows": [
     { "name": "chat-run", "binding": "CHAT_RUN", "class_name": "ChatRunWorkflow" }
   ],

@@ -16,9 +16,30 @@ export const envSchema = z.object({
   TAVILY_API_KEY: z.string().optional(),
   // Agent guardrails (cost + abuse containment)
   MAX_DAILY_TOKENS_PER_USER: z.coerce.number().int().positive().default(2_000_000),
+  /** Per model reply. OpenRouter reserves credit for the full amount, so keep it modest. */
+  MAX_OUTPUT_TOKENS: z.coerce.number().int().positive().default(8192),
   MAX_RUNS_PER_USER: z.coerce.number().int().positive().default(50),
   RUN_TIMEOUT_SECONDS: z.coerce.number().int().positive().default(900),
   WS_TOKEN_SECRET: z.string().min(32).optional(),
+
+  // --- Computer (one E2B desktop per user, shared by that user's bots) ---
+  E2B_API_KEY: z.string().optional(),
+  /** Kill switch: false disables every computer feature without a deploy. */
+  COMPUTER_ENABLED: z.stringbool().default(true),
+  /** E2B template. The official "desktop" template is 8 vCPU / 8 GiB; a smaller custom one costs less. */
+  E2B_TEMPLATE: z.string().default("desktop"),
+  /** Running time per user per UTC day. The meter is the main protection for the E2B bill. */
+  COMPUTER_MAX_MINUTES_PER_DAY: z.coerce.number().int().positive().default(120),
+  /** No activity for this long and the computer is paused (paused computers are not billed). */
+  COMPUTER_IDLE_MINUTES: z.coerce.number().int().positive().default(5),
+  /** Mouse/keyboard actions one agent run may take. */
+  COMPUTER_MAX_ACTIONS_PER_RUN: z.coerce.number().int().positive().default(400),
+  /** Optional comma-separated allow-list of hostnames the computer may reach. Empty = any public host. */
+  COMPUTER_ALLOWED_HOSTS: z.string().optional(),
+  /** Agent steps per Workflow step. A run longer than this continues in the next slice. */
+  RUN_SLICE_STEPS: z.coerce.number().int().positive().default(60),
+  /** Upper bound on slices per run (steps x slices = the hard ceiling on one run). */
+  MAX_RUN_SLICES: z.coerce.number().int().positive().default(300),
   // z.coerce.boolean() would turn the string "false" into true.
   LANGSMITH_TRACING: z.stringbool().default(false),
 });
@@ -30,6 +51,8 @@ export type Env = z.infer<typeof envSchema> & {
   RL: RateLimit;
   /** Per-user limiter for mutating/expensive routes. */
   RL_WRITE: RateLimit;
+  /** One computer per user: addressed by user id. */
+  USER_COMPUTER: DurableObjectNamespace<import("../computer/user-computer").UserComputerDurableObject>;
 };
 
 // Bindings object is stable for the life of a request; parse it once.

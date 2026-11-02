@@ -7,12 +7,13 @@
     "cf-typegen": "wrangler types --env-interface CloudflareBindings",
     "check-types": "tsc --noEmit",
     "check:relay-token": "bun run src/lib/relay-token.check.ts",
-    "check:stream": "bun run src/agent/stream.check.ts",
-    "check": "bun run check:relay-token && bun run check:stream",
+    "check:guards": "bun run src/computer/guards.check.ts",
+    "check": "bun run check:relay-token && bun run check:guards",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
-    "agent:chat": "bun --env-file=.dev.vars run src/agent/cli.ts"
+    "agent:chat": "bun --env-file=.dev.vars run src/agent/cli.ts",
+    "e2b:smoke": "bun --env-file=.dev.vars run scripts/e2b/desktop-smoke.ts"
   },
   "dependencies": {
     "@hono/zod-validator": "^0.9.1",
@@ -31,6 +32,8 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@e2b/cli": "^2.23.0",
+    "@e2b/desktop": "^2.5.0",
     "@types/node": "^26.6.6",
     "drizzle-kit": "^0.31.11",
     "wrangler": "^4.110.0"

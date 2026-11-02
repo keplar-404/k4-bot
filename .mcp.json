@@ -16,6 +16,10 @@
     "nextjs": {
       "type": "http",
       "url": "http://localhost:3000/_next/mcp"
+    },
+    "e2b-docs": {
+      "type": "http",
+      "url": "https://docs.e2b.dev/mcp"
     }
   }
 }
