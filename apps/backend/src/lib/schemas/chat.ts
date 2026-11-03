@@ -5,17 +5,22 @@ export const createThreadSchema = z.object({
   title: z.string().max(200).optional(),
 });
 
-export const sendMessageSchema = z.object({
+export const sendMessageSchema = z
+  .object({
   /** Client-generated; makes a retried send idempotent. */
   messageId: z.uuid().optional(),
   /** Re-ask a message whose answer failed: starts a new run for the same message. */
   retry: z.boolean().optional(),
-  content: z.string().min(1).max(32_000),
+  /** May be empty when files are attached. */
+  content: z.string().max(32_000),
+  /** Files uploaded beforehand with POST /files. */
+  fileIds: z.array(z.uuid()).max(10).optional(),
   /** Model id from GET /api/v1/models; omit for the catalog default. */
   modelId: z.string().min(1).max(200).optional(),
   /** One of the model's reasoningEfforts, when it supports reasoning. */
   reasoningEffort: z.string().min(1).max(32).optional(),
-});
+  })
+  .refine((m) => m.content.trim().length > 0 || (m.fileIds?.length ?? 0) > 0, { message: "Write a message or attach a file", path: ["content"] });
 
 /**
  * Answer to a paused run: HITL decisions (mirrors LangChain's `Decision`, one per paused action)

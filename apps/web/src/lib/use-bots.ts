@@ -1,8 +1,8 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { useSession } from "@/lib/auth-client";
+import { redirectToSignIn } from "@/lib/auth-redirect";
 import {
   type Bot,
   BotApiError,
@@ -15,7 +15,6 @@ import {
 } from "@/lib/bots";
 
 export function useBots() {
-  const router = useRouter();
   const { data: session, isPending: isSessionPending } = useSession();
   const [bots, setBots] = useState<Bot[]>([]);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
@@ -53,9 +52,9 @@ export function useBots() {
   useEffect(() => {
     if (unauthorized) {
       invalidateBots();
-      router.replace("/sign-in?callbackUrl=/dashboard");
+      redirectToSignIn();
     }
-  }, [unauthorized, router]);
+  }, [unauthorized]);
 
   const createBot = useCallback(
     async (input: CreateBotInput) => {

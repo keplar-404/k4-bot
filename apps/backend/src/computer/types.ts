@@ -40,6 +40,12 @@ export type Owner = { kind: "bot"; id: string } | { kind: "user" };
 
 export type ComputerState = "off" | "starting" | "running" | "paused" | "error";
 
+/** A bot that used the computer in the last few minutes, in a run that has not ended. */
+export interface WorkingBot {
+  botId: string;
+  name: string;
+}
+
 /** Everything the UI needs, readable without calling E2B. */
 export interface ComputerStatus {
   state: ComputerState;
@@ -47,13 +53,18 @@ export interface ComputerStatus {
   lease: Owner | null;
   minutesUsedToday: number;
   minutesLimit: number;
+  /** Today's computer time is used up: nobody can turn it on until 00:00 UTC. */
+  limitReached: boolean;
+  /** Bots using the computer right now. Shutting it down while there are any needs the user's say-so. */
+  working: WorkingBot[];
   /** Why it is in this state ("Paused after being idle.", "Starting the screen…", an error). */
   message?: string;
   /**
-   * While running: time left in this session. `warning` once the user should be asked to wrap up;
-   * `wrapping` after they chose to (the bots are told to finish and summarise).
+   * While running: time left until the computer goes to sleep by itself, whichever comes first: the
+   * session (`reason: "session"`) or today's computer time (`"quota"`). `warning` once the user should be
+   * asked to wrap up; `wrapping` after they chose to (the bots are told to finish and summarise).
    */
-  session?: { endsInMs: number; warning: boolean; wrapping: boolean };
+  session?: { endsInMs: number; warning: boolean; wrapping: boolean; reason: "session" | "quota" };
   /** When the last screen was saved (taken when the computer goes to sleep). */
   snapshotAt?: number;
   updatedAt: number;

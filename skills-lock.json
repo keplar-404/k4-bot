@@ -247,6 +247,27 @@
       "skillPath": "config/skills/swarm/SKILL.md",
       "computedHash": "1839bb3cb12115e36b4f7873d9bc4b3d97c5cd1140860f4f0032672dc1ec5241"
     },
+    "tavily-research": {
+      "source": "tavily-ai/skills",
+      "sourceType": "github",
+      "skillPath": "skills/tasks/tavily-research/SKILL.md",
+      "computedHash": "bddb8779230c8865dbe12a43b9b9cadd794cb2cd5ee8043d2f9e90ff09398d77",
+      "installMode": "copy"
+    },
+    "tavily-sdk": {
+      "source": "tavily-ai/skills",
+      "sourceType": "github",
+      "skillPath": "skills/developers/tavily-sdk/SKILL.md",
+      "computedHash": "de3e2baadd4b4575741e77c2aacf229e91b28a215c6e419fd0fe7cf90fcaa08a",
+      "installMode": "copy"
+    },
+    "tavily-search": {
+      "source": "tavily-ai/skills",
+      "sourceType": "github",
+      "skillPath": "skills/core/tavily-search/SKILL.md",
+      "computedHash": "d992cc8a8f74d38359a72392c98ffcf8e85ccc4641761156f3ed1955fbc60e1c",
+      "installMode": "copy"
+    },
     "turborepo": {
       "source": "vercel/turborepo",
       "sourceType": "github",

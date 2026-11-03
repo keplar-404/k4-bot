@@ -1,19 +1,32 @@
 "use client";
 
+import type { SubagentStatus } from "@backend/agent/parts";
 import {
   BrainIcon,
+  CheckIcon,
   CircleAlertIcon,
+  CircleDashedIcon,
   ClockIcon,
+  EyeIcon,
   FileTextIcon,
+  GlobeIcon,
+  ImageIcon,
   ListChecksIcon,
+  ListTreeIcon,
+  Loader2Icon,
   MessageCircleQuestionIcon,
+  MonitorDownIcon,
   MonitorIcon,
+  MonitorUpIcon,
+  NetworkIcon,
+  PlugIcon,
   PowerIcon,
   SearchIcon,
   TerminalIcon,
   WrenchIcon,
 } from "lucide-react";
 import type { ReactNode } from "react";
+import { FileList } from "@/components/file-card";
 import { Markdown } from "@/components/markdown";
 import {
   CodeBlock,
@@ -83,6 +96,49 @@ function computerSentence(a: Record<string, unknown>, done: boolean): string {
   }
 }
 
+/** "example.com" from a URL (or the first of a list), for one-line titles. */
+const hostOf = (value: unknown) => {
+  const url = Array.isArray(value) ? value[0] : value;
+  try {
+    return new URL(String(url)).hostname.replace(/^www\./, "");
+  } catch {
+    return "a page";
+  }
+};
+
+/** Live status of a sub-agent group, under its step while it runs. */
+function SubagentList({ agents }: { agents: SubagentStatus[] }) {
+  return (
+    <ul className="ml-6 flex flex-col gap-1 border-l pl-3 text-xs text-muted-foreground">
+      {agents.map((agent) => (
+        <li key={agent.name} className="flex items-center gap-1.5">
+          {agent.status === "running" ? (
+            <Loader2Icon className="size-3 animate-spin" />
+          ) : agent.status === "done" ? (
+            <CheckIcon className="size-3 text-foreground" />
+          ) : agent.status === "failed" ? (
+            <CircleAlertIcon className="size-3 text-destructive" />
+          ) : (
+            <CircleDashedIcon className="size-3" />
+          )}
+          <span className="font-medium text-foreground">{agent.name}</span>
+          <span>
+            {agent.status === "failed"
+              ? `failed${agent.note ? `: ${agent.note}` : ""}`
+              : agent.status}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** Connected apps (MCP servers), by tool name prefix. */
+const APP_NAMES: Record<string, string> = {
+  airtable: "Airtable",
+  shadcn: "shadcn/ui",
+};
+
 /** Title + icon for one tool call, in the user's words rather than the tool's name. */
 function describe(
   part: ToolPart,
@@ -107,11 +163,45 @@ function describe(
         icon: <TerminalIcon />,
         title: `${done ? "Ran" : "Running"} ${str(a.command, 70)}`,
       };
-    case "internet_search":
+    case "tavily_search":
       return {
         icon: <SearchIcon />,
         title: `${done ? "Searched" : "Searching"} "${str(a.query, 60)}"`,
       };
+    case "tavily_extract": {
+      const n = Array.isArray(a.urls) ? a.urls.length : 0;
+      return {
+        icon: <GlobeIcon />,
+        title: `${done ? "Read" : "Reading"} ${n === 1 ? hostOf(a.urls) : `${n} pages`}`,
+      };
+    }
+    case "tavily_map":
+      return {
+        icon: <NetworkIcon />,
+        title: `${done ? "Mapped" : "Mapping"} ${hostOf(a.url)}`,
+      };
+    case "tavily_crawl":
+      return {
+        icon: <GlobeIcon />,
+        title: `${done ? "Crawled" : "Crawling"} ${hostOf(a.url)}`,
+      };
+    case "wait_for_subagents":
+      return {
+        icon: <ListTreeIcon />,
+        title: done ? "Heard back from sub-agents" : "Waiting for sub-agents",
+      };
+    case "message_subagents":
+      return {
+        icon: <MessageCircleQuestionIcon />,
+        title: `${done ? "Messaged" : "Messaging"} ${a.to === "all" ? "all sub-agents" : str(a.to, 40)}`,
+      };
+    case "spawn_subagents": {
+      const n = Array.isArray(a.agents) ? a.agents.length : 0;
+      return {
+        icon: <ListTreeIcon />,
+        title: `${done ? "Ran" : "Running"} ${n} sub-agent${n === 1 ? "" : "s"}`,
+      };
+    }
     case "ask_user":
       return {
         icon: <MessageCircleQuestionIcon />,
@@ -121,6 +211,28 @@ function describe(
       return {
         icon: <ClockIcon />,
         title: `${done ? "Waited" : "Waiting"}: ${str(a.reason, 60)}`,
+      };
+    case "generate_image":
+      return {
+        icon: <ImageIcon />,
+        title: done ? "Created an image" : "Creating an image",
+      };
+    case "view_image":
+      return {
+        icon: <EyeIcon />,
+        title: done ? "Looked at an image" : "Looking at an image",
+      };
+    case "share_file": {
+      const name = str(a.path, 200).split("/").pop() || "a file";
+      return {
+        icon: <MonitorDownIcon />,
+        title: `${done ? "Shared" : "Sharing"} ${str(name, 60)} from the computer`,
+      };
+    }
+    case "copy_to_computer":
+      return {
+        icon: <MonitorUpIcon />,
+        title: `${done ? "Copied a file to" : "Copying a file to"} ${str(a.path, 50) || "the computer"}`,
       };
     case "write_todos":
       return {
@@ -147,11 +259,21 @@ function describe(
         title: `${verb[part.name]![done ? 0 : 1]} ${target}`.trim(),
       };
     }
-    default:
+    default: {
+      // Connected-app (MCP) tools are named "<app>_<tool>": shown as "Airtable: list records".
+      const app = Object.entries(APP_NAMES).find(([prefix]) =>
+        part.name.startsWith(`${prefix}_`),
+      );
+      if (app)
+        return {
+          icon: <PlugIcon />,
+          title: `${app[1]}: ${part.name.slice(app[0].length + 1).replace(/_/g, " ")}`,
+        };
       return {
         icon: <WrenchIcon />,
         title: `${done ? "Used" : "Using"} ${part.name}`,
       };
+    }
   }
 }
 
@@ -176,6 +298,11 @@ function Output({ label, text }: { label: string; text: string }) {
 
 function prettyInput(part: ToolPart): string {
   const a = parse(part.input);
+  // A sub-agent group as its members' tasks.
+  if (part.name === "spawn_subagents" && Array.isArray(a.agents))
+    return (a.agents as { name?: string; task?: string }[])
+      .map((s) => `${s.name ?? "?"}: ${s.task ?? ""}`)
+      .join("\n\n");
   // The shell and search tools are clearer as the command itself than as JSON.
   if (part.name === "execute" && typeof a.command === "string")
     return a.command;
@@ -199,6 +326,13 @@ function ToolStep({ part, streaming }: { part: ToolPart; streaming: boolean }) {
   const failed = part.status === "error" || stopped;
   const { icon, title } = describe(part, !running);
   const hasDetail = Boolean(part.input || part.output);
+  // What the tool made for the user (an image, a shared file) stays visible under its step; a running sub-agent
+  // group shows each member's status.
+  const files = part.files?.length ? (
+    <FileList files={part.files} />
+  ) : running && part.agents?.length ? (
+    <SubagentList agents={part.agents} />
+  ) : null;
 
   const line = (
     <TraceLine status={running ? "running" : failed ? "error" : undefined}>
@@ -212,25 +346,34 @@ function ToolStep({ part, streaming }: { part: ToolPart; streaming: boolean }) {
       </TraceTitle>
     </TraceLine>
   );
-  if (!hasDetail) return <Trace>{line}</Trace>;
+  if (!hasDetail)
+    return (
+      <>
+        <Trace>{line}</Trace>
+        {files}
+      </>
+    );
 
   return (
-    <Trace>
-      <TraceCollapsible>
-        <TraceCollapsibleTrigger>{line}</TraceCollapsibleTrigger>
-        <TraceCollapsibleContent>
-          <div className="flex flex-col gap-3">
-            {part.name !== "ask_user" && part.name !== "wait_for" && (
-              <Output label="Input" text={prettyInput(part)} />
-            )}
-            <Output
-              label={failed ? "Error" : "Result"}
-              text={part.output ?? ""}
-            />
-          </div>
-        </TraceCollapsibleContent>
-      </TraceCollapsible>
-    </Trace>
+    <>
+      <Trace>
+        <TraceCollapsible>
+          <TraceCollapsibleTrigger>{line}</TraceCollapsibleTrigger>
+          <TraceCollapsibleContent>
+            <div className="flex flex-col gap-3">
+              {part.name !== "ask_user" && part.name !== "wait_for" && (
+                <Output label="Input" text={prettyInput(part)} />
+              )}
+              <Output
+                label={failed ? "Error" : "Result"}
+                text={part.output ?? ""}
+              />
+            </div>
+          </TraceCollapsibleContent>
+        </TraceCollapsible>
+      </Trace>
+      {files}
+    </>
   );
 }
 
@@ -288,6 +431,7 @@ export function AgentParts({
             </Markdown>
           ) : null;
         }
+        if (part.type === "file") return null; // only user messages carry these
         if (part.type === "reasoning") {
           // biome-ignore lint/suspicious/noArrayIndexKey: parts are append-only
           return <ReasoningStep key={i} text={part.text} streaming={live} />;

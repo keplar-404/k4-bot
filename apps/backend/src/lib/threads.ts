@@ -1,4 +1,4 @@
-import { and, count, eq, gte, sql } from "drizzle-orm";
+import { and, count, countDistinct, eq, gte, isNull, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { agentUsage, chatMessage, chatThread } from "../db/schema";
 import type { Env } from "./env";
@@ -40,11 +40,13 @@ export async function tokensUsedToday(db: Db, userId: string): Promise<number> {
 
 /**
  * Daily spend guard, checked before a run is started. Runs are counted from the
- * user's own messages, so a run that crashes still counts.
+ * user's own messages (so a run that crashes still counts), plus the runs of chats
+ * deleted with their bot today (their usage rows stay), so deleting a bot never
+ * resets the count.
  * Returns a user-facing reason when the limit is hit.
  */
 export async function quotaExceeded(db: Db, env: Env, userId: string): Promise<string | null> {
-  const [[runs], tokens] = await Promise.all([
+  const [[runs], [deletedRuns], tokens] = await Promise.all([
     db
       .select({ used: count() })
       .from(chatMessage)
@@ -56,10 +58,20 @@ export async function quotaExceeded(db: Db, env: Env, userId: string): Promise<s
           gte(chatMessage.createdAt, startOfUtcDay()),
         ),
       ),
+    db
+      .select({ used: countDistinct(agentUsage.runId) })
+      .from(agentUsage)
+      .where(
+        and(
+          eq(agentUsage.userId, userId),
+          isNull(agentUsage.threadId),
+          gte(agentUsage.createdAt, startOfUtcDay()),
+        ),
+      ),
     tokensUsedToday(db, userId),
   ]);
 
-  if (Number(runs?.used ?? 0) >= env.MAX_RUNS_PER_USER) {
+  if (Number(runs?.used ?? 0) + Number(deletedRuns?.used ?? 0) >= env.MAX_RUNS_PER_USER) {
     return `Daily limit of ${env.MAX_RUNS_PER_USER} messages reached. Resets at 00:00 UTC.`;
   }
   if (tokens >= env.MAX_DAILY_TOKENS_PER_USER) {

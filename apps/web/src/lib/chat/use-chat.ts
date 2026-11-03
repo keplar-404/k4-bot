@@ -19,6 +19,7 @@ import { backoffMs, canRetry, type OutboxItem } from "./outbox";
 import {
   type ChatErrorInfo,
   type ChatMessageView,
+  type FileRef,
   networkError,
   type RunState,
 } from "./protocol";
@@ -49,11 +50,13 @@ function rowsToViews(rows: MessageRow[]): ChatMessageView[] {
   return rows.map((r) => {
     const assistant = r.role !== "user";
     const parts = assistant ? mergeToolParts(r.parts ?? []) : (r.parts ?? []);
+    const files = parts.flatMap((p) => (p.type === "file" ? [p.file] : []));
     return {
       id: r.id,
       role: assistant ? "assistant" : "user",
       text: textOfParts(parts),
       ...(assistant ? { parts } : {}),
+      ...(files.length ? { files } : {}),
       state: "sent",
       createdAt: new Date(r.createdAt).getTime() || Date.now(),
       seq: r.seq,
@@ -144,6 +147,7 @@ export function useChat(botId: string) {
         id: i.id,
         role: "user",
         text: i.content,
+        files: i.files,
         state: "failed",
         createdAt: i.createdAt,
         error: i.error ?? networkError(),
@@ -286,6 +290,7 @@ export function useChat(botId: string) {
       content: string,
       messageId: string,
       rerun = false,
+      files?: FileRef[],
     ) => {
       if (inflightRef.current.has(messageId)) return;
       inflightRef.current.add(messageId);
@@ -294,6 +299,7 @@ export function useChat(botId: string) {
           threadId,
           messageId,
           content,
+          fileIds: files?.length ? files.map((f) => f.id) : undefined,
           modelId: modelIdRef.current,
           reasoningEffort: reasoningEffortRef.current,
           retry: rerun || undefined,
@@ -345,9 +351,9 @@ export function useChat(botId: string) {
   );
 
   const send = useCallback(
-    async (text: string) => {
+    async (text: string, files: FileRef[] = []) => {
       const content = text.trim();
-      if (!content) return;
+      if (!content && files.length === 0) return;
       setError(null);
 
       let threadId = threadRef.current;
@@ -372,6 +378,7 @@ export function useChat(botId: string) {
             id,
             role: "user",
             text: content,
+            ...(files.length ? { files } : {}),
             state: "sending",
             createdAt: Date.now(),
           },
@@ -386,13 +393,14 @@ export function useChat(botId: string) {
           id,
           threadId,
           content,
+          ...(files.length ? { files } : {}),
           createdAt: Date.now(),
           attempts: 0,
           state: "sending",
         },
       ];
       persistOutbox(threadId);
-      await deliver(threadId, content, id);
+      await deliver(threadId, content, id, false, files);
     },
     [botId, connect, deliver, persistOutbox, sync],
   );
@@ -445,6 +453,7 @@ export function useChat(botId: string) {
         question.text,
         question.id,
         target.role === "assistant",
+        question.files,
       );
     },
     [deliver, sync],

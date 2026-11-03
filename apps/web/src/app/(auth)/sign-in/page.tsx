@@ -3,7 +3,7 @@
 import { Loader2Icon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,7 +16,12 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { signIn } from "@/lib/auth-client";
+import { authClient, signIn } from "@/lib/auth-client";
+import { safeCallback } from "@/lib/auth-redirect";
+
+/** Where the visitor was going before being sent here (a same-site path only). */
+const callbackTarget = () =>
+  safeCallback(new URL(window.location.href).searchParams.get("callbackUrl"));
 
 export default function SignInPage() {
   const router = useRouter();
@@ -25,18 +30,23 @@ export default function SignInPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [unverified, setUnverified] = useState(false);
+  const [resending, setResending] = useState(false);
   const submittingRef = useRef(false);
 
-  // The account-deletion email link lands here once the account is gone.
-  useEffect(() => {
-    const url = new URL(window.location.href);
-    if (url.searchParams.get("deleted") !== "1") return;
-    toast.success("Your account was deleted", {
-      description: "Your bots, their chats and your computer were removed.",
+  async function resendVerification() {
+    setResending(true);
+    const { error } = await authClient.sendVerificationEmail({
+      email,
+      callbackURL: `${window.location.origin}${callbackTarget()}`,
     });
-    url.searchParams.delete("deleted");
-    window.history.replaceState(null, "", url);
-  }, []);
+    setResending(false);
+    if (error) toast.error(error.message ?? "Could not send the email.");
+    else
+      toast.success("Verification email sent", {
+        description: `Check ${email}.`,
+      });
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -44,13 +54,16 @@ export default function SignInPage() {
     submittingRef.current = true;
     setLoading(true);
     setError(null);
+    setUnverified(false);
     try {
       const { error } = await signIn.email({ email, password });
       if (error) {
+        setUnverified(error.code === "EMAIL_NOT_VERIFIED");
         setError(error.message ?? "Sign in failed");
         return;
       }
-      router.push("/dashboard");
+      // replace, not push: Back must not return to the sign-in form.
+      router.replace(callbackTarget());
     } finally {
       setLoading(false);
       submittingRef.current = false;
@@ -61,7 +74,7 @@ export default function SignInPage() {
     setGoogleLoading(true);
     await signIn.social({
       provider: "google",
-      callbackURL: `${window.location.origin}/dashboard`,
+      callbackURL: `${window.location.origin}${callbackTarget()}`,
     });
     setGoogleLoading(false);
   }
@@ -95,6 +108,18 @@ export default function SignInPage() {
             />
           </div>
           {error && <p className="text-sm text-destructive">{error}</p>}
+          {unverified && (
+            <Button
+              type="button"
+              variant="link"
+              className="h-auto p-0 text-sm"
+              disabled={resending}
+              onClick={() => void resendVerification()}
+            >
+              {resending && <Loader2Icon className="animate-spin" />}
+              Resend the verification email
+            </Button>
+          )}
           <Button
             type="submit"
             className="w-full cursor-pointer"

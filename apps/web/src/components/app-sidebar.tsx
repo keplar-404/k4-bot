@@ -2,6 +2,7 @@
 
 import {
   BotIcon,
+  FolderOpenIcon,
   LayoutDashboardIcon,
   MonitorIcon,
   PuzzleIcon,
@@ -9,6 +10,7 @@ import {
   UserIcon,
 } from "lucide-react";
 import type * as React from "react";
+import { IntegrationsDialog } from "@/components/integrations/integrations-dialog";
 import { NavMain } from "@/components/nav-main";
 import { NavProjects } from "@/components/nav-projects";
 import { NavUser } from "@/components/nav-user";
@@ -23,12 +25,23 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from "@/components/ui/sidebar";
+import { openIntegrations } from "@/lib/integrations";
 
 const navItems = [
   { title: "Dashboard", url: "/dashboard", icon: <LayoutDashboardIcon /> },
-  { title: "MCP", url: "/dashboard/mcp", icon: <ServerIcon /> },
-  { title: "Skills", url: "/dashboard/skills", icon: <PuzzleIcon /> },
+  // Skills and MCP open one dialog (tabs), on the tab that was clicked.
+  {
+    title: "Skills",
+    icon: <PuzzleIcon />,
+    onSelect: () => openIntegrations("skills"),
+  },
+  {
+    title: "MCP",
+    icon: <ServerIcon />,
+    onSelect: () => openIntegrations("mcp"),
+  },
   { title: "VM machine", url: "/dashboard/vm", icon: <MonitorIcon /> },
+  { title: "Files", url: "/dashboard/files", icon: <FolderOpenIcon /> },
   { title: "Avatar", url: "/dashboard/avatar", icon: <UserIcon /> },
 ];
 
@@ -56,6 +69,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavUser />
       </SidebarFooter>
       <SidebarRail />
+      <IntegrationsDialog />
     </Sidebar>
   );
 }

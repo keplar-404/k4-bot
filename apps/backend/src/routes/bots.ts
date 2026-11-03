@@ -1,5 +1,6 @@
 import { Hono } from "hono";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
+import type { Db } from "../db";
 import { getRequestContext } from "../lib/context";
 import { validate } from "../lib/validate";
 import { createBotSchema, setBotModelSchema } from "../lib/schemas/bot";
@@ -8,17 +9,49 @@ import { userLimit } from "../middleware/rate-limit";
 import { computerFor } from "../computer/sandbox-backend";
 import { cleanupThreads } from "../lib/cleanup";
 import { resolveModel } from "../agent/models";
-import { bot, chatThread } from "../db/schema";
+import { domainFor, publicDomains } from "../agent/domains";
+import { bot, botMcpServer, botSkill, chatThread, userMcpServer, userSkill } from "../db/schema";
+
+/**
+ * Replaces a bot's skills and connected apps with the given ones, keeping only those the user owns (an id from
+ * another account is dropped, never linked). Omitted lists are left as they are.
+ */
+async function setBotIntegrations(db: Db, userId: string, botId: string, skillIds?: string[], mcpServerIds?: string[]) {
+  if (skillIds) {
+    const owned = skillIds.length
+      ? await db.select({ id: userSkill.id }).from(userSkill).where(and(eq(userSkill.userId, userId), inArray(userSkill.id, skillIds)))
+      : [];
+    await db.delete(botSkill).where(eq(botSkill.botId, botId));
+    if (owned.length) await db.insert(botSkill).values(owned.map((s) => ({ botId, userSkillId: s.id })));
+  }
+  if (mcpServerIds) {
+    const owned = mcpServerIds.length
+      ? await db.select({ id: userMcpServer.id }).from(userMcpServer).where(and(eq(userMcpServer.userId, userId), inArray(userMcpServer.id, mcpServerIds)))
+      : [];
+    await db.delete(botMcpServer).where(eq(botMcpServer.botId, botId));
+    if (owned.length) await db.insert(botMcpServer).values(owned.map((s) => ({ botId, userMcpServerId: s.id })));
+  }
+}
 
 const bots = new Hono<AuthGuardEnv>()
   .use("*", authGuard)
+  // Per-role defaults and suggestions for the bot form (static: changes only with a deploy).
+  .get("/domains", (c) => c.json({ domains: publicDomains() }, 200, { "Cache-Control": "private, max-age=3600" }))
+
   .get("/", async (c) => {
     const { db } = getRequestContext(c);
-    const rows = await db
+    const userId = c.get("session").user.id;
+    const [rows, skills, apps] = await Promise.all([
+      db
       .select({
         id: bot.id,
         name: bot.name,
         description: bot.description,
+        role: bot.role,
+        roleTitle: bot.roleTitle,
+        subagentsEnabled: bot.subagentsEnabled,
+        maxSubagents: bot.maxSubagents,
+        maxParallelTools: bot.maxParallelTools,
         shape: bot.shape,
         color: bot.color,
         expression: bot.expression,
@@ -26,35 +59,58 @@ const bots = new Hono<AuthGuardEnv>()
         reasoningEffort: bot.reasoningEffort,
       })
       .from(bot)
-      .where(eq(bot.userId, c.get("session").user.id))
-      .orderBy(desc(bot.createdAt));
+      .where(eq(bot.userId, userId))
+      .orderBy(desc(bot.createdAt)),
+      db
+        .select({ botId: botSkill.botId, id: botSkill.userSkillId })
+        .from(botSkill)
+        .innerJoin(userSkill, eq(userSkill.id, botSkill.userSkillId))
+        .where(eq(userSkill.userId, userId)),
+      db
+        .select({ botId: botMcpServer.botId, id: botMcpServer.userMcpServerId })
+        .from(botMcpServer)
+        .innerJoin(userMcpServer, eq(userMcpServer.id, botMcpServer.userMcpServerId))
+        .where(eq(userMcpServer.userId, userId)),
+    ]);
+    const idsOf = (links: Array<{ botId: string; id: string }>, botId: string) => links.filter((l) => l.botId === botId).map((l) => l.id);
     // No HTTP caching: the client keeps its own TTL cache and must never
     // re-serve a stale list over an optimistic create/update/delete.
     c.header("Cache-Control", "no-store");
-    return c.json({ bots: rows });
+    return c.json({ bots: rows.map((r) => ({ ...r, skillIds: idsOf(skills, r.id), mcpServerIds: idsOf(apps, r.id) })) });
   })
 
   .post("/", userLimit, validate("json", createBotSchema), async (c) => {
     const { db } = getRequestContext(c);
+    const userId = c.get("session").user.id;
+    const { skillIds, mcpServerIds, ...fields } = c.req.valid("json");
+    // Capabilities the form did not send come from the role (e.g. research bots spawn sub-agents).
+    const defaults = domainFor(fields.role).defaults;
     const [created] = await db
       .insert(bot)
       .values({
         id: crypto.randomUUID(),
-        userId: c.get("session").user.id,
-        ...c.req.valid("json"),
+        userId,
+        ...fields,
+        subagentsEnabled: fields.subagentsEnabled ?? defaults.subagents,
+        maxSubagents: fields.maxSubagents ?? defaults.maxSubagents,
+        maxParallelTools: fields.maxParallelTools ?? defaults.maxParallelTools,
       })
       .returning();
-    return c.json({ bot: created }, 201);
+    await setBotIntegrations(db, userId, created!.id, skillIds, mcpServerIds);
+    return c.json({ bot: { ...created, skillIds: skillIds ?? [], mcpServerIds: mcpServerIds ?? [] } }, 201);
   })
 
   .patch("/:id", userLimit, validate("json", createBotSchema), async (c) => {
     const { db } = getRequestContext(c);
+    const userId = c.get("session").user.id;
+    const { skillIds, mcpServerIds, ...fields } = c.req.valid("json");
     const [updated] = await db
       .update(bot)
-      .set(c.req.valid("json"))
-      .where(and(eq(bot.id, c.req.param("id")), eq(bot.userId, c.get("session").user.id)))
+      .set(fields)
+      .where(and(eq(bot.id, c.req.param("id")), eq(bot.userId, userId)))
       .returning();
     if (!updated) return c.json({ error: "NOT_FOUND", message: "Bot not found" }, 404);
+    await setBotIntegrations(db, userId, updated.id, skillIds, mcpServerIds);
     return c.json({ bot: updated });
   })
 

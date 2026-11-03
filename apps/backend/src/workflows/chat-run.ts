@@ -1,13 +1,19 @@
 import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from "cloudflare:workers";
 import { Command, GraphRecursionError } from "@langchain/langgraph";
-import { and, eq, sql } from "drizzle-orm";
-import { buildAgent } from "../agent/agent";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
+import { type AgentBot, buildAgent } from "../agent/agent";
 import { NeonHttpCheckpointer } from "../agent/checkpointer/neon-http-checkpointer";
-import { DEFAULT_MODEL_ID } from "../agent/models";
-import type { Part } from "../agent/parts";
+import { DEFAULT_MODEL_ID, resolveModel } from "../agent/models";
+import type { FileRef, Part } from "../agent/parts";
+import { MAX_VIEW_BYTES, MAX_VIEW_IMAGES, toDataUrl } from "../agent/tools/files";
+import { connectBotApps, type BotApps } from "../agent/mcp";
+import { collectUnfinished, GroupHub } from "../agent/tools/subagents";
 import { consumeRun, type RunStream } from "../agent/run-stream";
+import { loadBotSkills } from "../lib/skills";
+import { catalogMcp } from "../lib/catalog/mcp";
 import { createDb, type Db } from "../db";
-import { agentUsage, bot, chatMessage, chatThread } from "../db/schema";
+import { agentUsage, bot, chatFile, chatMessage, chatThread, userMcpServer, userSkill } from "../db/schema";
+import { formatBytes, isInline, toRef } from "../lib/files";
 import { parseEnv, type Env } from "../lib/env";
 import { getOwnedThread, nextMessageSeq, tokensUsedToday } from "../lib/threads";
 
@@ -17,6 +23,8 @@ export interface ChatRunParams {
   userId: string;
   userMessageId: string;
   content: string;
+  /** Files the user attached (uploaded beforehand with POST /files). */
+  fileIds?: string[];
   modelId?: string;
   reasoningEffort?: string;
 }
@@ -61,6 +69,10 @@ function describeActivity(name: string, input: string): string | null {
     case "glob":
     case "grep":
       return `Searched files ${String(a.pattern ?? "")}`.trim();
+    case "share_file":
+      return `Shared ${path} with the user`;
+    case "copy_to_computer":
+      return `Copied a file to ${path || "its files folder"}`;
     default:
       return null;
   }
@@ -121,7 +133,16 @@ export class ChatRunWorkflow extends WorkflowEntrypoint<Env, ChatRunParams> {
     const botRow = await step.do("load-context", async () => {
       const db = createDb(env.DATABASE_URL);
       const [row] = await db
-        .select({ id: bot.id, name: bot.name, description: bot.description })
+        .select({
+          id: bot.id,
+          name: bot.name,
+          description: bot.description,
+          role: bot.role,
+          roleTitle: bot.roleTitle,
+          subagentsEnabled: bot.subagentsEnabled,
+          maxSubagents: bot.maxSubagents,
+          maxParallelTools: bot.maxParallelTools,
+        })
         .from(chatThread)
         .innerJoin(bot, eq(bot.id, chatThread.botId))
         .where(and(eq(chatThread.id, params.threadId), eq(chatThread.userId, params.userId)))
@@ -130,20 +151,36 @@ export class ChatRunWorkflow extends WorkflowEntrypoint<Env, ChatRunParams> {
       return row;
     });
 
-    await step.do("save-user-message", async () => {
+    const attached = await step.do("save-user-message", async () => {
       const db = createDb(env.DATABASE_URL);
+      // The user's own files only; they now belong to this chat (and stay in the Files page if it is deleted).
+      const files: FileRef[] = params.fileIds?.length
+        ? (
+            await db
+              .select()
+              .from(chatFile)
+              .where(and(eq(chatFile.userId, params.userId), inArray(chatFile.id, params.fileIds)))
+          ).map(toRef)
+        : [];
+      if (files.length) {
+        await db
+          .update(chatFile)
+          .set({ threadId: params.threadId, botId: botRow.id })
+          .where(and(eq(chatFile.userId, params.userId), inArray(chatFile.id, files.map((f) => f.id)), isNull(chatFile.threadId)));
+      }
       await db
         .insert(chatMessage)
         .values({
           id: params.userMessageId,
           threadId: params.threadId,
           role: "user",
-          parts: [{ type: "text", text: params.content }],
+          parts: [{ type: "text", text: params.content }, ...files.map((file) => ({ type: "file" as const, file }))],
           runId: params.runId,
           seq: await nextMessageSeq(db, params.threadId),
         })
         // A retried send reuses the id, so the message is stored once.
         .onConflictDoNothing();
+      return files;
     });
 
     let resume: unknown;
@@ -152,7 +189,7 @@ export class ChatRunWorkflow extends WorkflowEntrypoint<Env, ChatRunParams> {
         `slice-${slice}`,
         // No automatic retry: re-running a half-streamed slice would publish its events twice.
         { retries: { limit: 0, delay: 1 }, timeout: "25 minutes" },
-        () => this.runSlice(env, params, botRow, slice, resume),
+        () => this.runSlice(env, params, botRow, attached, slice, resume),
       );
       resume = undefined;
 
@@ -177,7 +214,8 @@ export class ChatRunWorkflow extends WorkflowEntrypoint<Env, ChatRunParams> {
   private async runSlice(
     env: Env,
     params: ChatRunParams,
-    botRow: { id: string; name: string; description: string | null },
+    botRow: AgentBot,
+    attached: FileRef[],
     slice: number,
     resume: unknown,
   ): Promise<SliceResult> {
@@ -205,9 +243,13 @@ export class ChatRunWorkflow extends WorkflowEntrypoint<Env, ChatRunParams> {
 
     const stub = env.COMPUTER_ENABLED && env.E2B_API_KEY ? env.USER_COMPUTER.get(env.USER_COMPUTER.idFromName(userId)) : undefined;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let apps: BotApps | undefined;
+    // This segment's sub-agent groups. They live only while the segment runs, so they must end before it does.
+    const sliceDeadline = Date.now() + SLICE_WALL_MS;
+    const hub = new GroupHub();
 
     try {
-      // The bot or the account was deleted while this run waited or slept: stop quietly (there is no chat left to tell).
+      // The bot was deleted while this run waited or slept: stop quietly (there is no chat left to tell).
       if (!(await getOwnedThread(db, threadId, userId))) return { status: "failed" };
       // Its name for /home/BOTS.md. Storage only in the Durable Object: no E2B call.
       await stub?.registerBot(botRow.id, botRow.name).catch(() => undefined);
@@ -216,8 +258,61 @@ export class ChatRunWorkflow extends WorkflowEntrypoint<Env, ChatRunParams> {
         return { status: "failed" };
       }
 
+      // The user's other bots, so the prompt can say where their files are (one small query, no E2B call).
+      const peers = stub
+        ? await db
+            .select({ id: bot.id, name: bot.name })
+            .from(bot)
+            .where(and(eq(bot.userId, userId), sql`${bot.id} <> ${botRow.id}`))
+        : [];
+
+      // Attached images are shown to a vision model during the whole run (read again per slice: R2 only, no third party).
+      const images: Array<{ name: string; dataUrl: string }> = [];
+      if (env.FILES && resolveModel(params.modelId ?? DEFAULT_MODEL_ID)?.vision) {
+        for (const f of attached.filter((f) => isInline(f.mimeType) && f.size <= MAX_VIEW_BYTES).slice(0, MAX_VIEW_IMAGES)) {
+          const [row] = await db.select({ key: chatFile.storageKey }).from(chatFile).where(and(eq(chatFile.id, f.id), eq(chatFile.userId, userId)));
+          const object = row ? await env.FILES.get(row.key) : null;
+          if (object) images.push({ name: f.name, dataUrl: toDataUrl(f.mimeType, new Uint8Array(await object.arrayBuffer())) });
+        }
+      }
+
+      // The bot's skills (read from R2) and connected apps (MCP servers; tokens decrypted here, for this slice only).
+      const skills = env.FILES ? await loadBotSkills(env.FILES, db, userId, botRow.id) : {};
+      apps = await connectBotApps(env, db, userId, botRow.id);
+      // A bot that spawns sub-agents may give them any skill or app the user installed (two small queries, no third party).
+      const subagents = botRow.subagentsEnabled
+        ? {
+            env,
+            db,
+            userId,
+            threadId,
+            runId,
+            installedSkills: await db
+              .select({ name: userSkill.name, skillId: userSkill.skillId, storageKey: userSkill.storageKey, description: userSkill.description })
+              .from(userSkill)
+              .where(eq(userSkill.userId, userId)),
+            connectedApps: (
+              await db
+                .select({ id: userMcpServer.id, serverId: userMcpServer.serverId, secrets: userMcpServer.secrets })
+                .from(userMcpServer)
+                .where(eq(userMcpServer.userId, userId))
+            ).flatMap((r) => {
+              const entry = catalogMcp(r.serverId);
+              return entry ? [{ ...r, name: entry.name }] : [];
+            }),
+            // Live status of the group for the chat (not stored: the tool's result has the reports).
+            report: (toolCallId: string, agents: unknown) => publish("tool.progress", { id: toolCallId, agents }),
+            hub,
+            sliceDeadline,
+          }
+        : undefined;
+
       const agent = buildAgent({
         bot: botRow,
+        skills,
+        apps,
+        subagents,
+        peers,
         modelId: params.modelId,
         reasoningEffort: params.reasoningEffort,
         openrouterApiKey: env.OPENROUTER_API_KEY,
@@ -225,6 +320,21 @@ export class ChatRunWorkflow extends WorkflowEntrypoint<Env, ChatRunParams> {
         maxOutputTokens: env.MAX_OUTPUT_TOKENS,
         checkpointer: new NeonHttpCheckpointer(db),
         ...(stub ? { computer: { stub, runId } } : {}),
+        ...(env.FILES
+          ? {
+              files: {
+                bucket: env.FILES,
+                db,
+                userId,
+                threadId,
+                runId,
+                imageModel: env.IMAGE_MODEL,
+                maxImagesPerDay: env.MAX_IMAGES_PER_DAY,
+                maxStorageBytes: env.MAX_STORAGE_MB_PER_USER * 1024 * 1024,
+                attached: images,
+              },
+            }
+          : {}),
       }) as unknown as {
         streamEvents(input: unknown, config: object): Promise<RunStream & { abort?: () => void }>;
       };
@@ -234,34 +344,52 @@ export class ChatRunWorkflow extends WorkflowEntrypoint<Env, ChatRunParams> {
       // Clients show a question, approval or sleep until told the run went on.
       if (resume !== undefined) await publish("run.resumed", {});
 
-      const input = resume !== undefined ? new Command({ resume }) : slice === 0 ? { messages: [{ role: "user", content: params.content }] } : null;
+      // Attached files are listed under the message, so the model knows their ids.
+      const content = attached.length
+        ? `${params.content}\n\n[Attached files]\n${attached.map((f) => `- "${f.name}" (${f.mimeType}, ${formatBytes(f.size)}, file id ${f.id})`).join("\n")}`
+        : params.content;
+      // A new message also clears the cached skill list, so skills added to or removed from the bot since the
+      // last message are seen (Deep Agents keeps the list in the thread's state once loaded).
+      const input = resume !== undefined ? new Command({ resume }) : slice === 0 ? { messages: [{ role: "user", content }], skillsMetadata: null } : null;
 
+      const sink = {
+        text: (delta: string) => tokens.push(delta),
+        reasoning: (delta: string) => thoughts.push(delta),
+        toolStart: async (part: { id: string; name: string; input: string }) => {
+          await flushAll();
+          await publish("tool.start", { id: part.id, name: part.name, input: part.input });
+          const line = describeActivity(part.name, part.input);
+          if (line) await stub?.logActivity(botRow.id, line).catch(() => undefined);
+        },
+        toolEnd: (part: { id: string; status: string; output?: string; files?: unknown }) =>
+          publish("tool.end", { id: part.id, status: part.status, output: part.output, files: part.files }),
+        partsChanged: saveProgress,
+      };
       const stream = await agent.streamEvents(input, {
         version: "v3",
         configurable: { thread_id: threadId },
         recursionLimit: env.RUN_SLICE_STEPS,
         durability: "sync",
       });
-      timer = setTimeout(() => stream.abort?.(), SLICE_WALL_MS);
-
-      const { interrupt } = await consumeRun(
-        stream,
-        {
-          text: (delta) => tokens.push(delta),
-          reasoning: (delta) => thoughts.push(delta),
-          toolStart: async (part) => {
-            await flushAll();
-            await publish("tool.start", { id: part.id, name: part.name, input: part.input });
-            const line = describeActivity(part.name, part.input);
-            if (line) await stub?.logActivity(botRow.id, line).catch(() => undefined);
-          },
-          toolEnd: (part) => publish("tool.end", { id: part.id, status: part.status, output: part.output }),
-          partsChanged: saveProgress,
-        },
-        acc,
-      );
+      timer = setTimeout(() => stream.abort?.(), sliceDeadline - Date.now());
+      let { interrupt } = await consumeRun(stream, sink, acc);
       await flushAll();
       await saveProgress();
+
+      // The bot ended its turn while a sub-agent group was still working: wait for the group, then hand its results
+      // back to the bot so it can act on them (they would otherwise be lost when this segment ends).
+      if (!interrupt && hub.groups.size > 0) {
+        const results = await collectUnfinished(hub);
+        if (results) {
+          const followUp = await agent.streamEvents(
+            { messages: [{ role: "user", content: `[Automatic message] Your sub-agent group finished after your last reply. Act on its results now.\n\n${results}` }] },
+            { version: "v3", configurable: { thread_id: threadId }, recursionLimit: env.RUN_SLICE_STEPS, durability: "sync" },
+          );
+          ({ interrupt } = await consumeRun(followUp, sink, acc));
+          await flushAll();
+          await saveProgress();
+        }
+      }
 
       if (interrupt) {
         const payload = (interrupt.payload ?? {}) as { actionRequests?: unknown; kind?: string; question?: string; ms?: number; reason?: string };
@@ -294,6 +422,7 @@ export class ChatRunWorkflow extends WorkflowEntrypoint<Env, ChatRunParams> {
       return { status: "failed" };
     } finally {
       clearTimeout(timer);
+      await apps?.close();
       if (acc.usage.input + acc.usage.output > 0) {
         await db
           .insert(agentUsage)

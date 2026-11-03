@@ -1,3 +1,4 @@
+import { redirectToSignIn } from "@/lib/auth-redirect";
 import {
   type ChatErrorInfo,
   type MessagePart,
@@ -28,6 +29,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw new ChatHttpError(networkError());
   }
   if (!res.ok) {
+    // The session ended (expired or signed out elsewhere): sign in again, then come back here.
+    if (res.status === 401) redirectToSignIn();
     const body = await res.json().catch(() => null);
     throw new ChatHttpError(
       mapHttpError(res.status, body, res.headers.get("retry-after")),
@@ -116,6 +119,7 @@ export function sendMessage(args: {
   threadId: string;
   messageId: string;
   content: string;
+  fileIds?: string[];
   modelId?: string;
   reasoningEffort?: string;
   retry?: boolean;

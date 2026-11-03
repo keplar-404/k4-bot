@@ -51,6 +51,7 @@ const runs = new Hono<AuthGuardEnv>()
             userId,
             userMessageId,
             content: data.content,
+            fileIds: data.fileIds,
             modelId: data.modelId,
             reasoningEffort: data.reasoningEffort,
           } satisfies ChatRunParams,
@@ -65,7 +66,7 @@ const runs = new Hono<AuthGuardEnv>()
       await db
         .update(chatThread)
         .set({
-          title: sql`case when ${chatThread.title} = 'New chat' then ${data.content.slice(0, 80)} else ${chatThread.title} end`,
+          title: sql`case when ${chatThread.title} = 'New chat' then ${(data.content.trim() || "Files").slice(0, 80)} else ${chatThread.title} end`,
         })
         .where(eq(chatThread.id, threadId));
 

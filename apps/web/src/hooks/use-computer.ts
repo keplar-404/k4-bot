@@ -5,11 +5,12 @@ import { ChatHttpError } from "@/lib/chat/client";
 import { backoffMs } from "@/lib/chat/outbox";
 import {
   type ActivityEvent,
+  type WorkingBot,
   type ComputerStatus,
+  closeComputer,
   getStatus,
   keepControl,
   mintSocketToken,
-  pause,
   releaseControl,
   snapshotUrl,
   socketUrl,
@@ -37,6 +38,8 @@ export function useComputer() {
   /** Local clock time the session ends, from the server's "ms left" (immune to clock skew). */
   const [sessionEndsAt, setSessionEndsAt] = useState<number | null>(null);
   const [snapshot, setSnapshot] = useState<string | null>(null);
+  /** Bots that were using the computer when the user tried to put it to sleep: the page asks before going on. */
+  const [blockers, setBlockers] = useState<{ bots: WorkingBot[]; at: number } | null>(null);
   const attempts = useRef(0);
 
   const applyStatus = useCallback((s: ComputerStatus) => {
@@ -178,8 +181,22 @@ export function useComputer() {
           throw e;
         }
       }),
-    pause: () => run("pause", async () => applyStatus(await pause())),
-    wrapUp: () => run("wrap", async () => applyStatus(await wrapUp())),
+    /** Sleeps the computer. If bots are using it, nothing happens yet and `blockers` asks the user what to do. */
+    pause: (force = false) =>
+      run("pause", async () => {
+        const result = await closeComputer(force);
+        if (result.closed) {
+          setBlockers(null);
+          applyStatus(result.status);
+        } else setBlockers({ bots: result.working, at: Date.now() });
+      }),
+    blockers,
+    dismissBlockers: () => setBlockers(null),
+    wrapUp: () =>
+      run("wrap", async () => {
+        setBlockers(null);
+        applyStatus(await wrapUp());
+      }),
     takeControl: () =>
       run("take", async () => {
         const result = await takeControl();

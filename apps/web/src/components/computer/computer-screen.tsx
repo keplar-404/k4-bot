@@ -40,6 +40,8 @@ export function ComputerScreen({
   const [src, setSrc] = useState<string | null>(null);
   const [state, setState] = useState<VncState>("connecting");
   const frameRef = useRef<HTMLIFrameElement>(null);
+  /** The viewer page has reported its state at least once (then the fallback below never overrides it). */
+  const reportedRef = useRef(false);
 
   useEffect(() => {
     if (!enabled) {
@@ -67,7 +69,10 @@ export function ComputerScreen({
   // biome-ignore lint/correctness/useExhaustiveDependencies: reset whenever the viewer URL changes
   useEffect(() => {
     setState("connecting");
-    const reveal = setTimeout(() => setState("connected"), REVEAL_FALLBACK_MS);
+    reportedRef.current = false;
+    const reveal = setTimeout(() => {
+      if (!reportedRef.current) setState("connected");
+    }, REVEAL_FALLBACK_MS);
     return () => clearTimeout(reveal);
   }, [src]);
 
@@ -83,6 +88,7 @@ export function ComputerScreen({
         !data.state
       )
         return;
+      reportedRef.current = true;
       setState(data.state);
     };
     window.addEventListener("message", onMessage);

@@ -21,6 +21,7 @@ import {
   type ComputerStatus,
   type ExecResult,
   type Owner,
+  type WorkingBot,
 } from "./types";
 
 /** E2B sandbox timeout. Extended while there is activity; on expiry E2B pauses (never kills) the computer. */
@@ -33,6 +34,14 @@ const TICK_MS = 30_000;
 const ACTIONS_PER_MINUTE = 90;
 const MAX_PARALLEL_EXEC = 4;
 const MAX_OUTPUT_CHARS = 30_000;
+/** A bot counts as "using the computer" this long after its last shell, file or screen action (and until its run ends). */
+const BUSY_MS = 3 * 60_000;
+/** How long a bot is still told that the computer was shut down under it (a later, unrelated run is not). */
+const CLOSED_TTL_MS = 30 * 60_000;
+/** The tick while bots are wrapping up: the computer sleeps as soon as the last one is done. */
+const WRAP_TICK_MS = 10_000;
+/** Waking needs at least this much of today's computer time left: booting for a few seconds of use is waste. */
+const MIN_WAKE_SECONDS = 60;
 
 /** Our own VNC servers. 5911/6091 is read-only (enforced by x11vnc itself), 5912/6092 is interactive. */
 type Ports = { vnc: number; web: number };
@@ -61,6 +70,22 @@ const cap = (s: string) => (s.length > MAX_OUTPUT_CHARS ? `${s.slice(0, MAX_OUTP
 const MAX_SNAPSHOT_BYTES = 1_900_000;
 const ACTIVITY_KEEP = 200;
 const STAGE_DIR = "/var/lib/k4-stage";
+/** Per bot account, across all of its commands and its browser. */
+const BOT_MAX_PROCESSES = 2048;
+
+/**
+ * Run as root once per computer, before any bot uses it. Bots are ordinary Linux users with no sudo
+ * rights; this closes what is left:
+ *  - the desktop's own account (/home/user) is not readable by bots;
+ *  - bots cannot see other users' processes or their command lines (hidepid);
+ *  - root has no usable password, so `su` cannot become root.
+ * Every step is idempotent and best effort: a template without one of these just skips it.
+ */
+const HARDEN = [
+  "chmod 750 /home/user",
+  "mount -o remount,hidepid=2 /proc",
+  "passwd -l root",
+].map((c) => `${c} >/dev/null 2>&1`).join("; ") + "; true";
 
 /** What is persisted across evictions. */
 type Core = {
@@ -72,6 +97,16 @@ type Core = {
   warned?: boolean;
   wrapping?: boolean;
   snapshotAt?: number;
+};
+
+/**
+ * The computer was shut down while these bots were working. Each is told on its next model call (and by
+ * the error of any computer tool), so it stops and writes a final message instead of trying again.
+ */
+type Closed = {
+  cause: "user" | "quota" | "session";
+  at: number;
+  bots: Record<string, { name: string; told: boolean }>;
 };
 
 /** Thrown to the agent's tools when the computer is not on. Agents never wake it by themselves. */
@@ -96,8 +131,11 @@ export class UserComputerDurableObject extends DurableObject<Env> {
   private gui: Promise<unknown> = Promise.resolve();
   private botUsers = new Set<string>();
   private vncFor?: string;
+  private hardenedFor?: string;
   private execInFlight = 0;
   private recentActions: number[] = [];
+  /** Last time each bot was written to `workers` (the write is throttled: a busy bot acts every second or two). */
+  private marked = new Map<string, number>();
   private runActions = new Map<string, number>();
   private lastDriver?: string;
 
@@ -112,8 +150,8 @@ export class UserComputerDurableObject extends DurableObject<Env> {
   private warned = false;
   private wrapping = false;
   private snapshotAt?: number;
-  /** The account was deleted: this computer never starts again. */
-  private deleted = false;
+  /** True while `pause` runs: calls that fail meanwhile failed because the computer is going to sleep. */
+  private pausing = false;
   /** Set by the sign-up provisioning alarm; any real wake-up clears it, so the computer is not put back to sleep. */
   private provisionOnly = false;
   /** /home/BOTS.md is out of date (a bot was added, renamed or removed). */
@@ -124,15 +162,16 @@ export class UserComputerDurableObject extends DurableObject<Env> {
     // This object's own SQLite database: survives evictions and restarts.
     //  activity:     what the bots did on the computer (shown in the panel);
     //  bots:         names of the bots that have an account here (for /home/BOTS.md);
+    //  workers:      bots using the computer in a run that has not ended (cleared when its slice ends);
     //  removed_bots: deleted bots. Their account is purged now if the computer is awake, otherwise on
     //                its next wake, and a run still in flight can never use the computer again.
     ctx.storage.sql.exec(`
       CREATE TABLE IF NOT EXISTS activity (at INTEGER NOT NULL, bot_id TEXT NOT NULL, text TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS bots (bot_id TEXT PRIMARY KEY, name TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS removed_bots (bot_id TEXT PRIMARY KEY, purged INTEGER NOT NULL DEFAULT 0);
+      CREATE TABLE IF NOT EXISTS workers (bot_id TEXT PRIMARY KEY, last_touch INTEGER NOT NULL);
     `);
     ctx.blockConcurrencyWhile(async () => {
-      this.deleted = (await ctx.storage.get<boolean>("deleted")) ?? false;
       const saved = await ctx.storage.get<Core>("core");
       if (saved) {
         // After eviction we have no sandbox object, but we know its id and that it was running: it stays
@@ -162,18 +201,65 @@ export class UserComputerDurableObject extends DurableObject<Env> {
     return u?.day === today() ? u.seconds : 0;
   }
 
+  private get wrapMs() {
+    return this.cfg.COMPUTER_WRAP_MINUTES * 60_000;
+  }
+
+  /**
+   * When the computer will go to sleep by itself: the end of this session or the moment today's computer
+   * time runs out, whichever comes first. Usage is saved at every tick, so the quota end is exact.
+   */
+  private async endsAt(): Promise<{ at: number; reason: "session" | "quota" }> {
+    const left = this.cfg.COMPUTER_MAX_MINUTES_PER_DAY * 60 - (await this.usedSeconds());
+    const quotaAt = this.lastTick + Math.max(0, left) * 1000;
+    const sessionAt = this.sessionEndsAt || Number.POSITIVE_INFINITY;
+    return quotaAt <= sessionAt ? { at: quotaAt, reason: "quota" } : { at: sessionAt, reason: "session" };
+  }
+
+  /** Bots that used the computer a moment ago and whose run has not ended (`except` leaves one out). */
+  private working(except?: string): WorkingBot[] {
+    return this.ctx.storage.sql
+      .exec<{ botId: string; name: string }>(
+        `SELECT w.bot_id AS botId, COALESCE(b.name, 'A bot') AS name FROM workers w LEFT JOIN bots b ON b.bot_id = w.bot_id
+         WHERE w.last_touch > ? AND w.bot_id <> ? ORDER BY w.last_touch DESC`,
+        Date.now() - BUSY_MS,
+        except ?? "",
+      )
+      .toArray();
+  }
+
+  /** Called on every shell, file or screen action of a bot. Storage only: never touches E2B. */
+  private markWorking(botId: string) {
+    const now = Date.now();
+    if (now - (this.marked.get(botId) ?? 0) < 15_000) return;
+    this.marked.set(botId, now);
+    this.ctx.storage.sql.exec(
+      "INSERT INTO workers (bot_id, last_touch) VALUES (?, ?) ON CONFLICT (bot_id) DO UPDATE SET last_touch = excluded.last_touch",
+      botId,
+      now,
+    );
+  }
+
   async status(): Promise<ComputerStatus> {
     const now = Date.now();
+    const used = await this.usedSeconds();
+    const end = this.state === "running" ? await this.endsAt() : null;
     return {
       state: this.state,
       lease: this.lease && this.lease.until > now ? this.lease.owner : null,
-      minutesUsedToday: Math.round((await this.usedSeconds()) / 60),
+      minutesUsedToday: Math.round(used / 60),
       minutesLimit: this.cfg.COMPUTER_MAX_MINUTES_PER_DAY,
+      limitReached: this.cfg.COMPUTER_MAX_MINUTES_PER_DAY * 60 - used < MIN_WAKE_SECONDS,
+      working: this.state === "running" ? this.working() : [],
       message: this.message,
-      session:
-        this.state === "running" && this.sessionEndsAt
-          ? { endsInMs: Math.max(0, this.sessionEndsAt - now), warning: this.warned, wrapping: this.wrapping }
-          : undefined,
+      session: end
+        ? {
+            endsInMs: Math.max(0, end.at - now),
+            warning: this.warned || end.at - now <= this.wrapMs,
+            wrapping: this.wrapping,
+            reason: end.reason,
+          }
+        : undefined,
       snapshotAt: this.snapshotAt,
       updatedAt: now,
     };
@@ -211,15 +297,15 @@ export class UserComputerDurableObject extends DurableObject<Env> {
   // ---------------------------------------------------------------- lifecycle
 
   private assertEnabled() {
-    if (this.deleted) throw new Error("This account was deleted.");
     const cfg = this.cfg;
     if (!cfg.COMPUTER_ENABLED) throw new Error("The computer feature is turned off.");
     if (!cfg.E2B_API_KEY) throw new Error("The computer is not configured on this server.");
   }
 
+  /** A running computer may use its last second; waking it needs a minute left (MIN_WAKE_SECONDS). */
   private async assertQuota() {
-    const limit = this.cfg.COMPUTER_MAX_MINUTES_PER_DAY * 60;
-    if ((await this.usedSeconds()) >= limit) {
+    const left = this.cfg.COMPUTER_MAX_MINUTES_PER_DAY * 60 - (await this.usedSeconds());
+    if (left <= 0 || (this.state !== "running" && left < MIN_WAKE_SECONDS)) {
       throw new Error(`Daily computer time limit reached (${this.cfg.COMPUTER_MAX_MINUTES_PER_DAY} min). It resets at 00:00 UTC.`);
     }
   }
@@ -237,7 +323,7 @@ export class UserComputerDurableObject extends DurableObject<Env> {
    */
   async provision(): Promise<void> {
     const cfg = this.cfg;
-    if (this.deleted || !cfg.COMPUTER_ENABLED || !cfg.E2B_API_KEY) return;
+    if (!cfg.COMPUTER_ENABLED || !cfg.E2B_API_KEY) return;
     if (await this.ctx.storage.get<string>("sandboxId")) return;
     await this.ctx.storage.put("provision", true);
     await this.ctx.storage.setAlarm(Date.now());
@@ -245,7 +331,7 @@ export class UserComputerDurableObject extends DurableObject<Env> {
 
   /** If it throws, the flag stays and the platform retries the alarm (with backoff). */
   private async runProvisioning() {
-    const needed = !this.deleted && (this.state === "off" || this.state === "error") && !(await this.ctx.storage.get<string>("sandboxId"));
+    const needed = (this.state === "off" || this.state === "error") && !(await this.ctx.storage.get<string>("sandboxId"));
     if (needed) {
       this.provisionOnly = true;
       try {
@@ -256,24 +342,6 @@ export class UserComputerDurableObject extends DurableObject<Env> {
       }
     }
     await this.ctx.storage.delete("provision");
-  }
-
-  /** Account deletion: destroys the computer and its disk, wipes this object's storage, and refuses to start again. */
-  async deleteAll(): Promise<void> {
-    // Refuse new starts at once, and let one already in progress settle first: otherwise it would finish
-    // after this and leave a running computer (billing) that nothing owns any more.
-    this.deleted = true;
-    await this.starting?.catch(() => undefined);
-    const id = this.sbx?.sandboxId ?? (await this.ctx.storage.get<string>("sandboxId"));
-    this.sbx = undefined;
-    this.lease = null;
-    if (id) await Sandbox.kill(id, { apiKey: this.cfg.E2B_API_KEY }).catch((e) => console.error("[computer] kill", e));
-    for (const ws of this.ctx.getWebSockets()) ws.close(1000, "account deleted");
-    await this.ctx.storage.deleteAlarm();
-    await this.ctx.storage.deleteAll();
-    this.deleted = true;
-    this.state = "off";
-    await this.ctx.storage.put("deleted", true);
   }
 
   private async live(): Promise<Sandbox> {
@@ -306,6 +374,17 @@ export class UserComputerDurableObject extends DurableObject<Env> {
           if (!(error instanceof NotFoundError)) throw error;
         }
       }
+      // One computer per user: if this object lost track of the user's computer (it crashed between creating
+      // it and saving its id), find it by its metadata and use it instead of creating a second one.
+      if (!sbx) {
+        sbx = await this.findOwnSandbox(apiKey);
+        if (sbx) {
+          this.botUsers.clear();
+          this.vncFor = undefined;
+          this.directoryDirty = true;
+          await this.ctx.storage.put("sandboxId", sbx.sandboxId);
+        }
+      }
       if (!sbx) {
         if (!reconnecting) await this.setState("starting", "Setting up a new computer…");
         const allowed = parseAllowedHosts(cfg.COMPUTER_ALLOWED_HOSTS);
@@ -328,11 +407,6 @@ export class UserComputerDurableObject extends DurableObject<Env> {
           metadata: { app: "k4-bot", userId: this.ctx.id.name ?? "unknown" },
         };
         sbx = cfg.E2B_TEMPLATE === "desktop" ? await Sandbox.create(options) : await Sandbox.create(cfg.E2B_TEMPLATE, options);
-        // The account was deleted while this was being created: it must not outlive it.
-        if (this.deleted) {
-          await Sandbox.kill(sbx.sandboxId, { apiKey }).catch(() => undefined);
-          throw new Error("This account was deleted.");
-        }
         this.botUsers.clear();
         this.vncFor = undefined;
         this.directoryDirty = true;
@@ -342,6 +416,7 @@ export class UserComputerDurableObject extends DurableObject<Env> {
       }
 
       this.sbx = sbx;
+      await this.harden(sbx);
       // Bots deleted while the computer slept: remove their accounts and files before anyone can use it.
       await this.purgeRemovedBots(sbx).catch((e) => console.error("[computer] purge", e));
       if (!reconnecting) {
@@ -357,6 +432,9 @@ export class UserComputerDurableObject extends DurableObject<Env> {
         this.sessionEndsAt = now + cfg.COMPUTER_SESSION_MINUTES * 60_000;
         this.warned = false;
         this.wrapping = false;
+        this.ctx.storage.sql.exec("DELETE FROM workers");
+        this.marked.clear();
+        await this.ctx.storage.delete("closed");
         await this.setState("running");
         await this.scheduleAlarm();
       }
@@ -373,6 +451,15 @@ export class UserComputerDurableObject extends DurableObject<Env> {
    * The screen is saved first, so the asleep preview shows where things were left.
    */
   async pause(reason = "Asleep. Your work is saved."): Promise<void> {
+    this.pausing = true;
+    try {
+      await this.sleepNow(reason);
+    } finally {
+      this.pausing = false;
+    }
+  }
+
+  private async sleepNow(reason: string) {
     const sbx = this.sbx;
     this.sbx = undefined;
     this.lease = null;
@@ -393,54 +480,156 @@ export class UserComputerDurableObject extends DurableObject<Env> {
     if (this.state === "running" || this.state === "starting") await this.setState("paused", reason);
   }
 
-  /** The user chose "Wrap up": the bots are told to finish, and the computer sleeps after COMPUTER_WRAP_MINUTES. */
+  /**
+   * Shuts the computer down on someone's say-so. While bots are using it that needs `force`: without it nothing
+   * happens and the bots are returned, so the caller can ask first (the server is the judge, not a possibly
+   * stale screen). Forced, the bots are remembered so each is told it was shut down and writes a final message.
+   * `exceptBotId` is the bot that asked for it (it knows).
+   */
+  async close(options: {
+    reason: string;
+    cause: Closed["cause"];
+    force: boolean;
+    exceptBotId?: string;
+  }): Promise<{ closed: true } | { closed: false; working: WorkingBot[] }> {
+    const busy = this.state === "running" ? this.working(options.exceptBotId) : [];
+    if (busy.length > 0 && !options.force) return { closed: false, working: busy };
+    await this.rememberClosed(options.cause, busy);
+    await this.pause(options.reason);
+    return { closed: true };
+  }
+
+  /** Who is using the computer besides `botId`, and whether the user holds the mouse. For a bot about to turn it off. */
+  async shutdownCheck(botId: string): Promise<{ others: string[]; userInControl: boolean }> {
+    if (this.state !== "running") return { others: [], userInControl: false };
+    return { others: this.working(botId).map((b) => b.name), userInControl: this.holder()?.kind === "user" };
+  }
+
+  private async rememberClosed(cause: Closed["cause"], bots: WorkingBot[]) {
+    if (bots.length === 0) return;
+    await this.ctx.storage.put("closed", {
+      cause,
+      at: Date.now(),
+      bots: Object.fromEntries(bots.map((b) => [b.botId, { name: b.name, told: false }])),
+    } satisfies Closed);
+  }
+
+  /** The record of a shutdown that hit this bot, if it is recent. */
+  private async closedFor(botId?: string): Promise<Closed | null> {
+    if (!botId) return null;
+    const closed = await this.ctx.storage.get<Closed>("closed");
+    return closed && Date.now() - closed.at < CLOSED_TTL_MS && closed.bots[botId] ? closed : null;
+  }
+
+  /** What a bot is told once the computer was shut down while it worked. */
+  private closedText(cause: Closed["cause"]): string {
+    switch (cause) {
+      case "user":
+        return (
+          "The user shut the computer down while you were working. It is OFF now and you must NOT ask to turn it on. " +
+          "Stop working. Reply with a short final message: say the computer was closed by the user, what you had finished, and that you could not complete the rest."
+        );
+      case "quota":
+        return (
+          "The computer shut down because today's computer time ran out. It cannot be turned on again by anyone until 00:00 UTC. Do NOT ask to turn it on. " +
+          "Stop working. Reply with a short final message: what you finished, and that you could not complete the rest because the daily computer time ended."
+        );
+      case "session":
+        return (
+          "The computer went to sleep while you were working (its session or the wrap-up time ended). " +
+          "Stop working. Reply with a short final message: what you finished and what is left. The user can wake the computer and ask you to continue."
+        );
+    }
+  }
+
+  /** The user chose "Wrap up": bots finish and summarise, and the computer sleeps as soon as none is working (or after COMPUTER_WRAP_MINUTES). */
   async wrapUp(): Promise<void> {
     if (this.state !== "running" || this.wrapping) return;
+    if (this.working().length === 0) {
+      await this.pause("Wrapped up. Your work is saved.");
+      return;
+    }
     this.wrapping = true;
     this.warned = true;
-    this.sessionEndsAt = Date.now() + this.cfg.COMPUTER_WRAP_MINUTES * 60_000;
+    this.sessionEndsAt = Math.min(this.sessionEndsAt || Number.POSITIVE_INFINITY, Date.now() + this.wrapMs);
     await this.persist();
     await this.publishStatus();
     await this.scheduleAlarm();
   }
 
-  /**
-   * What the agent must be told before its next model call, if anything. Read by the agent's
-   * middleware, so a bot that is thinking or searching (not touching the computer) still hears it.
-   */
-  async notice(): Promise<string | null> {
-    if (this.state !== "running" || !this.wrapping) return null;
-    const seconds = Math.max(0, Math.round((this.sessionEndsAt - Date.now()) / 1000));
-    return (
-      `The user asked you to wrap up: the computer goes to sleep in about ${seconds}s (its state is saved). ` +
-      "Start no new computer work. Save anything important to files now, then reply with a short summary of what you did and what is left."
-    );
+  /** While wrapping up, the computer goes to sleep the moment the last bot has finished. */
+  private async sleepIfWrapped() {
+    if (this.state === "running" && this.wrapping && this.working().length === 0) await this.pause("Wrapped up. Your work is saved.");
   }
 
-  /** Next alarm: the regular tick, or sooner when the wrap-up warning or the session end is due. */
+  /**
+   * What this bot must be told before its next model call, if anything. Read by the agent's middleware, so a
+   * bot that is thinking or searching (not touching the computer) still hears it.
+   */
+  async notice(botId: string): Promise<string | null> {
+    const closed = await this.closedFor(botId);
+    if (closed) {
+      const entry = closed.bots[botId];
+      if (entry && !entry.told) {
+        entry.told = true;
+        await this.ctx.storage.put("closed", closed);
+      }
+      return this.closedText(closed.cause);
+    }
+    if (this.state !== "running") return null;
+    const end = await this.endsAt();
+    const seconds = Math.max(0, Math.round((end.at - Date.now()) / 1000));
+    if (this.wrapping) {
+      return (
+        `The user asked you to wrap up: the computer goes to sleep in at most ${seconds}s (its state is saved), sooner once every bot is done. ` +
+        "Start no new computer work. Finish the step you are on, save anything important to files, then reply with a short summary of what you did and what is left."
+      );
+    }
+    if (end.reason === "quota" && end.at - Date.now() <= this.wrapMs) {
+      return (
+        `Today's computer time ends in about ${seconds}s. Then the computer shuts down and cannot be turned on again until 00:00 UTC. ` +
+        "Start no new computer work. Save anything important to files, then reply with a short summary of what you did and what is left."
+      );
+    }
+    return null;
+  }
+
+  /** Next alarm: the regular tick (faster while wrapping up), or sooner when the warning or the end is due. */
   private async scheduleAlarm() {
     const now = Date.now();
-    const warnAt = this.sessionEndsAt - this.cfg.COMPUTER_WRAP_MINUTES * 60_000;
-    const due = [now + TICK_MS, this.sessionEndsAt || Number.POSITIVE_INFINITY, this.warned ? Number.POSITIVE_INFINITY : warnAt];
+    const end = (await this.endsAt()).at;
+    const warnAt = end - this.wrapMs;
+    const due = [now + (this.wrapping ? WRAP_TICK_MS : TICK_MS), end, warnAt > now ? warnAt : Number.POSITIVE_INFINITY];
     await this.ctx.storage.setAlarm(Math.max(now + 1000, Math.min(...due)));
   }
 
-  /** Destroys the computer and its disk. For abuse handling and account deletion. */
-  async destroy(): Promise<void> {
-    const id = await this.ctx.storage.get<string>("sandboxId");
-    this.sbx = undefined;
-    this.lease = null;
-    this.sessionEndsAt = 0;
-    this.warned = false;
-    this.wrapping = false;
-    if (id) await Sandbox.kill(id, { apiKey: this.cfg.E2B_API_KEY }).catch(() => undefined);
-    await this.ctx.storage.delete("sandboxId");
-    this.botUsers.clear();
-    await this.setState("off");
+  /** The user's computer if one exists that this object has no id for (newest kept, any other killed). */
+  private async findOwnSandbox(apiKey: string | undefined): Promise<Sandbox | undefined> {
+    const userId = this.ctx.id.name;
+    if (!userId) return undefined;
+    const found = await Sandbox.list({ apiKey, query: { metadata: { app: "k4-bot", userId } } })
+      .nextItems()
+      .catch(() => []);
+    const [keep, ...extra] = found.sort((a, b) => b.startedAt.getTime() - a.startedAt.getTime());
+    for (const s of extra) await Sandbox.kill(s.sandboxId, { apiKey }).catch(() => undefined);
+    if (!keep) return undefined;
+    console.log(`[computer] adopted ${keep.sandboxId}${extra.length ? `, killed ${extra.length} extra` : ""}`);
+    return Sandbox.connect(keep.sandboxId, { apiKey, timeoutMs: SESSION_MS });
   }
 
-  private offMessage() {
+  private async harden(sbx: Sandbox) {
+    if (this.hardenedFor === sbx.sandboxId) return;
+    await sbx.commands.run(HARDEN, { user: "root" }).catch((e) => console.error("[computer] harden", e));
+    this.hardenedFor = sbx.sandboxId;
+  }
+
+  private async offMessage(botId?: string): Promise<string> {
     if (this.state === "starting") return "The computer is starting. Wait a few seconds, then try again.";
+    const closed = await this.closedFor(botId);
+    if (closed) return this.closedText(closed.cause);
+    if (this.cfg.COMPUTER_MAX_MINUTES_PER_DAY * 60 - (await this.usedSeconds()) < MIN_WAKE_SECONDS) {
+      return "Today's computer time is used up. Nobody can turn the computer on until 00:00 UTC, so do NOT call turn_on_computer. Tell the user what you could not do.";
+    }
     return (
       `The computer is off${this.message ? ` (${this.message.replace(/\.$/, "")})` : ""}. ` +
       "To use it, call turn_on_computer now: that asks the user with an Approve / Reject button, so do not ask them in text."
@@ -452,15 +641,17 @@ export class UserComputerDurableObject extends DurableObject<Env> {
    * to ask (turn_on_computer, which needs the user's approval). If E2B says it went to sleep on its own,
    * it is marked asleep instead of being woken behind the user's back.
    */
-  private async withSandbox<T>(fn: (sbx: Sandbox) => Promise<T>): Promise<T> {
-    if (this.state !== "running") throw new ComputerOffError(this.offMessage());
+  private async withSandbox<T>(botId: string, fn: (sbx: Sandbox) => Promise<T>): Promise<T> {
+    if (this.state !== "running") throw new ComputerOffError(await this.offMessage(botId));
     try {
       return await fn(await this.live());
     } catch (error) {
+      // The computer went to sleep (or was shut down) while this call was in flight: say so, not E2B's raw error.
+      if (this.state !== "running" || this.pausing) throw new ComputerOffError(await this.offMessage(botId));
       if (!(error instanceof NotFoundError) && !/not running|paused|not found|expired/i.test(String(error))) throw error;
       this.sbx = undefined;
       await this.setState("paused", "Went to sleep.");
-      throw new ComputerOffError(this.offMessage());
+      throw new ComputerOffError(await this.offMessage(botId));
     }
   }
 
@@ -494,11 +685,20 @@ export class UserComputerDurableObject extends DurableObject<Env> {
     }
   }
 
+  /** The bot's run (slice) ended: it lets go of the mouse and is no longer "using" the computer. */
   async releaseBot(botId: string): Promise<void> {
+    this.marked.delete(botId);
+    this.ctx.storage.sql.exec("DELETE FROM workers WHERE bot_id = ?", botId);
+    const closed = await this.ctx.storage.get<Closed>("closed");
+    if (closed?.bots[botId]?.told) {
+      delete closed.bots[botId];
+      await this.ctx.storage.put("closed", closed);
+    }
     if (this.lease?.owner.kind === "bot" && this.lease.owner.id === botId) {
       this.lease = null;
-      await this.publishStatus();
     }
+    await this.publishStatus();
+    await this.sleepIfWrapped();
   }
 
   /** The user takes the mouse and keyboard. The agent's GUI actions are refused until it is released. */
@@ -548,6 +748,8 @@ export class UserComputerDurableObject extends DurableObject<Env> {
    */
   private async botUser(sbx: Sandbox, botId: string): Promise<string> {
     if (this.isRemoved(botId)) throw new ComputerOffError("This bot was deleted.");
+    // Every shell, file and screen action of a bot passes here: this is what makes it "using the computer".
+    this.markWorking(botId);
     const checked = botUnixUser(botId);
     if (!checked.ok) throw new Error(checked.reason);
     const user = checked.value;
@@ -607,8 +809,12 @@ export class UserComputerDurableObject extends DurableObject<Env> {
     for (const { bot_id } of pending) {
       const user = botUnixUser(bot_id);
       if (user.ok) {
-        // Stop everything it runs (its browser too), then delete the account with its home.
-        await sbx.commands.run(`pkill -KILL -u ${user.value}; userdel -r -f ${user.value} 2>/dev/null; true`, { user: "root" });
+        // Stop everything it runs (its browser too), delete what it left in the shared temp folders (by owner,
+        // so nobody else's files), then the account with its home (files, browser profile and all).
+        await sbx.commands.run(
+          `pkill -KILL -u ${user.value}; find /tmp /var/tmp /dev/shm -xdev -user ${user.value} -delete 2>/dev/null; userdel -r -f ${user.value} 2>/dev/null; true`,
+          { user: "root", timeoutMs: 120_000 },
+        );
         this.botUsers.delete(user.value);
       }
       this.ctx.storage.sql.exec("UPDATE removed_bots SET purged = 1 WHERE bot_id = ?", bot_id);
@@ -619,7 +825,9 @@ export class UserComputerDurableObject extends DurableObject<Env> {
   private async runAs(sbx: Sandbox, user: string, command: string, timeoutMs = 120_000, background = false) {
     const home = botHome(user);
     // umask 022: what a bot creates is readable (never writable) by the other bots.
-    return sbx.commands.run(`umask 022; ${command}`, {
+    // ulimit -u: a hard cap on the bot's processes and threads (a fork bomb cannot take the computer down;
+    // a non-root process can lower it but never raise it again). Chrome alone uses a few hundred threads.
+    return sbx.commands.run(`ulimit -u ${BOT_MAX_PROCESSES} 2>/dev/null; umask 022; ${command}`, {
       user,
       cwd: home,
       envs: { HOME: home, DISPLAY: sbx.display, LANG: "C.UTF-8" },
@@ -636,7 +844,7 @@ export class UserComputerDurableObject extends DurableObject<Env> {
     }
     this.execInFlight++;
     try {
-      return await this.withSandbox(async (sbx) => {
+      return await this.withSandbox(botId, async (sbx) => {
         const user = await this.botUser(sbx, botId);
         await this.touch();
         try {
@@ -644,6 +852,8 @@ export class UserComputerDurableObject extends DurableObject<Env> {
           const output = r.stdout + r.stderr;
           return { output: cap(output), exitCode: r.exitCode ?? 0, truncated: output.length > MAX_OUTPUT_CHARS };
         } catch (error) {
+          // Cut off because the computer is going to sleep: let withSandbox say why (not "timed out").
+          if (this.state !== "running" || this.pausing) throw error;
           if (error instanceof CommandExitError) {
             const output = error.stdout + error.stderr;
             return { output: cap(output), exitCode: error.exitCode, truncated: output.length > MAX_OUTPUT_CHARS };
@@ -672,7 +882,7 @@ export class UserComputerDurableObject extends DurableObject<Env> {
   }
 
   async upload(botId: string, files: Array<[string, Uint8Array]>): Promise<Array<{ path: string; error: string | null }>> {
-    return this.withSandbox(async (sbx) => {
+    return this.withSandbox(botId, async (sbx) => {
       const user = await this.botUser(sbx, botId);
       const out: Array<{ path: string; error: string | null }> = [];
       for (const [path, data] of files) {
@@ -699,7 +909,7 @@ export class UserComputerDurableObject extends DurableObject<Env> {
 
   /** Reads as the bot's own user: other bots' shared files yes, their private browser profile no. */
   async download(botId: string, paths: string[]): Promise<Array<{ path: string; content: Uint8Array | null; error: string | null }>> {
-    return this.withSandbox(async (sbx) => {
+    return this.withSandbox(botId, async (sbx) => {
       const user = await this.botUser(sbx, botId);
       const out: Array<{ path: string; content: Uint8Array | null; error: string | null }> = [];
       for (const path of paths) {
@@ -730,7 +940,7 @@ export class UserComputerDurableObject extends DurableObject<Env> {
    * in `act`). Storage and a socket broadcast only: it never touches E2B. Called by the run workflow.
    */
   async logActivity(botId: string, text: string): Promise<void> {
-    if (this.deleted || this.isRemoved(botId)) return;
+    if (this.isRemoved(botId)) return;
     this.note(botId, text.replace(/\s+/g, " ").slice(0, 160));
   }
 
@@ -757,7 +967,7 @@ export class UserComputerDurableObject extends DurableObject<Env> {
    * the tool already validated it, but this is the trust boundary, so it does not rely on the caller.
    */
   async act(botId: string, runId: string, input: unknown): Promise<ActionResult> {
-    if (this.state !== "running") return { ok: false, text: this.offMessage() };
+    if (this.state !== "running") return { ok: false, text: await this.offMessage(botId) };
     const parsed = computerActionSchema.safeParse(input);
     if (!parsed.success) return { ok: false, text: `Invalid action: ${parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}. Coordinates are whole PIXELS on the ${SCREEN.width}x${SCREEN.height} screenshot, not fractions.` };
     const action = parsed.data;
@@ -782,7 +992,7 @@ export class UserComputerDurableObject extends DurableObject<Env> {
 
   private async perform(botId: string, action: ComputerAction): Promise<ActionResult> {
     try {
-      return await this.withSandbox(async (sbx) => {
+      return await this.withSandbox(botId, async (sbx) => {
         await this.touch();
         const user = await this.botUser(sbx, botId);
         const q = (n: number) => String(Math.round(n));
@@ -889,18 +1099,32 @@ export class UserComputerDurableObject extends DurableObject<Env> {
 
   // ---------------------------------------------------------------- live view
 
-  private async portsListening(sbx: Sandbox) {
-    const r = await sbx.commands.run("ss -ltn | awk '{print $4}'");
-    return { view: r.stdout.includes(`:${VIEW.web}`), control: r.stdout.includes(`:${CONTROL.web}`) };
+  /**
+   * Which of our VNC servers are up with the current flags. A server started by an older version
+   * (without `-noxdamage`) counts as down, so it is replaced and the preview gets the fix too.
+   */
+  private async vncUp(sbx: Sandbox) {
+    const r = await sbx.commands.run(`ss -ltn | awk '{print $4}'; echo ===; pgrep -af x11vnc || true`);
+    const [ports = "", procs = ""] = r.stdout.split("===");
+    const ok = (p: Ports) =>
+      ports.includes(`:${p.web}`) && procs.split("\n").some((l) => l.includes(`-rfbport ${p.vnc}`) && l.includes("-noxdamage"));
+    return { view: ok(VIEW), control: ok(CONTROL) };
   }
 
-  /** Starts the two VNC servers (read-only and interactive) on first use. Idempotent. */
+  /**
+   * Starts the two VNC servers (read-only and interactive) on first use. Idempotent.
+   * `-noxdamage`: x11vnc otherwise waits for X "damage" events, and Chrome's compositor does not send them
+   * for most of what it draws, so the preview froze while a bot scrolled or typed in the browser (verified).
+   * Without them x11vnc compares the screen itself every `-wait` ms (50, as E2B's own stream does).
+   */
   private async ensureVnc(sbx: Sandbox) {
     if (this.vncFor === sbx.sandboxId) return;
-    const up = await this.portsListening(sbx);
+    const up = await this.vncUp(sbx);
     const start = async (ports: Ports, viewOnly: boolean) => {
+      // "[-]": the pattern must not match this very shell's own command line, or pkill kills it too.
+      await sbx.commands.run(`pkill -f "[-]rfbport ${ports.vnc}"; pkill -f "[-]-listen ${ports.web}"; true`);
       await sbx.commands.run(
-        `x11vnc -bg -display ${sbx.display} -forever -shared -nopw ${viewOnly ? "-viewonly " : ""}-rfbport ${ports.vnc} 2>/tmp/x11vnc-${ports.vnc}.log`,
+        `x11vnc -bg -display ${sbx.display} -forever -shared -nopw -noxdamage -wait 50 ${viewOnly ? "-viewonly " : ""}-rfbport ${ports.vnc} 2>/tmp/x11vnc-${ports.vnc}.log`,
       );
       await sbx.commands.run(
         `cd /opt/noVNC/utils && nohup ./novnc_proxy --vnc localhost:${ports.vnc} --listen ${ports.web} --web /opt/noVNC >/tmp/novnc-${ports.web}.log 2>&1 &`,
@@ -910,7 +1134,7 @@ export class UserComputerDurableObject extends DurableObject<Env> {
     if (!up.view) await start(VIEW, true);
     if (!up.control) await start(CONTROL, false);
     for (let i = 0; i < 20; i++) {
-      const now = await this.portsListening(sbx);
+      const now = await this.vncUp(sbx);
       if (now.view && now.control) break;
       await sleep(300);
     }
@@ -945,7 +1169,8 @@ export class UserComputerDurableObject extends DurableObject<Env> {
   }
 
   override webSocketClose(ws: WebSocket, code: number, reason: string) {
-    ws.close(code, reason);
+    // 1005/1006 only describe how the peer went away; they may not be sent back (the runtime throws).
+    ws.close(code === 1005 || code === 1006 ? 1000 : code, reason);
   }
 
   private broadcast(message: unknown) {
@@ -978,14 +1203,19 @@ export class UserComputerDurableObject extends DurableObject<Env> {
     const idleMs = this.cfg.COMPUTER_IDLE_MINUTES * 60_000;
 
     if (seconds >= this.cfg.COMPUTER_MAX_MINUTES_PER_DAY * 60) {
+      await this.rememberClosed("quota", this.working());
       await this.pause("Daily computer time limit reached.");
     } else if (this.sessionEndsAt && now >= this.sessionEndsAt) {
-      await this.pause(this.wrapping ? "Wrapped up. Your work is saved." : `The ${this.cfg.COMPUTER_SESSION_MINUTES}-minute session ended. Your work is saved.`);
+      const wrapped = this.wrapping;
+      await this.rememberClosed("session", this.working());
+      await this.pause(wrapped ? "Wrapped up. Your work is saved." : `The ${this.cfg.COMPUTER_SESSION_MINUTES}-minute session ended. Your work is saved.`);
+    } else if (this.wrapping && this.working().length === 0) {
+      await this.pause("Wrapped up. Your work is saved.");
     } else if (!userInControl && now - this.lastActivity > idleMs) {
       await this.pause("Paused after being idle. Your work is saved.");
     } else {
-      // The session is nearly over: the user is asked (in the chat) to wrap up or stop now.
-      if (!this.warned && this.sessionEndsAt && now >= this.sessionEndsAt - this.cfg.COMPUTER_WRAP_MINUTES * 60_000) {
+      // The end is near (the session's or today's computer time): the user is asked, in the chat, to wrap up or stop now.
+      if (!this.warned && (await this.endsAt()).at - now <= this.wrapMs) {
         this.warned = true;
       }
       if (this.sbx && this.expiresAt - now < EXTEND_WHEN_BELOW_MS) {

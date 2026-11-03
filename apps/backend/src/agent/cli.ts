@@ -24,7 +24,7 @@ async function ask(prompt: string): Promise<string> {
 }
 const config = { version: "v3", configurable: { thread_id: "cli" }, durability: "sync" };
 const agent = buildAgent({
-  bot: { id: crypto.randomUUID(), name: "CLI", description: null },
+  bot: { id: crypto.randomUUID(), name: "CLI", description: null, role: "assistant", roleTitle: null, subagentsEnabled: false, maxSubagents: 5, maxParallelTools: 5 },
   modelId: process.argv[2] ?? DEFAULT_MODEL_ID,
   openrouterApiKey: process.env.OPENROUTER_API_KEY,
   tavilyApiKey: process.env.TAVILY_API_KEY,

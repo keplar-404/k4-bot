@@ -19,6 +19,9 @@
   // (model calls, relay events, database writes), so the cap is raised (allowed up to 10M).
   // https://developers.cloudflare.com/workflows/reference/limits/
   "limits": { "cpu_ms": 300000, "subrequests": 1000000 },
+  // Files users upload, images bots create and files bots share from the computer. Downloads come from here,
+  // so they work while the computer sleeps. Local dev simulates the bucket; production needs it created once.
+  "r2_buckets": [{ "binding": "FILES", "bucket_name": "k4-bot-files" }],
   "workflows": [
     { "name": "chat-run", "binding": "CHAT_RUN", "class_name": "ChatRunWorkflow" }
   ],

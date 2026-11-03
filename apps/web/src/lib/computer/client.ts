@@ -1,8 +1,9 @@
-import type { ActivityEvent, ComputerStatus } from "@backend/computer/types";
+import type { ActivityEvent, ComputerStatus, WorkingBot } from "@backend/computer/types";
+import { redirectToSignIn } from "@/lib/auth-redirect";
 import { ChatHttpError } from "@/lib/chat/client";
 import { mapHttpError, networkError } from "@/lib/chat/protocol";
 
-export type { ActivityEvent, ComputerStatus };
+export type { ActivityEvent, ComputerStatus, WorkingBot };
 
 export const BASE = process.env.NEXT_PUBLIC_AUTH_URL ?? "http://localhost:8787";
 
@@ -19,6 +20,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
   const body = await res.json().catch(() => null);
   if (!res.ok) {
+    if (res.status === 401) redirectToSignIn();
     throw new ChatHttpError(
       mapHttpError(res.status, body, res.headers.get("retry-after")),
     );
@@ -35,8 +37,32 @@ const post = <T>(path: string, body?: unknown) =>
 export const getStatus = () => request<ComputerStatus>("");
 /** The only call that can start billing: it wakes (or creates) the user's computer. */
 export const wake = () => post<ComputerStatus>("/wake");
-/** Sleeps the computer now; its open apps and files are saved. */
-export const pause = () => post<ComputerStatus>("/pause");
+export type CloseResult = { closed: true; status: ComputerStatus } | { closed: false; working: WorkingBot[] };
+
+/**
+ * Sleeps the computer; its open apps and files are saved. While bots are using it the server refuses
+ * (409 + who) unless `force` is set, so the page can ask first and a stale screen can never kill their work.
+ */
+export async function closeComputer(force: boolean): Promise<CloseResult> {
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}/api/v1/computer/pause`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ force }),
+    });
+  } catch {
+    throw new ChatHttpError(networkError());
+  }
+  const body = (await res.json().catch(() => null)) as { error?: string; working?: WorkingBot[] } | null;
+  if (res.status === 409 && body?.error === "BOTS_WORKING") return { closed: false, working: body.working ?? [] };
+  if (!res.ok) {
+    if (res.status === 401) redirectToSignIn();
+    throw new ChatHttpError(mapHttpError(res.status, body, res.headers.get("retry-after")));
+  }
+  return { closed: true, status: body as ComputerStatus };
+}
 /** The session is ending: the bots are told to finish and summarise, then it sleeps. */
 export const wrapUp = () => post<ComputerStatus>("/session/wrap");
 

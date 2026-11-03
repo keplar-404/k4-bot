@@ -1,4 +1,4 @@
-import type { ChatErrorInfo } from "./protocol";
+import type { ChatErrorInfo, FileRef } from "./protocol";
 
 /**
  * The send queue.
@@ -11,6 +11,8 @@ export interface OutboxItem {
   id: string;
   threadId: string;
   content: string;
+  /** Already uploaded: only their ids are sent with the message. */
+  files?: FileRef[];
   createdAt: number;
   attempts: number;
   state: "queued" | "sending" | "failed";

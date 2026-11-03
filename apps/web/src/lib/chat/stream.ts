@@ -1,4 +1,10 @@
-import type { ChatMessageView, MessagePart, RunState } from "./protocol";
+import type { SubagentStatus } from "@backend/agent/parts";
+import type {
+  ChatMessageView,
+  FileRef,
+  MessagePart,
+  RunState,
+} from "./protocol";
 
 /**
  * Event reducer for the thread stream.
@@ -248,6 +254,19 @@ export function reduceEvent(
       };
       break;
     }
+    case "tool.progress": {
+      // A sub-agent group reports each member's status while it runs.
+      const id = String(payload.id ?? "");
+      const agents = Array.isArray(payload.agents)
+        ? (payload.agents as SubagentStatus[])
+        : undefined;
+      next = editDraft(next, runId, (parts) =>
+        parts.map((p) =>
+          p.type === "tool" && p.id === id ? { ...p, agents } : p,
+        ),
+      );
+      break;
+    }
     case "tool.end": {
       const id = String(payload.id ?? "");
       const status = payload.status === "error" ? "error" : "done";
@@ -261,6 +280,9 @@ export function reduceEvent(
                   typeof payload.output === "string"
                     ? payload.output
                     : p.output,
+                ...(Array.isArray(payload.files)
+                  ? { files: payload.files as FileRef[] }
+                  : {}),
               }
             : p,
         ),

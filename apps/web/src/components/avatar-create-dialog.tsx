@@ -4,6 +4,11 @@ import { PlusIcon } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { BloubAvatar } from "@/components/bloub-avatar";
+import {
+  BotCapabilities,
+  type Capabilities,
+} from "@/components/bot-capabilities";
+import { BotIntegrationsPicker } from "@/components/integrations/bot-integrations-picker";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -24,7 +29,15 @@ import {
   type ShapeId,
 } from "@/lib/bloub/bot/skins";
 import { COLOR_LABELS, SHAPE_LABELS } from "@/lib/bloub/labels";
+import {
+  DEFAULT_ROLE,
+  MAX_ROLE_TITLE,
+  ROLES,
+  type RoleId,
+} from "@/lib/bot-roles";
 import type { Bot, CreateBotInput } from "@/lib/bots";
+import { FALLBACK_DEFAULTS, useDomains } from "@/lib/domains";
+import { useIntegrations } from "@/lib/integrations";
 
 export function AvatarCreateDialog({
   open: openProp,
@@ -46,16 +59,82 @@ export function AvatarCreateDialog({
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [role, setRole] = useState<RoleId>(DEFAULT_ROLE);
+  const [roleTitle, setRoleTitle] = useState("");
+  const [skillIds, setSkillIds] = useState<string[]>([]);
+  const [mcpServerIds, setMcpServerIds] = useState<string[]>([]);
   const [shape, setShape] = useState<ShapeId>(SHAPES[0].id);
   const [color, setColor] = useState<ColorId>("encre");
   const [expression, setExpression] = useState<ExpressionId>("neutre");
   const [submitting, setSubmitting] = useState(false);
+  const [caps, setCaps] = useState<Capabilities>({
+    subagentsEnabled: FALLBACK_DEFAULTS.subagents,
+    maxSubagents: FALLBACK_DEFAULTS.maxSubagents,
+    maxParallelTools: FALLBACK_DEFAULTS.maxParallelTools,
+  });
+  // Once the user changes capabilities or the skill/app picks, picking a role no longer overwrites them.
+  const [capsTouched, setCapsTouched] = useState(false);
+  const [picksTouched, setPicksTouched] = useState(false);
+  const domains = useDomains();
+  const { skills: installedSkills, mcp: installedApps } = useIntegrations();
+
+  /** The role's starting point: its capabilities, and (for a new bot) the installed skills and apps suggested for it. */
+  const applyRoleDefaults = useCallback(
+    (next: RoleId) => {
+      const domain = domains.find((d) => d.id === next);
+      if (!domain) return;
+      if (!capsTouched)
+        setCaps({
+          subagentsEnabled: domain.defaults.subagents,
+          maxSubagents: domain.defaults.maxSubagents,
+          maxParallelTools: domain.defaults.maxParallelTools,
+        });
+      if (!isEditing && !picksTouched) {
+        setSkillIds(
+          (installedSkills?.installed ?? [])
+            .filter((s) => domain.recommended.skills.includes(s.skillId))
+            .map((s) => s.id),
+        );
+        setMcpServerIds(
+          (installedApps?.installed ?? [])
+            .filter((a) => domain.recommended.apps.includes(a.serverId))
+            .map((a) => a.id),
+        );
+      }
+    },
+    [
+      domains,
+      capsTouched,
+      picksTouched,
+      isEditing,
+      installedSkills,
+      installedApps,
+    ],
+  );
+
+  // A new bot starts from its role's defaults as soon as they are loaded.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: run when the dialog opens or the defaults arrive, not on every pick
+  useEffect(() => {
+    if (open && !isEditing) applyRoleDefaults(role);
+  }, [open, isEditing, domains]);
 
   // Reset fields each time the dialog opens (edit mode pre-fills from the bot).
   useEffect(() => {
     if (!open) return;
+    setCapsTouched(false);
+    setPicksTouched(false);
+    setCaps({
+      subagentsEnabled: bot?.subagentsEnabled ?? FALLBACK_DEFAULTS.subagents,
+      maxSubagents: bot?.maxSubagents ?? FALLBACK_DEFAULTS.maxSubagents,
+      maxParallelTools:
+        bot?.maxParallelTools ?? FALLBACK_DEFAULTS.maxParallelTools,
+    });
     setName(bot?.name ?? "");
     setDescription(bot?.description ?? "");
+    setRole((bot?.role as RoleId) ?? DEFAULT_ROLE);
+    setRoleTitle(bot?.roleTitle ?? "");
+    setSkillIds(bot?.skillIds ?? []);
+    setMcpServerIds(bot?.mcpServerIds ?? []);
     setShape((bot?.shape as ShapeId) ?? SHAPES[0].id);
     setColor((bot?.color as ColorId) ?? "encre");
     setExpression("neutre");
@@ -98,12 +177,21 @@ export function AvatarCreateDialog({
 
   const handleSubmit = useCallback(async () => {
     if (submitting) return;
+    if (role === "custom" && !roleTitle.trim()) {
+      toast.error("Name the custom role, or pick one of the others.");
+      return;
+    }
     setSubmitting(true);
     setExpression("heureux");
     try {
       await onSubmit({
         name: name || "Untitled bot",
         description,
+        role,
+        ...(role === "custom" ? { roleTitle: roleTitle.trim() } : {}),
+        skillIds,
+        mcpServerIds,
+        ...caps,
         shape,
         color,
         expression: "neutre",
@@ -120,7 +208,20 @@ export function AvatarCreateDialog({
       setSubmitting(false);
       setTimeout(() => setExpression("neutre"), 1500);
     }
-  }, [name, description, shape, color, setOpen, onSubmit, submitting]);
+  }, [
+    name,
+    description,
+    role,
+    roleTitle,
+    skillIds,
+    mcpServerIds,
+    caps,
+    shape,
+    color,
+    setOpen,
+    onSubmit,
+    submitting,
+  ]);
 
   const handleCancel = useCallback(() => {
     setOpen(false);
@@ -134,7 +235,7 @@ export function AvatarCreateDialog({
           <span className="sr-only">Create avatar</span>
         </DialogTrigger>
       )}
-      <DialogContent className="max-w-3xl gap-4 p-5">
+      <DialogContent className="max-h-[90dvh] max-w-3xl gap-4 overflow-y-auto p-5">
         <DialogHeader className="items-center text-center">
           <DialogTitle>{isEditing ? "Edit Bot" : "Create Avatar"}</DialogTitle>
           <DialogDescription>
@@ -225,6 +326,62 @@ export function AvatarCreateDialog({
               }}
             />
           </div>
+          <fieldset className="w-full space-y-2">
+            <legend className="text-sm leading-none font-medium">Role</legend>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {ROLES.map((r) => (
+                <button
+                  key={r.id}
+                  type="button"
+                  aria-pressed={role === r.id}
+                  onClick={() => {
+                    setRole(r.id);
+                    applyRoleDefaults(r.id);
+                  }}
+                  className={`flex min-w-0 flex-col items-start gap-0.5 rounded-lg border p-2.5 text-left transition hover:bg-muted ${
+                    role === r.id ? "border-primary ring-2 ring-primary/40" : ""
+                  }`}
+                >
+                  <span className="flex items-center gap-1.5 text-sm font-medium">
+                    <r.icon className="size-4 shrink-0" />
+                    {r.label}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {r.description}
+                  </span>
+                </button>
+              ))}
+            </div>
+            {role === "custom" && (
+              <Input
+                aria-label="Custom role"
+                placeholder="e.g. Travel planner, Math tutor, Customer support"
+                maxLength={MAX_ROLE_TITLE}
+                value={roleTitle}
+                onChange={(e) => setRoleTitle(e.target.value)}
+              />
+            )}
+          </fieldset>
+          <BotIntegrationsPicker
+            role={role}
+            skillIds={skillIds}
+            mcpServerIds={mcpServerIds}
+            onSkillsChange={(ids) => {
+              setPicksTouched(true);
+              setSkillIds(ids);
+            }}
+            onMcpChange={(ids) => {
+              setPicksTouched(true);
+              setMcpServerIds(ids);
+            }}
+          />
+          <BotCapabilities
+            value={caps}
+            onChange={(next) => {
+              setCapsTouched(true);
+              setCaps(next);
+            }}
+          />
           <div className="w-full space-y-2">
             <Label htmlFor="av-desc">Description</Label>
             <Textarea

@@ -97,7 +97,7 @@ function Asleep({ computer }: { computer: Computer }) {
   const starting = status?.state === "starting" || pending === "wake";
   const elapsed = useElapsed(starting);
   if (!status) return null;
-  const limitReached = status.minutesUsedToday >= status.minutesLimit;
+  const limitReached = status.limitReached;
   return (
     <div className="relative flex size-full flex-col items-center justify-center gap-2 p-4 text-center">
       {snapshot && (

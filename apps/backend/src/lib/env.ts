@@ -4,8 +4,9 @@ export const envSchema = z.object({
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
   DATABASE_URL_UNPOOLED: z.string().optional(),
   BETTER_AUTH_SECRET: z.string().min(32, "BETTER_AUTH_SECRET must be at least 32 chars"),
-  BETTER_AUTH_URL: z.url("BETTER_AUTH_URL must be a valid URL"),
-  WEB_ORIGIN: z.url("WEB_ORIGIN must be a valid URL").optional(),
+  // Trimmed: a stray space (e.g. `' http://...'` in .dev.vars) would end up in auth links and origin checks.
+  BETTER_AUTH_URL: z.string().trim().pipe(z.url("BETTER_AUTH_URL must be a valid URL")),
+  WEB_ORIGIN: z.string().trim().pipe(z.url("WEB_ORIGIN must be a valid URL")).optional(),
   /** Parent domain shared by web and API (e.g. "example.com") so the session cookie reaches both. */
   COOKIE_DOMAIN: z.string().optional(),
   GOOGLE_CLIENT_ID: z.string().optional(),
@@ -33,12 +34,24 @@ export const envSchema = z.object({
   COMPUTER_IDLE_MINUTES: z.coerce.number().int().positive().default(5),
   /** One wake-up lasts at most this long; then the computer is paused with its state saved. */
   COMPUTER_SESSION_MINUTES: z.coerce.number().int().positive().default(20),
-  /** The user is asked to wrap up this long before the session ends; "Wrap up" gives the bot this long to finish. */
-  COMPUTER_WRAP_MINUTES: z.coerce.number().int().positive().default(2),
+  /** The user (and bots) are warned this long before the session or today's computer time ends; "Wrap up" gives bots at most this long to finish. */
+  COMPUTER_WRAP_MINUTES: z.coerce.number().int().positive().default(5),
   /** Mouse/keyboard actions one agent run may take. */
   COMPUTER_MAX_ACTIONS_PER_RUN: z.coerce.number().int().positive().default(400),
   /** Optional comma-separated allow-list of hostnames the computer may reach. Empty = any public host. */
   COMPUTER_ALLOWED_HOSTS: z.string().optional(),
+  // --- Files (uploads, generated images, files shared from the computer; kept in R2) ---
+  /** OpenRouter image model for generate_image (POST /api/v1/images). */
+  IMAGE_MODEL: z.string().default("google/gemini-3.1-flash-image"),
+  /** Images a user's bots may create per UTC day: every image is billed by OpenRouter. */
+  MAX_IMAGES_PER_DAY: z.coerce.number().int().positive().default(20),
+  /** Total size of one user's stored files. */
+  MAX_STORAGE_MB_PER_USER: z.coerce.number().int().positive().default(1024),
+  // --- Secrets users give us (MCP tokens): AES-256-GCM, see lib/secrets.ts ---
+  /** 32 random bytes, base64. Generate with: openssl rand -base64 32 */
+  SECRETS_ENCRYPTION_KEY: z.string().optional(),
+  /** The previous key while rotating, so values encrypted with it still decrypt. */
+  SECRETS_ENCRYPTION_KEY_PREVIOUS: z.string().optional(),
   /** Agent steps per Workflow step. A run longer than this continues in the next slice. */
   RUN_SLICE_STEPS: z.coerce.number().int().positive().default(60),
   /** Upper bound on slices per run (steps x slices = the hard ceiling on one run). */
@@ -48,7 +61,7 @@ export const envSchema = z.object({
 });
 
 export type Env = z.infer<typeof envSchema> & {
-  CHAT_RELAY: DurableObjectNamespace;
+  CHAT_RELAY: DurableObjectNamespace<import("../durable/chat-relay").ChatRelayDurableObject>;
   CHAT_RUN: Workflow;
   /** Per-IP limiter for every API request. */
   RL: RateLimit;
@@ -56,6 +69,8 @@ export type Env = z.infer<typeof envSchema> & {
   RL_WRITE: RateLimit;
   /** One computer per user: addressed by user id. */
   USER_COMPUTER: DurableObjectNamespace<import("../computer/user-computer").UserComputerDurableObject>;
+  /** Stored files. Without the binding, uploads and the file tools are off. */
+  FILES?: R2Bucket;
 };
 
 // Bindings object is stable for the life of a request; parse it once.

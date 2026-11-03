@@ -38,6 +38,10 @@ const HIDE_NOVNC_CHROME =
 const reportVncState = (origin: string) =>
   `(()=>{const h=document.documentElement,post=()=>parent.postMessage({source:"k4-vnc",state:h.classList.contains("noVNC_connected")?"connected":h.classList.contains("noVNC_reconnecting")?"reconnecting":"connecting"},${JSON.stringify(origin)});new MutationObserver(post).observe(h,{attributes:true,attributeFilter:["class"]});post()})()`;
 
+/** The path inside the VM's noVNC server, after the token. */
+const rest = (url: string, mode: string, userId: string, token: string) =>
+  new URL(url).pathname.slice(`/api/v1/computer/stream/${mode}/${userId}/${token}`.length) || "/";
+
 /** `{host,token}` for the viewer, cached briefly in this isolate: a noVNC page is ~60 requests. */
 const targets = new Map<string, { host: string; token: string; until: number }>();
 
@@ -68,10 +72,13 @@ const computer = new Hono<AuthGuardEnv>()
     return c.json(await stub.status());
   })
 
-  .post("/pause", userLimit, async (c) => {
+  // Sleeps the computer. While bots are working it does nothing unless `force` is set, and answers 409 with
+  // who is working so the page can ask first; forced, those bots are told it was shut down and stop.
+  .post("/pause", userLimit, validate("json", z.object({ force: z.boolean().optional() }).default({})), async (c) => {
     const { env } = getRequestContext(c);
     const stub = computerFor(env, c.get("session").user.id);
-    await stub.pause("Paused by you. Your work is saved.");
+    const result = await stub.close({ reason: "Paused by you. Your work is saved.", cause: "user", force: c.req.valid("json").force === true });
+    if (!result.closed) return c.json({ error: "BOTS_WORKING", message: "Bots are using the computer.", working: result.working }, 409);
     return c.json(await stub.status());
   })
 
@@ -176,16 +183,24 @@ const computer = new Hono<AuthGuardEnv>()
     if (!target || target.until < Date.now() || isSocket) {
       const found = await computerFor(env, userId).viewerTarget(mode as Mode);
       if ("error" in found) {
-        // 409 with a reason lets the panel show "asleep" / "take control first" instead of a blank frame.
-        return c.text(found.error, found.error === "asleep" || found.error === "not_in_control" ? 409 : 502);
+        const status = found.error === "asleep" || found.error === "not_in_control" ? 409 : 502;
+        // The viewer page itself: instead of raw error text inside the panel, a blank page that keeps the
+        // panel's "connecting" state and tries again (the screen servers may still be starting).
+        if (rest(c.req.url, mode, userId, token) === "/vnc.html") {
+          return c.html(
+            `<!doctype html><html><head><style>html,body{background:#0b0b0c}</style><script>${reportVncState(env.WEB_ORIGIN ?? "*")};setTimeout(()=>location.reload(),3000)</script></head></html>`,
+            status,
+            { "cache-control": "no-store", "content-security-policy": `frame-ancestors ${env.WEB_ORIGIN ?? "'self'"}` },
+          );
+        }
+        return c.text(found.error, status);
       }
       target = { ...found, until: Date.now() + 20_000 };
       targets.set(key, target);
     }
 
     const incoming = new URL(c.req.url);
-    const prefix = `/api/v1/computer/stream/${mode}/${userId}/${token}`;
-    const rest = incoming.pathname.slice(prefix.length) || "/";
+    const path = rest(c.req.url, mode, userId, token);
 
     // Only what the VM needs: never forward the user's cookies or the Authorization header.
     const headers = new Headers({ "e2b-traffic-access-token": target.token });
@@ -193,7 +208,7 @@ const computer = new Hono<AuthGuardEnv>()
       const value = c.req.header(name);
       if (value) headers.set(name, value);
     }
-    const upstream = await fetch(`https://${target.host}${rest}${incoming.search}`, {
+    const upstream = await fetch(`https://${target.host}${path}${incoming.search}`, {
       method: c.req.method,
       headers,
       body: ["GET", "HEAD"].includes(c.req.method) ? undefined : c.req.raw.body,

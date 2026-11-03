@@ -80,9 +80,9 @@ export const agentUsage = pgTable(
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
-    threadId: text("thread_id")
-      .notNull()
-      .references(() => chatThread.id, { onDelete: "cascade" }),
+    // Kept (unlinked) when its chat is deleted with its bot: the daily budgets count these rows, so
+    // deleting a bot must not hand back today's tokens and runs.
+    threadId: text("thread_id").references(() => chatThread.id, { onDelete: "set null" }),
     runId: text("run_id").notNull(),
     model: text("model").notNull(),
     inputTokens: integer("input_tokens").notNull().default(0),

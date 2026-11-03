@@ -1,11 +1,23 @@
 import type { ExpressionId } from "@/lib/bloub/bot/expressions";
 import type { ColorId, ShapeId } from "@/lib/bloub/bot/skins";
+import type { RoleId } from "@/lib/bot-roles";
 import { api } from "./api-client";
 
 export type Bot = {
   id: string;
   name: string;
   description: string | null;
+  /** What the bot is for (see lib/bot-roles.ts). Older responses may omit it: treat as "assistant". */
+  role?: string;
+  /** The user's own title when role is "custom". */
+  roleTitle?: string | null;
+  /** Installed skills (user_skill ids) and connected apps (user_mcp_server ids) the bot uses. */
+  skillIds?: string[];
+  mcpServerIds?: string[];
+  /** Capabilities: sub-agent groups and parallel tool calls. */
+  subagentsEnabled?: boolean;
+  maxSubagents?: number;
+  maxParallelTools?: number;
   shape: string;
   color: string;
   expression: string;
@@ -51,6 +63,13 @@ export function fetchBots(): Promise<BotsResult> {
 export type CreateBotInput = {
   name: string;
   description?: string;
+  role?: RoleId;
+  roleTitle?: string;
+  skillIds?: string[];
+  mcpServerIds?: string[];
+  subagentsEnabled?: boolean;
+  maxSubagents?: number;
+  maxParallelTools?: number;
   shape: ShapeId;
   color: ColorId;
   expression: ExpressionId;

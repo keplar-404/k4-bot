@@ -11,6 +11,7 @@ import {
 import { type ReactNode, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { AgentParts } from "@/components/agent-parts";
+import { FileList } from "@/components/file-card";
 import { Markdown } from "@/components/markdown";
 import PromptBar from "@/components/prompt-bar";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
@@ -37,6 +38,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import type { ChatMessageView } from "@/lib/chat/protocol";
 import { useChat } from "@/lib/chat/use-chat";
+import { useAttachments } from "@/lib/use-attachments";
 
 /** The agent asked something (a login, a code, a decision) and is waiting, possibly for days. */
 function AgentQuestion({
@@ -49,6 +51,27 @@ function AgentQuestion({
   onAnswer: (text: string) => void;
 }) {
   const [text, setText] = useState("");
+  if (kind === "confirm") {
+    // A yes/no the bot needs before it does something that stops other work (e.g. turning the computer off).
+    return (
+      <Item variant="outline" size="sm" role="alert">
+        <ItemMedia variant="icon">
+          <ShieldQuestionIcon />
+        </ItemMedia>
+        <ItemContent>
+          <ItemTitle className="whitespace-normal">{question}</ItemTitle>
+        </ItemContent>
+        <ItemActions>
+          <Button size="sm" variant="outline" onClick={() => onAnswer("no")}>
+            Keep it on
+          </Button>
+          <Button size="sm" variant="destructive" onClick={() => onAnswer("yes")}>
+            Turn off anyway
+          </Button>
+        </ItemActions>
+      </Item>
+    );
+  }
   return (
     <Item variant="outline" size="sm">
       <ItemMedia variant="icon">
@@ -148,6 +171,7 @@ export function ChatView({
     approve,
     reject,
   } = useChat(botId);
+  const attachments = useAttachments(botId);
 
   // PromptBar expects { key, name, ... }; the API speaks full OpenRouter ids.
   const catalog = models.map((m) => ({
@@ -235,19 +259,26 @@ export function ChatView({
                         }
                       >
                         {isUser ? (
-                          <Bubble align="end" variant="default">
-                            <BubbleContent>
-                              <span
-                                className={
-                                  m.state === "sending"
-                                    ? "opacity-60"
-                                    : undefined
-                                }
-                              >
-                                {m.text}
-                              </span>
-                            </BubbleContent>
-                          </Bubble>
+                          <>
+                            {m.files && m.files.length > 0 && (
+                              <FileList files={m.files} compact />
+                            )}
+                            {m.text && (
+                              <Bubble align="end" variant="default">
+                                <BubbleContent>
+                                  <span
+                                    className={
+                                      m.state === "sending"
+                                        ? "opacity-60"
+                                        : undefined
+                                    }
+                                  >
+                                    {m.text}
+                                  </span>
+                                </BubbleContent>
+                              </Bubble>
+                            )}
+                          </>
                         ) : m.parts ? (
                           // Reasoning, tool calls and text, in the order they happened.
                           <AgentParts
@@ -370,7 +401,14 @@ export function ChatView({
         {beforeComposer}
 
         <PromptBar
-          onSend={(text) => void send(text)}
+          onSend={(text) => {
+            void send(text, attachments.files);
+            attachments.clear();
+          }}
+          attachments={attachments.items}
+          onAttach={attachments.add}
+          onRemoveAttachment={attachments.remove}
+          busy={attachments.uploading}
           models={catalog.length > 0 ? catalog : undefined}
           modelKey={modelId}
           effort={reasoningEffort}

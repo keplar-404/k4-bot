@@ -16,7 +16,7 @@ type ErrorCode = "file_not_found" | "permission_denied" | "is_directory" | "inva
  * class builds `ls`, `read_file`, `write_file`, `edit_file`, `glob` and `grep`
  * on top of `execute` (see the "Sandboxes" docs). Every call goes through the
  * user's Durable Object, which runs it as THIS bot's Linux user, so a bot can
- * only touch its own home directory.
+ * read other bots' files but only change its own.
  */
 export class ComputerSandbox extends BaseSandbox {
   readonly id: string;

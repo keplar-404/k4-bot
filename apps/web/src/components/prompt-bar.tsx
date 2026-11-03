@@ -201,7 +201,6 @@ const COMMANDS = [
   { key: "summarize", name: "/summarize", desc: "Digest the thread so far" },
 ];
 
-const FILES = ["flavor-chart.png", "summer-menu.pdf", "pos-export.csv"];
 const DICTATION = "Compare pistachio weekends to last summer";
 
 /* the last @word or /word being typed, if any */
@@ -216,6 +215,16 @@ function parseToken(
     start: match.index + match[1].length,
   };
 }
+
+/** A file in the composer (the parent uploads it). */
+export type ComposerAttachment = {
+  key: string;
+  name: string;
+  /** 0..1; below 1 it is still uploading. */
+  progress: number;
+  /** Local image preview. */
+  preview?: string;
+};
 
 type ModelOption = {
   key: string;
@@ -233,9 +242,19 @@ export default function PromptBar({
   modelKey,
   effort = null,
   onSelect,
+  attachments = [],
+  onAttach,
+  onRemoveAttachment,
+  busy = false,
 }: {
   placeholder?: string;
   onSend?: (text: string) => void;
+  /** Files picked, pasted or dropped. Without it the composer offers no attachments. */
+  onAttach?: (files: File[]) => void;
+  attachments?: ComposerAttachment[];
+  onRemoveAttachment?: (key: string) => void;
+  /** Uploads are still running: sending waits for them. */
+  busy?: boolean;
   models?: ModelOption[];
   /** The selected model and reasoning level. The parent owns them (they are saved per bot). */
   modelKey?: string;
@@ -258,7 +277,8 @@ export default function PromptBar({
   const [effortHovered, setEffortHovered] = useState<number | null>(null);
   const [effortMenuLeft, setEffortMenuLeft] = useState(0);
   const [effortMenuBottom, setEffortMenuBottom] = useState(0);
-  const [attachments, setAttachments] = useState<string[]>([]);
+  const [dragging, setDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [connected, setConnected] = useState(false);
   const [active, setActive] = useState(0);
   const [listening, setListening] = useState(false);
@@ -294,7 +314,10 @@ export default function PromptBar({
 
   const rows: { key: string; name: string; desc: string }[] =
     menu === "at"
-      ? SOURCES.filter((s) => s.name.toLowerCase().includes(query))
+      ? SOURCES.filter(
+          (s) =>
+            (onAttach || !s.attach) && s.name.toLowerCase().includes(query),
+        )
       : menu === "slash"
         ? COMMANDS.filter((c) => c.name.slice(1).startsWith(query))
         : [];
@@ -508,10 +531,7 @@ export default function PromptBar({
   const pick = (row: { key: string; name: string }) => {
     const source = SOURCES.find((s) => s.key === row.key);
     if (source?.attach) {
-      setAttachments((current) => [
-        ...current,
-        FILES[current.length % FILES.length],
-      ]);
+      fileInputRef.current?.click();
       if (token) setDraft(draft.slice(0, token.start));
     } else if (menu === "at") {
       setDraft(`${token ? draft.slice(0, token.start) : draft}@${row.name} `);
@@ -523,17 +543,55 @@ export default function PromptBar({
     inputRef.current?.focus();
   };
 
-  const canSend = draft.trim().length > 0 || attachments.length > 0;
+  const canSend =
+    !busy && (draft.trim().length > 0 || attachments.length > 0);
   const send = () => {
     if (!canSend) return;
     onSend?.(draft.trim());
     setDraft("");
-    setAttachments([]);
     closeMenus();
   };
 
+  const takeFiles = (list: FileList | null | undefined) => {
+    const files = Array.from(list ?? []);
+    if (files.length && onAttach) onAttach(files);
+    return files.length > 0;
+  };
+
   return (
-    <div data-promptbar className="w-full">
+    // biome-ignore lint/a11y/noStaticElementInteractions: drop target for files; the + menu and paste do the same by keyboard
+    <div
+      data-promptbar
+      className="w-full"
+      onDragOver={(event) => {
+        if (!onAttach || !event.dataTransfer.types.includes("Files")) return;
+        event.preventDefault();
+        setDragging(true);
+      }}
+      onDragLeave={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null))
+          setDragging(false);
+      }}
+      onDrop={(event) => {
+        if (!onAttach) return;
+        event.preventDefault();
+        setDragging(false);
+        takeFiles(event.dataTransfer.files);
+        inputRef.current?.focus();
+      }}
+    >
+      {onAttach && (
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          hidden
+          onChange={(event) => {
+            takeFiles(event.target.files);
+            event.target.value = "";
+          }}
+        />
+      )}
       {/* composer is the anchor — menus grow up from its top edge */}
       <div ref={composerAnchorRef} className="relative">
         {/* ── @ / slash menu ─────────────────────────────── */}
@@ -743,7 +801,14 @@ export default function PromptBar({
         )}
 
         {/* ── composer ───────────────────────────────────── */}
-        <div className="relative isolate flex flex-col gap-1.5 overflow-hidden rounded-[14px] border border-line bg-surface p-1.5 shadow-card transition-[border-color,border-radius] duration-150 focus-within:border-line-strong">
+        <div
+          className={`relative isolate flex flex-col gap-1.5 overflow-hidden rounded-[14px] border bg-surface p-1.5 shadow-card transition-[border-color,border-radius] duration-150 focus-within:border-line-strong ${dragging ? "border-dashed border-line-strong" : "border-line"}`}
+        >
+          {dragging && (
+            <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-surface/85 text-[12.5px] text-ink-2">
+              Drop files to attach
+            </div>
+          )}
           {/* rainbow glimm sweep — plays across the interior on model change.
             explicit w/h: a <canvas> is a replaced element and won't stretch
             to inset-0 alone, which feeds back into the shader's ResizeObserver. */}
@@ -764,30 +829,51 @@ export default function PromptBar({
 
           {attachments.length > 0 && (
             <div className="flex flex-wrap gap-1.5 px-0.5 pt-0.5">
-              {attachments.map((file, i) => (
+              {attachments.map((file) => (
                 <span
-                  // biome-ignore lint/suspicious/noArrayIndexKey: duplicate filenames allowed (verbatim demo code)
-                  key={`${file}-${i}`}
-                  className="flex h-6.5 items-center gap-1.5 rounded-chip bg-field py-1 pr-1 pl-1.5 text-[11.5px] text-ink-2 shadow-hairline"
+                  key={file.key}
+                  className="relative flex h-6.5 items-center gap-1.5 overflow-hidden rounded-chip bg-field py-1 pr-1 pl-1.5 text-[11.5px] text-ink-2 shadow-hairline"
                   style={{
                     animation: "pop-in 200ms cubic-bezier(0.23,1,0.32,1) both",
                   }}
+                  title={
+                    file.progress < 1
+                      ? `Uploading ${Math.round(file.progress * 100)}%`
+                      : file.name
+                  }
                 >
-                  <Icon size={12}>
-                    <g>
-                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                      <path d="M14 2v6h6" />
-                    </g>
-                  </Icon>
-                  <span className="max-w-36 truncate">{file}</span>
+                  {file.preview ? (
+                    // biome-ignore lint/performance/noImgElement: local object URL preview
+                    <img
+                      src={file.preview}
+                      alt=""
+                      className="size-4 rounded-[3px] object-cover"
+                    />
+                  ) : (
+                    <Icon size={12}>
+                      <g>
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                        <path d="M14 2v6h6" />
+                      </g>
+                    </Icon>
+                  )}
+                  <span
+                    className={`max-w-36 truncate ${file.progress < 1 ? "opacity-60" : ""}`}
+                  >
+                    {file.name}
+                  </span>
+                  {file.progress < 1 && (
+                    // Upload progress: a thin bar along the chip's bottom edge.
+                    <span
+                      aria-hidden="true"
+                      className="absolute bottom-0 left-0 h-0.5 bg-ink-3 transition-[width] duration-200"
+                      style={{ width: `${Math.max(4, file.progress * 100)}%` }}
+                    />
+                  )}
                   <button
                     type="button"
-                    aria-label={`Remove ${file}`}
-                    onClick={() =>
-                      setAttachments((current) =>
-                        current.filter((_, j) => j !== i),
-                      )
-                    }
+                    aria-label={`Remove ${file.name}`}
+                    onClick={() => onRemoveAttachment?.(file.key)}
                     className="-my-1 flex size-6 items-center justify-center rounded-[5px] text-ink-3 transition-colors duration-100 hover:bg-line/70 hover:text-ink"
                   >
                     <Icon size={10} strokeWidth={2.5}>
@@ -831,6 +917,11 @@ export default function PromptBar({
                 setDraft(event.target.value);
                 setDismissed(false);
                 setPlusOpen(false);
+              }}
+              onPaste={(event) => {
+                // A pasted screenshot or copied file is attached; pasted text is typed as usual.
+                if (onAttach && takeFiles(event.clipboardData.files))
+                  event.preventDefault();
               }}
               onKeyDown={(event) => {
                 if (menu && rows.length > 0) {

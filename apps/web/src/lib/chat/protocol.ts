@@ -5,10 +5,12 @@
  * `bun run src/lib/chat/*.check.ts` instead of by clicking around.
  */
 
-import type { Part } from "@backend/agent/parts";
+import type { FileRef, Part } from "@backend/agent/parts";
 
 /** One piece of an assistant turn: text, reasoning, or a tool call (shared with the server). */
 export type MessagePart = Part;
+
+export type { FileRef };
 
 export type DeliveryState = "queued" | "sending" | "sent" | "failed";
 
@@ -42,6 +44,8 @@ export interface ChatMessageView {
   text: string;
   /** Assistant messages: text, reasoning and tool calls in the order they happened. */
   parts?: MessagePart[];
+  /** User messages: the files they attached. */
+  files?: FileRef[];
   state: DeliveryState;
   createdAt: number;
   seq?: number;

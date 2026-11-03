@@ -162,7 +162,19 @@ export class ChatRelayDurableObject extends DurableObject<Env> {
     return event;
   }
 
+  /**
+   * The thread was deleted (with its bot): close its live sockets and drop this object's storage.
+   * RPC, so only this Worker's own binding can call it. Its events are rows that cascade in Postgres.
+   */
+  async purge(): Promise<void> {
+    for (const ws of this.ctx.getWebSockets()) ws.close(4404, "thread deleted");
+    await this.ctx.storage.deleteAll();
+    this.threadId = "";
+    this.seq = null;
+  }
+
   override webSocketClose(ws: WebSocket, code: number, reason: string) {
-    ws.close(code, reason);
+    // 1005/1006 only describe how the peer went away; they may not be sent back (the runtime throws).
+    ws.close(code === 1005 || code === 1006 ? 1000 : code, reason);
   }
 }

@@ -1,9 +1,6 @@
 "use client";
 
-import { ChevronsUpDownIcon, LogOutIcon, Trash2Icon } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { DeleteAccountDialog } from "@/components/delete-account-dialog";
+import { ChevronsUpDownIcon, LogOutIcon } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -20,22 +17,37 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { Skeleton } from "@/components/ui/skeleton";
 import { signOut, useSession } from "@/lib/auth-client";
 
 export function NavUser() {
   const { isMobile } = useSidebar();
-  const router = useRouter();
-  const { data: session } = useSession();
+  const { data: session, isPending } = useSession();
   const user = session?.user;
-  const name = user?.name ?? "Guest";
+  const name = user?.name ?? "";
   const email = user?.email ?? "";
   const avatar = (user as { image?: string | null } | undefined)?.image ?? "";
 
-  const [deleteOpen, setDeleteOpen] = useState(false);
-
   async function handleSignOut() {
     await signOut();
-    router.push("/sign-in");
+    // A full navigation: nothing of this session (cached bots, open sockets) carries over.
+    window.location.replace("/sign-in");
+  }
+
+  // No "Guest" placeholder: while the session loads there is no one to show yet, and without one the
+  // dashboard's AuthGuard is already on its way to the sign-in page.
+  if (isPending || !user) {
+    return (
+      <SidebarMenu>
+        <SidebarMenuItem className="flex items-center gap-2 p-2">
+          <Skeleton className="size-8 rounded-full" />
+          <div className="grid flex-1 gap-1">
+            <Skeleton className="h-3 w-24" />
+            <Skeleton className="h-3 w-32" />
+          </div>
+        </SidebarMenuItem>
+      </SidebarMenu>
+    );
   }
 
   return (
@@ -84,20 +96,8 @@ export function NavUser() {
               <LogOutIcon />
               Log out
             </DropdownMenuItem>
-            <DropdownMenuItem
-              variant="destructive"
-              onClick={() => setDeleteOpen(true)}
-            >
-              <Trash2Icon />
-              Delete account
-            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-        <DeleteAccountDialog
-          open={deleteOpen}
-          onOpenChange={setDeleteOpen}
-          email={email}
-        />
       </SidebarMenuItem>
     </SidebarMenu>
   );

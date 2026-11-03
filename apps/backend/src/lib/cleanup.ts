@@ -12,7 +12,10 @@ const ACTIVE_RUN_WINDOW_MS = 8 * 24 * 60 * 60_000;
  * rows are deleted (it needs them to find the runs):
  *  - runs still going are terminated, so they stop calling the model and the computer at once
  *    (a run that slips through also stops at its next slice, which checks its thread still exists);
- *  - agent checkpoints are deleted (they are keyed by thread id, without a foreign key).
+ *  - agent checkpoints are deleted (they are keyed by thread id, without a foreign key);
+ *  - each thread's relay object closes its live sockets and drops its storage.
+ * Messages, events and the thread rows themselves go with the database cascade; usage rows stay,
+ * unlinked, because the daily budgets count them.
  */
 export async function cleanupThreads(db: Db, env: Env, threadIds: string[]): Promise<void> {
   if (threadIds.length === 0) return;
@@ -32,4 +35,5 @@ export async function cleanupThreads(db: Db, env: Env, threadIds: string[]): Pro
   );
   const checkpointer = new NeonHttpCheckpointer(db);
   await Promise.all(threadIds.map((id) => checkpointer.deleteThread(id)));
+  await Promise.allSettled(threadIds.map((id) => env.CHAT_RELAY.get(env.CHAT_RELAY.idFromName(id)).purge()));
 }

@@ -2,6 +2,7 @@
 
 import { MoreHorizontalIcon, PencilIcon, Trash2Icon } from "lucide-react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { BloubAvatar } from "@/components/bloub-avatar";
 import {
   DropdownMenu,
@@ -21,22 +22,24 @@ import type { Bot } from "@/lib/bots";
 
 function BotItem({
   bot,
+  active,
   onEdit,
   onDelete,
 }: {
   bot: Bot;
+  active: boolean;
   onEdit: (bot: Bot) => void;
   onDelete: (id: string) => void;
 }) {
   return (
     <SidebarMenuItem>
       <SidebarMenuButton
-        size="lg"
-        className="[&_svg]:size-8"
+        className="h-9 [&_svg]:size-7"
+        isActive={active}
         render={<Link href={`/dashboard/bot/${bot.id}`} />}
       >
         <BloubAvatar
-          size={32}
+          size={28}
           shape={bot.shape}
           color={bot.color}
           expression={bot.expression}
@@ -45,7 +48,7 @@ function BotItem({
       </SidebarMenuButton>
       <DropdownMenu>
         <DropdownMenuTrigger
-          render={<SidebarMenuAction className="cursor-pointer" />}
+          render={<SidebarMenuAction className="top-2! cursor-pointer" />}
         >
           <MoreHorizontalIcon />
           <span className="sr-only">More options for {bot.name}</span>
@@ -89,13 +92,20 @@ export function BotList({
   onEdit: (bot: Bot) => void;
   onDelete: (id: string) => void;
 }) {
+  const pathname = usePathname();
   if (!bots.length) {
     return <p className="px-2 text-xs text-muted-foreground">No bots yet.</p>;
   }
   return (
     <SidebarMenu>
       {bots.map((bot) => (
-        <BotItem key={bot.id} bot={bot} onEdit={onEdit} onDelete={onDelete} />
+        <BotItem
+          key={bot.id}
+          bot={bot}
+          active={pathname === `/dashboard/bot/${bot.id}`}
+          onEdit={onEdit}
+          onDelete={onDelete}
+        />
       ))}
     </SidebarMenu>
   );

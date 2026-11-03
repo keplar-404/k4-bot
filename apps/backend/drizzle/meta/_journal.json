@@ -15,6 +15,41 @@
       "when": 1793645804420,
       "tag": "0001_many_cammi",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793681010126,
+      "tag": "0002_white_pestilence",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793693750239,
+      "tag": "0003_cultured_gamma_corps",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793695030751,
+      "tag": "0004_open_dormammu",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793699307356,
+      "tag": "0005_foamy_charles_xavier",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793702147735,
+      "tag": "0006_fluffy_guardian",
+      "breakpoints": true
     }
   ]
 }

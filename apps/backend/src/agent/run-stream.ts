@@ -1,4 +1,4 @@
-import { clip, type Part, type PartsUsage, type ToolPart } from "./parts";
+import { clip, type Part, type PartsUsage, takeFileMarkers, type ToolPart } from "./parts";
 
 /**
  * Reads one agent run through LangChain's event-streaming API
@@ -91,7 +91,15 @@ export async function consumeRun(
           const status = await call.status;
           const error = await call.error;
           part.status = status === "finished" && !error ? "done" : "error";
-          part.output = clip(error ? String((error as Error)?.message ?? error) : await call.output);
+          if (error) {
+            part.output = clip(String((error as Error)?.message ?? error));
+          } else {
+            const raw = await call.output;
+            // Taken before clipping, so a long result cannot cut a file off.
+            const { text, files } = takeFileMarkers(typeof raw === "string" ? raw : (JSON.stringify(raw) ?? ""));
+            part.output = clip(text);
+            if (files.length) part.files = files;
+          }
           await sink.toolEnd?.(part);
           await sink.partsChanged?.();
         })(),
