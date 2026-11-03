@@ -175,14 +175,29 @@ function editDraft(
   };
 }
 
-/** Streams a delta into the last part when it has the same type, otherwise starts a new part. */
-const appendDelta =
+/**
+ * One model turn (everything after the last tool call) has at most one reasoning part, then one
+ * text part: the shape the server stores. Some models stream reasoning and answer at the same
+ * time, so their deltas arrive interleaved; each joins its own part of the turn instead of
+ * opening a new block, and reasoning that arrives after the answer began still goes before it.
+ */
+export const appendDelta =
   (type: "text" | "reasoning", delta: string) =>
   (parts: MessagePart[]): MessagePart[] => {
-    const last = parts.at(-1);
-    if (last && last.type === type)
-      return [...parts.slice(0, -1), { type, text: last.text + delta }];
-    return [...parts, { type, text: delta }];
+    const turnStart = parts.findLastIndex((p) => p.type === "tool") + 1;
+    const own = parts.findIndex((p, i) => i >= turnStart && p.type === type);
+    if (own >= 0)
+      return parts.map((p, i) =>
+        i === own && p.type === type ? { type, text: p.text + delta } : p,
+      );
+    const part: MessagePart = { type, text: delta };
+    const answer =
+      type === "reasoning"
+        ? parts.findIndex((p, i) => i >= turnStart && p.type === "text")
+        : -1;
+    return answer >= 0
+      ? [...parts.slice(0, answer), part, ...parts.slice(answer)]
+      : [...parts, part];
   };
 
 /** The run is going again: nothing is being waited for. */

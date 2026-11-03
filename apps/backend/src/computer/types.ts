@@ -47,8 +47,15 @@ export interface ComputerStatus {
   lease: Owner | null;
   minutesUsedToday: number;
   minutesLimit: number;
-  /** Set when state is "error" or an action was refused. */
+  /** Why it is in this state ("Paused after being idle.", "Starting the screen…", an error). */
   message?: string;
+  /**
+   * While running: time left in this session. `warning` once the user should be asked to wrap up;
+   * `wrapping` after they chose to (the bots are told to finish and summarise).
+   */
+  session?: { endsInMs: number; warning: boolean; wrapping: boolean };
+  /** When the last screen was saved (taken when the computer goes to sleep). */
+  snapshotAt?: number;
   updatedAt: number;
 }
 

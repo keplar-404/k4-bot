@@ -107,5 +107,32 @@ export function createComputerTools(options: {
     },
   );
 
-  return [computerTool, askUser, waitFor];
+  // Power. Both are gated by Deep Agents' human-in-the-loop (`interruptOn` in agent.ts): the run pauses
+  // and these only execute after the user approves, because waking costs computer time and sleeping
+  // the computer stops the user's other bots too.
+  const turnOn = tool(
+    async () => {
+      await computer.ensure();
+      return "The computer is on. Take a screenshot to see it.";
+    },
+    {
+      name: "turn_on_computer",
+      description: "Turn on the user's computer when it is off and you need it. The user must approve. It uses their daily computer time.",
+      schema: z.object({}),
+    },
+  );
+
+  const turnOff = tool(
+    async () => {
+      await computer.pause("Turned off by a bot. Your work is saved.");
+      return "The computer is off. Its open apps and files are saved.";
+    },
+    {
+      name: "turn_off_computer",
+      description: "Turn the user's computer off (it sleeps with apps and files saved) when the task no longer needs it. The user must approve.",
+      schema: z.object({}),
+    },
+  );
+
+  return [computerTool, askUser, waitFor, turnOn, turnOff];
 }

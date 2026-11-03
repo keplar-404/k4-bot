@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
+import { computerFor } from "../computer/sandbox-backend";
 import { getRequestContext } from "../lib/context";
 import type { Env } from "../lib/env";
 import { signRelayToken, verifyRelayToken } from "../lib/relay-token";
@@ -14,16 +15,28 @@ import { ipLimit, userLimit } from "../middleware/rate-limit";
  * UserComputer Durable Object (one per user, named by user id), so a user can
  * only ever reach their own computer.
  */
-const computerFor = (env: Env, userId: string) => env.USER_COMPUTER.get(env.USER_COMPUTER.idFromName(userId));
 
 const secretOf = (env: Env) => env.WS_TOKEN_SECRET ?? env.BETTER_AUTH_SECRET;
 
-/** The live view is loaded in an iframe and over WebSocket, where no Authorization header can be sent. */
-const STREAM_TOKEN_TTL_SECONDS = 15 * 60;
+/**
+ * The live view is loaded in an iframe and over WebSocket, where no Authorization header can be sent.
+ * One token outlives a whole session (COMPUTER_SESSION_MINUTES + wrap-up), so the viewer never has to
+ * reload mid-session; noVNC's automatic reconnect reuses it after a network blip.
+ */
+const STREAM_TOKEN_TTL_SECONDS = 30 * 60;
 const MODES = ["watch", "control"] as const;
 type Mode = (typeof MODES)[number];
 
-const HIDE_NOVNC_CHROME = "#noVNC_control_bar_anchor,#noVNC_status{display:none!important}html,body{background:#0b0b0c}";
+/**
+ * noVNC (1.7) paints its own toolbar, status line ("Failed to connect to server"), connect dialog and
+ * "Connecting..." / "Reconnecting..." overlay. Inside our panel those read as errors and flicker, so they
+ * are hidden, and the page instead tells the panel its connection state (noVNC's own `noVNC_connected` /
+ * `noVNC_reconnecting` classes on <html>), so the panel shows one loading state of its own until it is live.
+ */
+const HIDE_NOVNC_CHROME =
+  "#noVNC_control_bar_anchor,#noVNC_status,#noVNC_connect_dlg,#noVNC_transition,#noVNC_fallback_error{display:none!important}html,body{background:#0b0b0c}";
+const reportVncState = (origin: string) =>
+  `(()=>{const h=document.documentElement,post=()=>parent.postMessage({source:"k4-vnc",state:h.classList.contains("noVNC_connected")?"connected":h.classList.contains("noVNC_reconnecting")?"reconnecting":"connecting"},${JSON.stringify(origin)});new MutationObserver(post).observe(h,{attributes:true,attributeFilter:["class"]});post()})()`;
 
 /** `{host,token}` for the viewer, cached briefly in this isolate: a noVNC page is ~60 requests. */
 const targets = new Map<string, { host: string; token: string; until: number }>();
@@ -58,8 +71,28 @@ const computer = new Hono<AuthGuardEnv>()
   .post("/pause", userLimit, async (c) => {
     const { env } = getRequestContext(c);
     const stub = computerFor(env, c.get("session").user.id);
-    await stub.pause("Paused by you.");
+    await stub.pause("Paused by you. Your work is saved.");
     return c.json(await stub.status());
+  })
+
+  // The session is ending: tell the bots to finish and summarise; the computer sleeps a little later.
+  .post("/session/wrap", userLimit, async (c) => {
+    const { env } = getRequestContext(c);
+    const stub = computerFor(env, c.get("session").user.id);
+    await stub.wrapUp();
+    return c.json(await stub.status());
+  })
+
+  // The screen saved when the computer last went to sleep. Read from Durable Object storage: no E2B call.
+  .get("/snapshot", async (c) => {
+    const { env } = getRequestContext(c);
+    const shot = await computerFor(env, c.get("session").user.id).snapshot();
+    if (!shot) return c.body(null, 404);
+    return c.body(shot.png as Uint8Array<ArrayBuffer>, 200, {
+      "content-type": "image/png",
+      // The client asks with ?at=<snapshotAt>, so a new screen is a new URL.
+      "cache-control": "private, max-age=86400",
+    });
   })
 
   // The user takes the mouse and keyboard; bots are told to wait. `keep` is the heartbeat while in control.
@@ -171,7 +204,12 @@ const computer = new Hono<AuthGuardEnv>()
 
     // noVNC's own toolbar would show up inside our panel: the page is ours, so it hides it.
     const isPage = upstream.headers.get("content-type")?.includes("text/html");
-    const body = isPage ? (await upstream.text()).replace("</head>", `<style>${HIDE_NOVNC_CHROME}</style></head>`) : upstream.body;
+    const body = isPage
+      ? (await upstream.text()).replace(
+          "</head>",
+          `<style>${HIDE_NOVNC_CHROME}</style><script>${reportVncState(env.WEB_ORIGIN ?? "*")}</script></head>`,
+        )
+      : upstream.body;
     const out = new Response(body, upstream);
     if (isPage) out.headers.delete("content-length");
     // The page is meant to be framed, but only by our own web app; and the token in the URL must not leak.
@@ -180,7 +218,9 @@ const computer = new Hono<AuthGuardEnv>()
     out.headers.set("cross-origin-resource-policy", "cross-origin");
     out.headers.set("referrer-policy", "no-referrer");
     out.headers.set("x-content-type-options", "nosniff");
-    out.headers.set("cache-control", "no-store");
+    // noVNC's scripts and styles are fixed for the session and their URL carries the session's token:
+    // the browser may keep them, so a page reload does not send ~60 requests through the Worker again.
+    out.headers.set("cache-control", isPage || upstream.status !== 200 ? "no-store" : "private, max-age=1800");
     return out;
   });
 

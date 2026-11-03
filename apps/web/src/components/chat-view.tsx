@@ -8,7 +8,7 @@ import {
   SendHorizontalIcon,
   ShieldQuestionIcon,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { AgentParts } from "@/components/agent-parts";
 import { Markdown } from "@/components/markdown";
@@ -27,12 +27,15 @@ import {
 import { Message, MessageContent } from "@/components/ui/message";
 import {
   MessageScroller,
+  MessageScrollerButton,
   MessageScrollerContent,
   MessageScrollerItem,
   MessageScrollerProvider,
   MessageScrollerViewport,
+  useMessageScroller,
 } from "@/components/ui/message-scroller";
 import { Skeleton } from "@/components/ui/skeleton";
+import type { ChatMessageView } from "@/lib/chat/protocol";
 import { useChat } from "@/lib/chat/use-chat";
 
 /** The agent asked something (a login, a code, a decision) and is waiting, possibly for days. */
@@ -47,7 +50,7 @@ function AgentQuestion({
 }) {
   const [text, setText] = useState("");
   return (
-    <Item variant="outline" size="sm" className="mx-4 mb-2">
+    <Item variant="outline" size="sm">
       <ItemMedia variant="icon">
         <MessageCircleQuestionIcon />
       </ItemMedia>
@@ -97,7 +100,34 @@ function AgentQuestion({
  * Layout: this fills its parent (`flex-1 min-h-0`) and the scroller viewport is
  * the only scrolling element, so the mouse wheel scrolls the conversation.
  */
-export function ChatView({ botId }: { botId: string }) {
+/**
+ * Sending a message jumps to the bottom (showing your message), and the scroller's auto-follow then
+ * keeps the newest part of the reply in view. Must sit inside the scroller's provider.
+ */
+function ScrollToEndOnSend({ lastMessage }: { lastMessage?: ChatMessageView }) {
+  const { scrollToEnd } = useMessageScroller();
+  const id = lastMessage?.role === "user" ? lastMessage.id : null;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only a new user message triggers it
+  useEffect(() => {
+    if (id) scrollToEnd({ behavior: "auto" });
+  }, [id]);
+  return null;
+}
+
+/** Approval prompts in the user's words; the tool name is the fallback. */
+const APPROVAL_LABEL: Record<string, string> = {
+  turn_on_computer: "Turn on your computer",
+  turn_off_computer: "Turn off your computer (its work is saved)",
+};
+
+export function ChatView({
+  botId,
+  beforeComposer,
+}: {
+  botId: string;
+  /** Shown above the composer with the other prompts (e.g. the computer's end-of-session prompt). */
+  beforeComposer?: ReactNode;
+}) {
   const {
     messages,
     run,
@@ -109,8 +139,9 @@ export function ChatView({ botId }: { botId: string }) {
     error,
     isLoading,
     models,
+    modelId,
+    reasoningEffort,
     chooseModel,
-    chooseReasoningEffort,
     send,
     retry,
     dismissError,
@@ -167,9 +198,11 @@ export function ChatView({ botId }: { botId: string }) {
       <MessageScrollerProvider autoScroll>
         <MessageScroller className="flex-1">
           <MessageScrollerViewport>
+            <ScrollToEndOnSend lastMessage={last} />
             {/* justify-end keeps a short thread anchored above the composer
-                instead of floating at the very top of a tall viewport. */}
-            <MessageScrollerContent className="justify-end px-4">
+                instead of floating at the very top of a tall viewport. py-6
+                keeps the first and last messages off the header and composer. */}
+            <MessageScrollerContent className="justify-end px-4 py-6">
               {isLoading && (
                 <output
                   className="flex flex-col gap-4 py-6"
@@ -269,73 +302,79 @@ export function ChatView({ botId }: { botId: string }) {
               )}
             </MessageScrollerContent>
           </MessageScrollerViewport>
+          {/* Shows only when scrolled away from the latest message; scrolls back on click. */}
+          <MessageScrollerButton />
         </MessageScroller>
       </MessageScrollerProvider>
 
-      {run === "waiting_approval" && approval && (
-        <Item variant="outline" size="sm" className="mx-4 mb-2">
-          <ItemMedia variant="icon">
-            <ShieldQuestionIcon />
-          </ItemMedia>
-          <ItemContent>
-            <ItemTitle className="break-all">
-              Approve{" "}
-              {approval.actions
-                .map(
-                  (a) =>
-                    `${a.name}${a.args.file_path ? ` ${String(a.args.file_path)}` : ""}`,
-                )
-                .join(", ")}
-              ?
-            </ItemTitle>
-          </ItemContent>
-          <ItemActions>
-            <Button size="sm" variant="outline" onClick={() => void reject()}>
-              Reject
-            </Button>
-            <Button size="sm" onClick={() => void approve()}>
-              Approve
-            </Button>
-          </ItemActions>
-        </Item>
-      )}
+      {/* Prompts sit directly above the composer, in the same column and padding, so their
+          edges line up with it (Item is w-full: side margins on it would overflow). */}
+      <div className="flex flex-col gap-2 p-4">
+        {run === "waiting_approval" && approval && (
+          <Item variant="outline" size="sm">
+            <ItemMedia variant="icon">
+              <ShieldQuestionIcon />
+            </ItemMedia>
+            <ItemContent>
+              <ItemTitle className="break-all">
+                {approval.actions
+                  .map(
+                    (a) =>
+                      APPROVAL_LABEL[a.name] ??
+                      `Approve ${a.name}${a.args.file_path ? ` ${String(a.args.file_path)}` : ""}`,
+                  )
+                  .join(", ")}
+                ?
+              </ItemTitle>
+            </ItemContent>
+            <ItemActions>
+              <Button size="sm" variant="outline" onClick={() => void reject()}>
+                Reject
+              </Button>
+              <Button size="sm" onClick={() => void approve()}>
+                Approve
+              </Button>
+            </ItemActions>
+          </Item>
+        )}
 
-      {run === "waiting_input" && prompt && (
-        <AgentQuestion
-          key={prompt.runId}
-          question={prompt.question}
-          kind={prompt.kind}
-          onAnswer={(text) => void answer(text)}
-        />
-      )}
+        {run === "waiting_input" && prompt && (
+          <AgentQuestion
+            key={prompt.runId}
+            question={prompt.question}
+            kind={prompt.kind}
+            onAnswer={(text) => void answer(text)}
+          />
+        )}
 
-      {run === "sleeping" && sleeping && (
-        <Item variant="outline" size="sm" className="mx-4 mb-2">
-          <ItemMedia variant="icon">
-            <ClockIcon />
-          </ItemMedia>
-          <ItemContent>
-            <ItemTitle>
-              Waiting until{" "}
-              {new Date(sleeping.until).toLocaleString([], {
-                dateStyle: "medium",
-                timeStyle: "short",
-              })}
-            </ItemTitle>
-            {sleeping.reason && (
-              <ItemDescription>{sleeping.reason}</ItemDescription>
-            )}
-          </ItemContent>
-        </Item>
-      )}
+        {run === "sleeping" && sleeping && (
+          <Item variant="outline" size="sm">
+            <ItemMedia variant="icon">
+              <ClockIcon />
+            </ItemMedia>
+            <ItemContent>
+              <ItemTitle>
+                Waiting until{" "}
+                {new Date(sleeping.until).toLocaleString([], {
+                  dateStyle: "medium",
+                  timeStyle: "short",
+                })}
+              </ItemTitle>
+              {sleeping.reason && (
+                <ItemDescription>{sleeping.reason}</ItemDescription>
+              )}
+            </ItemContent>
+          </Item>
+        )}
 
-      <div className="p-4">
+        {beforeComposer}
+
         <PromptBar
-          demo={false}
           onSend={(text) => void send(text)}
           models={catalog.length > 0 ? catalog : undefined}
-          onModelChange={(m) => chooseModel(m.key)}
-          onReasoningChange={(effort) => chooseReasoningEffort(effort)}
+          modelKey={modelId}
+          effort={reasoningEffort}
+          onSelect={chooseModel}
         />
       </div>
     </div>

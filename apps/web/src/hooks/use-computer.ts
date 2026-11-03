@@ -11,26 +11,38 @@ import {
   mintSocketToken,
   pause,
   releaseControl,
+  snapshotUrl,
   socketUrl,
   takeControl,
   wake,
+  wrapUp,
 } from "@/lib/computer/client";
 
-/** How often the page tells the server the user still holds the mouse (the server lets go after 45s of silence). */
+/** How often the page tells the server the user still holds the mouse (the server lets go after 5 min of silence). */
 const KEEP_CONTROL_MS = 15_000;
 const MAX_ACTIVITY = 50;
 
 /**
  * The user's computer: status and activity over one WebSocket to the user's
  * Durable Object, plus the few actions the user can take. Nothing here starts
- * the computer by itself; only `wake()` does.
+ * the computer by itself; only `wake()` does. Used once per page through
+ * `ComputerProvider`, so the panel and the chat share one connection.
  */
 export function useComputer() {
   const [status, setStatus] = useState<ComputerStatus | null>(null);
   const [activity, setActivity] = useState<ActivityEvent[]>([]);
-  const [busy, setBusy] = useState(false);
+  /** The action in flight, so its button can show a spinner while the others are disabled. */
+  const [pending, setPending] = useState<ComputerAction | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** Local clock time the session ends, from the server's "ms left" (immune to clock skew). */
+  const [sessionEndsAt, setSessionEndsAt] = useState<number | null>(null);
+  const [snapshot, setSnapshot] = useState<string | null>(null);
   const attempts = useRef(0);
+
+  const applyStatus = useCallback((s: ComputerStatus) => {
+    setStatus(s);
+    setSessionEndsAt(s.session ? Date.now() + s.session.endsInMs : null);
+  }, []);
 
   useEffect(() => {
     let closed = false;
@@ -48,7 +60,7 @@ export function useComputer() {
         ws.onmessage = (event) => {
           try {
             const frame = JSON.parse(String(event.data));
-            if (frame.type === "status") setStatus(frame.status);
+            if (frame.type === "status") applyStatus(frame.status);
             else if (frame.type === "activity")
               setActivity((a) => [
                 ...a.slice(-(MAX_ACTIVITY - 1)),
@@ -83,7 +95,7 @@ export function useComputer() {
     };
 
     void getStatus()
-      .then((s) => !closed && setStatus(s))
+      .then((s) => !closed && applyStatus(s))
       .catch(() => undefined);
     void connect();
     return () => {
@@ -91,21 +103,43 @@ export function useComputer() {
       clearTimeout(timer);
       ws?.close();
     };
-  }, []);
+  }, [applyStatus]);
 
-  const run = useCallback(async (action: () => Promise<unknown>) => {
-    setBusy(true);
-    setError(null);
-    try {
-      await action();
-    } catch (e) {
-      setError(
-        e instanceof ChatHttpError ? e.info.message : "Something went wrong.",
-      );
-    } finally {
-      setBusy(false);
-    }
-  }, []);
+  // The saved screen is fetched once per save (its time is in the URL, so the browser caches it).
+  const snapshotAt = status?.snapshotAt;
+  useEffect(() => {
+    if (!snapshotAt) return;
+    let url: string | null = null;
+    let cancelled = false;
+    void snapshotUrl(snapshotAt).then((u) => {
+      if (cancelled && u) URL.revokeObjectURL(u);
+      else {
+        url = u;
+        setSnapshot(u);
+      }
+    });
+    return () => {
+      cancelled = true;
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [snapshotAt]);
+
+  const run = useCallback(
+    async (name: ComputerAction, action: () => Promise<unknown>) => {
+      setPending(name);
+      setError(null);
+      try {
+        await action();
+      } catch (e) {
+        setError(
+          e instanceof ChatHttpError ? e.info.message : "Something went wrong.",
+        );
+      } finally {
+        setPending(null);
+      }
+    },
+    [],
+  );
 
   const inControl = status?.lease?.kind === "user";
 
@@ -122,16 +156,38 @@ export function useComputer() {
   return {
     status,
     activity,
-    busy,
+    busy: pending !== null,
+    pending,
     error,
     inControl,
-    wake: () => run(async () => setStatus(await wake())),
-    pause: () => run(async () => setStatus(await pause())),
+    sessionEndsAt,
+    snapshot,
+    wake: () =>
+      run("wake", async () => {
+        // Show "starting" at once; the server's own status replaces it within moments.
+        setStatus((s) =>
+          s ? { ...s, state: "starting", message: "Waking your computer…" } : s,
+        );
+        try {
+          applyStatus(await wake());
+        } catch (e) {
+          // Do not leave the optimistic "starting" behind.
+          void getStatus()
+            .then(applyStatus)
+            .catch(() => undefined);
+          throw e;
+        }
+      }),
+    pause: () => run("pause", async () => applyStatus(await pause())),
+    wrapUp: () => run("wrap", async () => applyStatus(await wrapUp())),
     takeControl: () =>
-      run(async () => {
+      run("take", async () => {
         const result = await takeControl();
         if (!result.ok) setError(result.message ?? "Could not take control.");
       }),
-    releaseControl: () => run(releaseControl),
+    releaseControl: () => run("release", releaseControl),
   };
 }
+
+export type Computer = ReturnType<typeof useComputer>;
+export type ComputerAction = "wake" | "pause" | "wrap" | "take" | "release";

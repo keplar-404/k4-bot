@@ -3,7 +3,9 @@
 import { useParams } from "next/navigation";
 import { Suspense } from "react";
 import { ChatView } from "@/components/chat-view";
+import { ComputerProvider } from "@/components/computer/computer-provider";
 import { ComputerSidebar } from "@/components/computer/computer-sidebar";
+import { SessionWrapUp } from "@/components/computer/session-wrap-up";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -23,12 +25,20 @@ function BotChat() {
   }
   return (
     // The chat keeps its own column exactly as before; the computer is a side bar next to it.
-    <div className="flex min-h-0 flex-1">
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <ChatView botId={botId} />
+    // One connection to the computer serves both (the chat shows its end-of-session prompt).
+    <ComputerProvider>
+      <div className="flex min-h-0 flex-1">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          {/* Keyed by bot: switching bots (client-side) starts a fresh chat instead of reusing the last one's state and socket. */}
+          <ChatView
+            key={botId}
+            botId={botId}
+            beforeComposer={<SessionWrapUp />}
+          />
+        </div>
+        <ComputerSidebar botId={botId} />
       </div>
-      <ComputerSidebar botId={botId} />
-    </div>
+    </ComputerProvider>
   );
 }
 

@@ -9,7 +9,7 @@ import { consumeRun, type RunStream } from "../agent/run-stream";
 import { createDb, type Db } from "../db";
 import { agentUsage, bot, chatMessage, chatThread } from "../db/schema";
 import { parseEnv, type Env } from "../lib/env";
-import { nextMessageSeq, tokensUsedToday } from "../lib/threads";
+import { getOwnedThread, nextMessageSeq, tokensUsedToday } from "../lib/threads";
 
 export interface ChatRunParams {
   runId: string;
@@ -37,6 +37,34 @@ export interface UserInput {
 /** A slice stops itself well inside the 30 minute guidance for a Workflow step and carries on in the next one. */
 const SLICE_WALL_MS = 20 * 60_000;
 const MAX_SLEEP_MS = 7 * 24 * 60 * 60_000;
+
+/** Shell and file tools as one line for the computer's Activity feed (screen actions are noted by the computer itself). */
+function describeActivity(name: string, input: string): string | null {
+  let a: Record<string, unknown> = {};
+  try {
+    a = JSON.parse(input) as Record<string, unknown>;
+  } catch {
+    // clipped input: fall back to the tool name only
+  }
+  const path = String(a.file_path ?? a.path ?? "");
+  switch (name) {
+    case "execute":
+      return `Ran ${String(a.command ?? "a command")}`;
+    case "write_file":
+      return `Wrote ${path}`;
+    case "edit_file":
+      return `Edited ${path}`;
+    case "read_file":
+      return `Read ${path}`;
+    case "ls":
+      return `Listed ${path}`;
+    case "glob":
+    case "grep":
+      return `Searched files ${String(a.pattern ?? "")}`.trim();
+    default:
+      return null;
+  }
+}
 
 /** Coalesces tokens so the relay gets a few events a second, not one per token. */
 class TokenBatcher {
@@ -176,10 +204,13 @@ export class ChatRunWorkflow extends WorkflowEntrypoint<Env, ChatRunParams> {
     };
 
     const stub = env.COMPUTER_ENABLED && env.E2B_API_KEY ? env.USER_COMPUTER.get(env.USER_COMPUTER.idFromName(userId)) : undefined;
-    let controller: AbortController | undefined;
     let timer: ReturnType<typeof setTimeout> | undefined;
 
     try {
+      // The bot or the account was deleted while this run waited or slept: stop quietly (there is no chat left to tell).
+      if (!(await getOwnedThread(db, threadId, userId))) return { status: "failed" };
+      // Its name for /home/BOTS.md. Storage only in the Durable Object: no E2B call.
+      await stub?.registerBot(botRow.id, botRow.name).catch(() => undefined);
       if ((await tokensUsedToday(db, userId)) >= env.MAX_DAILY_TOKENS_PER_USER) {
         await publish("run.failed", { error: `Daily token budget of ${env.MAX_DAILY_TOKENS_PER_USER} reached. It resets at 00:00 UTC.` });
         return { status: "failed" };
@@ -211,7 +242,6 @@ export class ChatRunWorkflow extends WorkflowEntrypoint<Env, ChatRunParams> {
         recursionLimit: env.RUN_SLICE_STEPS,
         durability: "sync",
       });
-      controller = new AbortController();
       timer = setTimeout(() => stream.abort?.(), SLICE_WALL_MS);
 
       const { interrupt } = await consumeRun(
@@ -222,6 +252,8 @@ export class ChatRunWorkflow extends WorkflowEntrypoint<Env, ChatRunParams> {
           toolStart: async (part) => {
             await flushAll();
             await publish("tool.start", { id: part.id, name: part.name, input: part.input });
+            const line = describeActivity(part.name, part.input);
+            if (line) await stub?.logActivity(botRow.id, line).catch(() => undefined);
           },
           toolEnd: (part) => publish("tool.end", { id: part.id, status: part.status, output: part.output }),
           partsChanged: saveProgress,
@@ -262,7 +294,6 @@ export class ChatRunWorkflow extends WorkflowEntrypoint<Env, ChatRunParams> {
       return { status: "failed" };
     } finally {
       clearTimeout(timer);
-      controller?.abort();
       if (acc.usage.input + acc.usage.output > 0) {
         await db
           .insert(agentUsage)

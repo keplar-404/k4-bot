@@ -8,20 +8,20 @@ import {
   MonitorOffIcon,
   PauseIcon,
   PowerIcon,
+  XIcon,
 } from "lucide-react";
-import { useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
+import { useComputerContext } from "@/components/computer/computer-provider";
 import { ComputerScreen } from "@/components/computer/computer-screen";
+import {
+  formatClock,
+  useSecondsLeft,
+} from "@/components/computer/session-wrap-up";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useComputer } from "@/hooks/use-computer";
+import type { Computer, ComputerAction } from "@/hooks/use-computer";
 import type { ActivityEvent, ComputerStatus } from "@/lib/computer/client";
 import { cn } from "@/lib/utils";
 
@@ -32,8 +32,6 @@ const STATE_LABEL: Record<ComputerStatus["state"], string> = {
   paused: "Asleep",
   error: "Problem",
 };
-
-type Computer = ReturnType<typeof useComputer>;
 
 function who(status: ComputerStatus, botId: string): string | null {
   const lease = status.lease;
@@ -58,40 +56,84 @@ function StateBadge({ status }: { status: ComputerStatus }) {
   );
 }
 
-/** What the screen area shows when there is nothing live to watch. */
-function Asleep({
-  status,
-  busy,
-  onWake,
-}: {
-  status: ComputerStatus;
-  busy: boolean;
-  onWake: () => void;
-}) {
-  const starting = status.state === "starting" || busy;
+/** Time left in the session, once it is worth showing. */
+function SessionClock({ computer }: { computer: Computer }) {
+  const left = useSecondsLeft(computer.sessionEndsAt);
+  if (left === null || computer.status?.state !== "running") return null;
+  return (
+    <span
+      className={cn(
+        "ml-auto text-xs tabular-nums text-muted-foreground",
+        computer.status.session?.warning && "text-amber-500",
+      )}
+      title="Time left in this computer session"
+    >
+      {formatClock(left)}
+    </span>
+  );
+}
+
+/** Seconds since the computer started waking, so a slow start never looks frozen. */
+function useElapsed(active: boolean): number {
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    if (!active) {
+      setElapsed(0);
+      return;
+    }
+    const started = Date.now();
+    const id = setInterval(
+      () => setElapsed(Math.round((Date.now() - started) / 1000)),
+      1000,
+    );
+    return () => clearInterval(id);
+  }, [active]);
+  return elapsed;
+}
+
+/** The screen area when there is nothing live to watch: the last saved screen, dimmed, and how to wake it. */
+function Asleep({ computer }: { computer: Computer }) {
+  const { status, pending, snapshot } = computer;
+  const starting = status?.state === "starting" || pending === "wake";
+  const elapsed = useElapsed(starting);
+  if (!status) return null;
   const limitReached = status.minutesUsedToday >= status.minutesLimit;
   return (
-    <div className="flex size-full flex-col items-center justify-center gap-2 p-4 text-center">
-      {starting ? (
-        <Loader2Icon className="size-6 animate-spin text-muted-foreground" />
-      ) : (
-        <MonitorOffIcon className="size-6 text-muted-foreground" />
+    <div className="relative flex size-full flex-col items-center justify-center gap-2 p-4 text-center">
+      {snapshot && (
+        // biome-ignore lint/performance/noImgElement: a private blob: URL, not an optimisable asset
+        <img
+          src={snapshot}
+          alt=""
+          className="absolute inset-0 size-full object-contain opacity-30"
+        />
       )}
-      <p className="text-sm font-medium">
-        {starting ? "Waking the computer…" : "The computer is asleep"}
-      </p>
-      <p className="max-w-[16rem] text-xs text-muted-foreground">
-        {status.message ??
-          (limitReached
-            ? "Today's computer time is used up. It resets at 00:00 UTC."
-            : "Your bots wake it when they need it, and it sleeps again by itself when idle.")}
-      </p>
-      {!starting && !limitReached && (
-        <Button size="sm" variant="outline" onClick={onWake}>
-          <PowerIcon />
-          Wake up
-        </Button>
-      )}
+      <div className="relative flex flex-col items-center gap-2 rounded-lg bg-background/70 px-4 py-3 backdrop-blur-sm">
+        {starting ? (
+          <Loader2Icon className="size-6 animate-spin text-muted-foreground" />
+        ) : (
+          <MonitorOffIcon className="size-6 text-muted-foreground" />
+        )}
+        <p className="text-sm font-medium">
+          {starting
+            ? `${status.message ?? "Waking the computer…"}${elapsed > 0 ? ` ${elapsed}s` : ""}`
+            : "The computer is asleep"}
+        </p>
+        {!starting && (
+          <p className="max-w-[16rem] text-xs text-muted-foreground">
+            {limitReached
+              ? "Today's computer time is used up. It resets at 00:00 UTC."
+              : (status.message ??
+                "Turn it on, or a bot asks you to when it needs it.")}
+          </p>
+        )}
+        {!starting && !limitReached && (
+          <Button size="sm" variant="outline" onClick={computer.wake}>
+            <PowerIcon />
+            Wake up
+          </Button>
+        )}
+      </div>
     </div>
   );
 }
@@ -154,103 +196,14 @@ function Usage({ status }: { status: ComputerStatus }) {
   );
 }
 
-/** Full-screen view: the whole desktop, what the bots are doing, and the user's take-over. */
-function FullscreenComputer({
-  computer,
-  botId,
-  open,
-  onOpenChange,
-}: {
-  computer: Computer;
-  botId: string;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}) {
-  const { status, inControl, busy, error } = computer;
-  if (!status) return null;
-  const live = status.state === "running";
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        showCloseButton
-        className="h-[92svh] w-[96vw] max-w-none grid-rows-[auto_1fr] gap-3 p-3 sm:max-w-none"
-      >
-        <div className="flex flex-wrap items-center gap-2 pr-10">
-          <DialogTitle className="flex items-center gap-2 text-sm">
-            <MonitorIcon className="size-4" />
-            Computer
-          </DialogTitle>
-          <StateBadge status={status} />
-          <DialogDescription className="min-w-0 flex-1 truncate text-xs">
-            {who(status, botId) ??
-              (live ? "Idle. Nobody is using the mouse." : "Asleep")}
-          </DialogDescription>
-          {live &&
-            (inControl ? (
-              <Button
-                size="sm"
-                onClick={() => void computer.releaseControl()}
-                disabled={busy}
-              >
-                <HandIcon />
-                Give control back
-              </Button>
-            ) : (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => void computer.takeControl()}
-                disabled={busy}
-              >
-                <HandIcon />
-                Take control
-              </Button>
-            ))}
-          {live && (
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => void computer.pause()}
-              disabled={busy}
-            >
-              <PauseIcon />
-              Sleep
-            </Button>
-          )}
-          {error && <span className="text-xs text-destructive">{error}</span>}
-        </div>
-        <div className="grid min-h-0 gap-3 md:grid-cols-[1fr_16rem]">
-          <div className="relative min-h-0 overflow-hidden rounded-lg border bg-black">
-            {live ? (
-              <ComputerScreen
-                mode={inControl ? "control" : "watch"}
-                enabled={open && live}
-                title="Computer"
-                className="size-full border-0"
-              />
-            ) : (
-              <Asleep status={status} busy={busy} onWake={computer.wake} />
-            )}
-          </div>
-          <aside className="hidden min-h-0 flex-col gap-3 md:flex">
-            <p className="text-xs font-medium">Activity</p>
-            <Activity
-              events={computer.activity}
-              botId={botId}
-              className="min-h-0 flex-1"
-            />
-            <Usage status={status} />
-          </aside>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 /**
- * The computer in the bot page's right side bar: a live preview (click it for the
- * full screen), what the bots are doing, and today's usage. One computer per user,
- * shared by all of their bots.
+ * The computer in the bot page's right side bar: a live preview (click it for the full
+ * screen), what the bots are doing, and today's usage. One computer per user, shared by
+ * all of their bots.
+ *
+ * Full screen is the same element growing to cover the window, not a second viewer in a
+ * dialog: moving an iframe to another place in the DOM reloads it, which is what made the
+ * preview go black and reconnect. Here the live view keeps its connection throughout.
  */
 export function ComputerPanel({
   botId,
@@ -259,9 +212,28 @@ export function ComputerPanel({
   botId: string;
   className?: string;
 }) {
-  const computer = useComputer();
+  const computer = useComputerContext();
   const [open, setOpen] = useState(false);
-  const { status } = computer;
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const { status, inControl, busy, pending } = computer;
+  const live = status?.state === "running";
+  /** The button's own icon, or a spinner while its action runs. */
+  const icon = (action: ComputerAction, idle: ReactNode) =>
+    pending === action ? <Loader2Icon className="animate-spin" /> : idle;
+
+  // Escape closes the full screen; focus moves into it when it opens.
+  useEffect(() => {
+    if (!open) return;
+    closeRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open]);
+
+  // Nothing to show full screen once the computer sleeps.
+  useEffect(() => {
+    if (!live && !inControl) setOpen(false);
+  }, [live, inControl]);
 
   if (!status) {
     return (
@@ -272,7 +244,6 @@ export function ComputerPanel({
     );
   }
 
-  const live = status.state === "running";
   const doing = who(status, botId);
 
   return (
@@ -281,43 +252,140 @@ export function ComputerPanel({
         <MonitorIcon className="size-4 text-muted-foreground" />
         <h2 className="text-sm font-medium">Computer</h2>
         <StateBadge status={status} />
+        <SessionClock computer={computer} />
       </div>
 
-      <div className="flex flex-col gap-2">
-        <div className="group relative aspect-[16/10] overflow-hidden rounded-xl border bg-black">
-          {live ? (
-            <>
-              <ComputerScreen
-                mode="watch"
-                enabled={live && !open}
-                title="Computer preview"
-                className="pointer-events-none size-full border-0"
-              />
-              <button
-                type="button"
-                onClick={() => setOpen(true)}
-                aria-label="Open the computer full screen"
-                className="absolute inset-0 flex items-end justify-end bg-transparent p-2 outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+      {/* The same element is the preview and the full screen; only its classes change. */}
+      <div
+        {...(open
+          ? {
+              role: "dialog",
+              "aria-modal": true,
+              "aria-label": "Computer, full screen",
+            }
+          : {})}
+        className={cn(
+          open
+            ? "fixed inset-0 z-50 flex flex-col gap-3 bg-background/95 p-3 backdrop-blur-sm"
+            : "flex flex-col gap-2",
+        )}
+      >
+        {open && (
+          <div className="flex flex-wrap items-center gap-2">
+            <MonitorIcon className="size-4" />
+            <span className="text-sm font-medium">Computer</span>
+            <StateBadge status={status} />
+            <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+              {doing ?? (live ? "Idle. Nobody is using the mouse." : "Asleep")}
+            </span>
+            {live &&
+              (inControl ? (
+                <Button
+                  size="sm"
+                  onClick={() => void computer.releaseControl()}
+                  disabled={busy}
+                  aria-busy={pending === "release"}
+                >
+                  {icon("release", <HandIcon />)}
+                  Give control back
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => void computer.takeControl()}
+                  disabled={busy}
+                  aria-busy={pending === "take"}
+                >
+                  {icon("take", <HandIcon />)}
+                  Take control
+                </Button>
+              ))}
+            {live && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => void computer.pause()}
+                disabled={busy}
+                aria-busy={pending === "pause"}
               >
-                <span className="rounded-md bg-background/80 p-1.5 opacity-0 backdrop-blur transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-                  <MaximizeIcon className="size-4" />
-                </span>
-              </button>
-              {doing && (
-                <span className="pointer-events-none absolute bottom-2 left-2 rounded-md bg-background/80 px-2 py-1 text-[11px] backdrop-blur">
-                  {doing}
-                </span>
-              )}
-            </>
-          ) : (
-            <Asleep
-              status={status}
-              busy={computer.busy}
-              onWake={computer.wake}
-            />
+                {icon("pause", <PauseIcon />)}
+                Sleep
+              </Button>
+            )}
+            <Button
+              ref={closeRef}
+              size="icon-sm"
+              variant="ghost"
+              aria-label="Close full screen"
+              onClick={() => setOpen(false)}
+            >
+              <XIcon />
+            </Button>
+          </div>
+        )}
+
+        <div
+          className={cn(
+            open
+              ? "grid min-h-0 flex-1 gap-3 md:grid-cols-[1fr_16rem]"
+              : "contents",
+          )}
+        >
+          <div
+            className={cn(
+              "group relative overflow-hidden rounded-xl border bg-black",
+              open ? "min-h-0" : "aspect-[16/10]",
+            )}
+          >
+            {live ? (
+              <>
+                <ComputerScreen
+                  mode={inControl ? "control" : "watch"}
+                  enabled={live}
+                  poster={computer.snapshot}
+                  title="Computer"
+                  className={cn(
+                    "size-full border-0",
+                    !(open && inControl) && "pointer-events-none",
+                  )}
+                />
+                {!open && (
+                  <button
+                    type="button"
+                    onClick={() => setOpen(true)}
+                    aria-label="Open the computer full screen"
+                    className="absolute inset-0 flex items-end justify-end bg-transparent p-2 outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+                  >
+                    <span className="rounded-md bg-background/80 p-1.5 opacity-0 backdrop-blur transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+                      <MaximizeIcon className="size-4" />
+                    </span>
+                  </button>
+                )}
+                {doing && !open && (
+                  <span className="pointer-events-none absolute bottom-2 left-2 rounded-md bg-background/80 px-2 py-1 text-[11px] backdrop-blur">
+                    {doing}
+                  </span>
+                )}
+              </>
+            ) : (
+              <Asleep computer={computer} />
+            )}
+          </div>
+          {open && (
+            <aside className="hidden min-h-0 flex-col gap-3 md:flex">
+              <p className="text-xs font-medium">Activity</p>
+              <Activity
+                events={computer.activity}
+                botId={botId}
+                className="min-h-0 flex-1"
+              />
+              <Usage status={status} />
+            </aside>
           )}
         </div>
-        {live && (
+
+        {live && !open && (
           <div className="flex gap-2">
             <Button
               size="sm"
@@ -332,9 +400,10 @@ export function ComputerPanel({
               size="sm"
               variant="ghost"
               onClick={() => void computer.pause()}
-              disabled={computer.busy}
+              disabled={busy}
+              aria-busy={pending === "pause"}
             >
-              <PauseIcon />
+              {icon("pause", <PauseIcon />)}
               Sleep
             </Button>
           </div>
@@ -354,13 +423,6 @@ export function ComputerPanel({
       </div>
 
       <Usage status={status} />
-
-      <FullscreenComputer
-        computer={computer}
-        botId={botId}
-        open={open}
-        onOpenChange={setOpen}
-      />
     </div>
   );
 }

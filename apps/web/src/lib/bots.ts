@@ -9,6 +9,9 @@ export type Bot = {
   shape: string;
   color: string;
   expression: string;
+  /** The model picked for this bot in the prompt bar; null = the catalog default. */
+  modelId?: string | null;
+  reasoningEffort?: string | null;
 };
 
 export type BotsResult =
@@ -127,4 +130,39 @@ export async function deleteBot(id: string): Promise<void> {
     );
   }
   invalidateBots();
+}
+
+/** Updates one bot in the cached list, so a re-read within the TTL sees the change without a refetch. */
+function patchCachedBot(id: string, fields: Partial<Bot>) {
+  if (!cachedPromise) return;
+  cachedPromise = cachedPromise.then((result) =>
+    result.ok
+      ? {
+          ok: true,
+          bots: result.bots.map((b) => (b.id === id ? { ...b, ...fields } : b)),
+        }
+      : result,
+  );
+}
+
+/** Saves the model (and reasoning level) picked for a bot, so it is still selected after a refresh. */
+export async function saveBotModel(
+  id: string,
+  modelId: string,
+  reasoningEffort: string | null,
+): Promise<void> {
+  const res = await api.api.v1.bots[":id"].model.$put(
+    { param: { id }, json: { modelId, reasoningEffort } },
+    { init: { credentials: "include" } },
+  );
+  if (!res.ok) {
+    const body = (await res.json().catch(() => null)) as {
+      message?: string;
+    } | null;
+    throw new BotApiError(
+      parseErrorBody(body, "Failed to save the model"),
+      res.status,
+    );
+  }
+  patchCachedBot(id, { modelId, reasoningEffort });
 }

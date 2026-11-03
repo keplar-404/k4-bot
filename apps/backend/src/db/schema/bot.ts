@@ -14,6 +14,10 @@ export const bot = pgTable(
     shape: text("shape").notNull(),
     color: text("color").notNull(),
     expression: text("expression").notNull(),
+    /** The model the user last picked for this bot (an OpenRouter id from the catalog). Null = the default. */
+    modelId: text("model_id"),
+    /** Reasoning level picked with that model; null when the model has none. */
+    reasoningEffort: text("reasoning_effort"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()

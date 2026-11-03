@@ -1,12 +1,22 @@
 "use client";
 
-import { PlusIcon, SearchIcon } from "lucide-react";
+import { Loader2Icon, PlusIcon, SearchIcon } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
 import * as React from "react";
-import { useRouter, usePathname } from "next/navigation";
 import { toast } from "sonner";
 import { AvatarCreateDialog } from "@/components/avatar-create-dialog";
 import { BloubAvatar } from "@/components/bloub-avatar";
 import { BotList, BotListSkeleton } from "@/components/bot-list";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Command,
@@ -50,20 +60,31 @@ export function NavProjects() {
     if (!next) setEditingBot(null);
   }, []);
 
+  // Deleting is irreversible (chats and the bot's files on the computer go too), so it is confirmed first.
+  const [confirming, setConfirming] = React.useState<Bot | null>(null);
+  const [deleting, setDeleting] = React.useState(false);
+
   const handleDelete = React.useCallback(
-    (id: string) => {
-      deleteBot(id)
-        .then(() => {
-          if (pathname === `/dashboard/bot/${id}`) {
-            router.replace("/dashboard");
-          }
-        })
-        .catch((e: unknown) => {
-          toast.error(e instanceof Error ? e.message : "Failed to delete bot.");
-        });
-    },
-    [deleteBot, pathname, router],
+    (id: string) => setConfirming(bots.find((b) => b.id === id) ?? null),
+    [bots],
   );
+
+  const confirmDelete = React.useCallback(async () => {
+    if (!confirming) return;
+    setDeleting(true);
+    try {
+      await deleteBot(confirming.id);
+      toast.success(`${confirming.name} was deleted.`);
+      if (pathname === `/dashboard/bot/${confirming.id}`) {
+        router.replace("/dashboard");
+      }
+      setConfirming(null);
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Failed to delete bot.");
+    } finally {
+      setDeleting(false);
+    }
+  }, [confirming, deleteBot, pathname, router]);
 
   return (
     <SidebarGroup className="group-data-[collapsible=icon]:hidden">
@@ -101,7 +122,7 @@ export function NavProjects() {
                         key={bot.id}
                         value={bot.name}
                         onSelect={() => {
-                          window.location.href = `/dashboard/bot/${bot.id}`;
+                          router.push(`/dashboard/bot/${bot.id}`);
                           setSearchOpen(false);
                         }}
                       >
@@ -126,6 +147,32 @@ export function NavProjects() {
       ) : (
         <BotList bots={bots} onEdit={openEdit} onDelete={handleDelete} />
       )}
+      <AlertDialog
+        open={confirming !== null}
+        onOpenChange={(open) => !open && !deleting && setConfirming(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {confirming?.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently deletes the bot, all of its chats, and its folder
+              and files on your computer. Anything it is doing now stops. Your
+              other bots and their files are not affected. This can't be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={deleting}
+              onClick={() => void confirmDelete()}
+            >
+              {deleting && <Loader2Icon className="animate-spin" />}
+              Delete bot
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <AvatarCreateDialog
         open={dialogOpen}
         onOpenChange={handleDialogOpenChange}

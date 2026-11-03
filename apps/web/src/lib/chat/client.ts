@@ -75,11 +75,19 @@ export interface ModelRow {
   tag: string;
 }
 
-export function listModels(): Promise<{
-  models: ModelRow[];
-  defaultModel: string;
-}> {
-  return request("/api/v1/models");
+type ModelCatalog = { models: ModelRow[]; defaultModel: string };
+let catalog: Promise<ModelCatalog> | null = null;
+
+/**
+ * The model catalog, fetched once per page load and shared by every chat (it only changes with a
+ * deploy; the server also lets the browser cache it). A failed fetch is not kept, so the next call retries.
+ */
+export function listModels(): Promise<ModelCatalog> {
+  catalog ??= request<ModelCatalog>("/api/v1/models").catch((error) => {
+    catalog = null;
+    throw error;
+  });
+  return catalog;
 }
 
 /**

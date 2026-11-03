@@ -27,8 +27,8 @@ function useWide() {
 
 /**
  * The computer in the bot page's right side bar. On wide screens it sits beside the chat;
- * on narrower ones it opens from a button, so the chat keeps the full width. Only one of
- * the two is ever mounted (each opens its own connection to the computer).
+ * on narrower ones it opens from a button, so the chat keeps the full width. Both read the
+ * page's single connection to the computer (ComputerProvider).
  */
 export function ComputerSidebar({ botId }: { botId: string }) {
   const wide = useWide();

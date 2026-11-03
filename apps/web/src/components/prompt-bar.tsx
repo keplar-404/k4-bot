@@ -20,7 +20,6 @@ const RAINBOW = accentChain([
  * A composer with real controls: attach, @ data sources,
  * / commands, a model picker, dictation, and send.
  * Type @ or / to open the menus; ↑↓ + Enter to pick.
- * Variants: Rounded (card radius) · Pill (full radius).
  * ───────────────────────────────────────────────────────── */
 
 function Icon({
@@ -202,43 +201,8 @@ const COMMANDS = [
   { key: "summarize", name: "/summarize", desc: "Digest the thread so far" },
 ];
 
-// Demo-only fallback. Same shape as the server catalog so the picker can
-// render either without branching.
-const MODELS = [
-  { key: "sprinkles-5", name: "Sprinkles 5", tag: "Flagship", vision: true, reasoning: true, reasoningEfforts: ["high", "medium", "low"] },
-  { key: "vanilla-1", name: "Vanilla 1", tag: "Basic", vision: false, reasoning: false, reasoningEfforts: [] },
-  { key: "freezer-burn", name: "Freezer Burn 0.4", tag: "Stale", vision: false, reasoning: false, reasoningEfforts: [] },
-];
-
 const FILES = ["flavor-chart.png", "summer-menu.pdf", "pos-export.csv"];
 const DICTATION = "Compare pistachio weekends to last summer";
-
-/* self-running demo: walk the @ menu, then the / menu, and repeat.
- * Any pointer or key interaction hands control to the user. */
-const AUTO_STEPS: {
-  draft: string;
-  active?: number;
-  connect?: boolean;
-  modelOpen?: boolean;
-  model?: string;
-  hold: number;
-}[] = [
-  { draft: "", connect: false, model: "vanilla-1", hold: 1100 },
-  { draft: "@", active: 0, hold: 900 },
-  { draft: "@", active: 1, hold: 620 },
-  { draft: "@", active: 4, hold: 620 },
-  { draft: "@", active: 6, hold: 700 },
-  { draft: "@", active: 6, connect: true, hold: 1000 },
-  { draft: "", hold: 700 },
-  { draft: "/", active: 0, hold: 900 },
-  { draft: "/", active: 1, hold: 620 },
-  { draft: "/", active: 3, hold: 1000 },
-  { draft: "", hold: 800 },
-  // open the model picker and upgrade to the flagship → rainbow sweep
-  { draft: "", modelOpen: true, hold: 1200 },
-  { draft: "", model: "sprinkles-5", hold: 2400 },
-  { draft: "", hold: 900 },
-];
 
 /* the last @word or /word being typed, if any */
 function parseToken(
@@ -263,42 +227,34 @@ type ModelOption = {
 };
 
 export default function PromptBar({
-  variant = "Rounded",
-  demo = true,
-  tall = false,
   placeholder,
   onSend,
   models: externalModels,
-  onModelChange,
-  onReasoningChange,
+  modelKey,
+  effort = null,
+  onSelect,
 }: {
-  variant?: string;
-  /** the self-running walkthrough; turn off when embedding in a real surface */
-  demo?: boolean;
-  /** hero sizing: a multi-line input with controls on their own row */
-  tall?: boolean;
   placeholder?: string;
   onSend?: (text: string) => void;
   models?: ModelOption[];
-  onModelChange?: (model: ModelOption) => void;
-  /** Fires when the reasoning level changes, and when a new model resets it. */
-  onReasoningChange?: (effort: string) => void;
+  /** The selected model and reasoning level. The parent owns them (they are saved per bot). */
+  modelKey?: string;
+  effort?: string | null;
+  /** The user picked a model (its first level comes with it) or a reasoning level. */
+  onSelect?: (modelKey: string, effort: string | null) => void;
 }) {
-  const pill = variant === "Pill";
-  // Real catalog from GET /api/v1/models when supplied; the built-in list is
-  // only the standalone-demo fallback.
-  const catalog =
-    externalModels && externalModels.length > 0 ? externalModels : MODELS;
+  // The catalog from GET /api/v1/models; empty until it loads.
+  const catalog = externalModels ?? [];
+  const model = catalog.find((m) => m.key === modelKey) ?? catalog[0];
   const [draft, setDraft] = useState("");
   const [dismissed, setDismissed] = useState(false);
   const [plusOpen, setPlusOpen] = useState(false);
   const [modelOpen, setModelOpen] = useState(false);
-  const [model, setModel] = useState(catalog[0]);
-  const [effort, setEffort] = useState<string | null>(
-    catalog[0]?.reasoningEfforts?.[0] ?? null,
-  );
   const [effortOpen, setEffortOpen] = useState(false);
-  const [effortBox, setEffortBox] = useState<{ top: number; height: number } | null>(null);
+  const [effortBox, setEffortBox] = useState<{
+    top: number;
+    height: number;
+  } | null>(null);
   const [effortHovered, setEffortHovered] = useState<number | null>(null);
   const [effortMenuLeft, setEffortMenuLeft] = useState(0);
   const [effortMenuBottom, setEffortMenuBottom] = useState(0);
@@ -306,10 +262,8 @@ export default function PromptBar({
   const [connected, setConnected] = useState(false);
   const [active, setActive] = useState(0);
   const [listening, setListening] = useState(false);
-  const [auto, setAuto] = useState(demo);
-  const [autoStep, setAutoStep] = useState(0);
   const [expanded, setExpanded] = useState(false);
-  const wide = expanded || tall;
+  const wide = expanded;
   const [rowBox, setRowBox] = useState<{ top: number; height: number } | null>(
     null,
   );
@@ -333,13 +287,6 @@ export default function PromptBar({
   const glimmRef = useRef<HTMLCanvasElement>(null);
   const shaderRef = useRef<ReturnType<typeof createShader> | null>(null);
   const sweepingRef = useRef(false);
-
-  /* hand control to the user: stop the demo loop, and when they aim at
-   * the input itself, clear the demo's leftover draft for a clean start */
-  const takeOver = (event: { target: EventTarget | null }) => {
-    setAuto(false);
-    if (auto && event.target === inputRef.current) setDraft("");
-  };
 
   const token = dismissed ? null : parseToken(draft);
   const menu: "at" | "slash" | null = plusOpen ? "at" : (token?.kind ?? null);
@@ -391,43 +338,38 @@ export default function PromptBar({
       ),
     );
     setModelMenuBottom(anchorRect.bottom - triggerRect.top + 8);
-  }, [modelOpen, wide, model.name]);
+  }, [modelOpen, wide, model?.name]);
 
   useEffect(() => {
     if (!modelOpen) setModelHovered(null);
   }, [modelOpen]);
 
-  // The catalog arrives after mount; without this the trigger keeps showing
-  // the demo entry while the request carries the server default.
-  const firstKey = externalModels?.[0]?.key;
-  useEffect(() => {
-    if (!externalModels || externalModels.length === 0) return;
-    const first = externalModels[0];
-    setModel(first);
-    setEffort(first.reasoningEfforts?.[0] ?? null);
-    onReasoningChange?.(first.reasoningEfforts?.[0] ?? "");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [firstKey]);
-
   const efforts = model?.reasoningEfforts ?? [];
   const effortIndex = effort ? efforts.indexOf(effort) : -1;
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: re-measure when the effort menu or its hovered row changes
   useLayoutEffect(() => {
     if (!effortOpen) return;
-    const target = effortRowRefs.current[effortHovered ?? Math.max(0, effortIndex)];
-    if (target) setEffortBox({ top: target.offsetTop, height: target.offsetHeight });
+    const target =
+      effortRowRefs.current[effortHovered ?? Math.max(0, effortIndex)];
+    if (target)
+      setEffortBox({ top: target.offsetTop, height: target.offsetHeight });
   }, [effortOpen, effortHovered, effortIndex, efforts.length]);
 
   useEffect(() => {
     if (!effortOpen) setEffortHovered(null);
   }, [effortOpen]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: re-measure on layout changes, like the model menu above
   useLayoutEffect(() => {
     if (!effortOpen || !composerAnchorRef.current || !effortRef.current) return;
     const anchorRect = composerAnchorRef.current.getBoundingClientRect();
     const triggerRect = effortRef.current.getBoundingClientRect();
     setEffortMenuLeft(
-      Math.max(0, Math.min(triggerRect.left - anchorRect.left, anchorRect.width - 160)),
+      Math.max(
+        0,
+        Math.min(triggerRect.left - anchorRect.left, anchorRect.width - 160),
+      ),
     );
     setEffortMenuBottom(anchorRect.bottom - triggerRect.top + 8);
   }, [effortOpen, wide, model?.name]);
@@ -496,34 +438,13 @@ export default function PromptBar({
     // Sparkle is reserved for the flagship — the first entry of a
     // flagship-first catalog. Downgrades and sidegrades stay quiet.
     const isFlagship = next.key === catalog[0]?.key;
-    setModel(next);
     setModelOpen(false);
     setEffortOpen(false);
-    onModelChange?.(next);
-
-    const nextEffort = next.reasoningEfforts?.[0];
-    setEffort(nextEffort ?? null);
-    if (nextEffort) onReasoningChange?.(nextEffort);
+    // A new model starts at its own first reasoning level.
+    onSelect?.(next.key, next.reasoningEfforts?.[0] ?? null);
 
     if (isFlagship) celebrate();
   };
-
-  /* autoplay: apply the current step, then advance after its hold */
-  // biome-ignore lint/correctness/useExhaustiveDependencies: demo autoplay loop (verbatim demo code)
-  useEffect(() => {
-    if (!auto) return;
-    const step = AUTO_STEPS[autoStep % AUTO_STEPS.length];
-    setDraft(step.draft);
-    if (step.active !== undefined) setActive(step.active);
-    if (step.connect !== undefined) setConnected(step.connect);
-    if (step.modelOpen !== undefined) setModelOpen(step.modelOpen);
-    if (step.model) {
-      const next = MODELS.find((m) => m.key === step.model);
-      if (next) selectModel(next);
-    }
-    const t = setTimeout(() => setAutoStep((s) => s + 1), step.hold);
-    return () => clearTimeout(t);
-  }, [auto, autoStep]);
 
   /* dictation resolves after a beat, like a real transcript landing */
   useEffect(() => {
@@ -612,16 +533,7 @@ export default function PromptBar({
   };
 
   return (
-    <div
-      data-promptbar
-      className={
-        demo
-          ? "flex min-h-[384px] w-full max-w-105 flex-col justify-end pb-8"
-          : "w-full"
-      }
-      onPointerDownCapture={takeOver}
-      onKeyDownCapture={takeOver}
-    >
+    <div data-promptbar className="w-full">
       {/* composer is the anchor — menus grow up from its top edge */}
       <div ref={composerAnchorRef} className="relative">
         {/* ── @ / slash menu ─────────────────────────────── */}
@@ -760,9 +672,11 @@ export default function PromptBar({
                 <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-ink">
                   {m.name}
                 </span>
-                    <span className="shrink-0 text-[11px] text-ink-3">{m.tag ?? ""}</span>
+                <span className="shrink-0 text-[11px] text-ink-3">
+                  {m.tag ?? ""}
+                </span>
                 <span
-                  className={`shrink-0 text-ink ${m.key === model.key ? "" : "invisible"}`}
+                  className={`shrink-0 text-ink ${m.key === model?.key ? "" : "invisible"}`}
                 >
                   <Icon size={13} strokeWidth={2.5}>
                     <path d="M20 6L9 17l-5-5" />
@@ -807,9 +721,8 @@ export default function PromptBar({
                 onMouseDown={(event) => event.preventDefault()}
                 onMouseEnter={() => setEffortHovered(i)}
                 onClick={() => {
-                  setEffort(level);
                   setEffortOpen(false);
-                  onReasoningChange?.(level);
+                  if (model) onSelect?.(model.key, level);
                   inputRef.current?.focus();
                 }}
                 className="relative z-10 flex h-7.5 w-full items-center gap-2 rounded-[6px] px-2 text-left"
@@ -830,19 +743,7 @@ export default function PromptBar({
         )}
 
         {/* ── composer ───────────────────────────────────── */}
-        <div
-          className={`relative isolate flex flex-col overflow-hidden border border-line bg-surface shadow-card transition-[border-color,border-radius] duration-150 focus-within:border-line-strong ${
-            tall ? "gap-2.5 p-3.5" : "gap-1.5 p-1.5"
-          } ${
-            pill
-              ? attachments.length > 0 || wide
-                ? "rounded-[24px]"
-                : "rounded-full"
-              : tall
-                ? "rounded-[22px]"
-                : "rounded-[14px]"
-          }`}
-        >
+        <div className="relative isolate flex flex-col gap-1.5 overflow-hidden rounded-[14px] border border-line bg-surface p-1.5 shadow-card transition-[border-color,border-radius] duration-150 focus-within:border-line-strong">
           {/* rainbow glimm sweep — plays across the interior on model change.
             explicit w/h: a <canvas> is a replaced element and won't stretch
             to inset-0 alone, which feeds back into the shader's ResizeObserver. */}
@@ -862,16 +763,12 @@ export default function PromptBar({
           </span>
 
           {attachments.length > 0 && (
-            <div
-              className={`flex flex-wrap gap-1.5 pt-0.5 ${pill ? "px-1" : "px-0.5"}`}
-            >
+            <div className="flex flex-wrap gap-1.5 px-0.5 pt-0.5">
               {attachments.map((file, i) => (
                 <span
                   // biome-ignore lint/suspicious/noArrayIndexKey: duplicate filenames allowed (verbatim demo code)
                   key={`${file}-${i}`}
-                  className={`flex h-6.5 items-center gap-1.5 bg-field py-1 pr-1 pl-1.5 text-[11.5px] text-ink-2 shadow-hairline ${
-                    pill ? "rounded-full" : "rounded-chip"
-                  }`}
+                  className="flex h-6.5 items-center gap-1.5 rounded-chip bg-field py-1 pr-1 pl-1.5 text-[11.5px] text-ink-2 shadow-hairline"
                   style={{
                     animation: "pop-in 200ms cubic-bezier(0.23,1,0.32,1) both",
                   }}
@@ -891,9 +788,7 @@ export default function PromptBar({
                         current.filter((_, j) => j !== i),
                       )
                     }
-                    className={`-my-1 flex size-6 items-center justify-center text-ink-3 transition-colors duration-100 hover:bg-line/70 hover:text-ink ${
-                      pill ? "rounded-full" : "rounded-[5px]"
-                    }`}
+                    className="-my-1 flex size-6 items-center justify-center rounded-[5px] text-ink-3 transition-colors duration-100 hover:bg-line/70 hover:text-ink"
                   >
                     <Icon size={10} strokeWidth={2.5}>
                       <path d="M18 6L6 18M6 6l12 12" />
@@ -921,9 +816,7 @@ export default function PromptBar({
                 setPlusOpen((current) => !current);
                 inputRef.current?.focus();
               }}
-              className={`flex size-7 shrink-0 items-center justify-center justify-self-start text-ink-3 transition-[background-color,color,transform] duration-150 hover:bg-hover hover:text-ink active:scale-[0.94] ${
-                pill ? "rounded-full" : "rounded-[8px]"
-              } ${plusOpen ? "bg-hover text-ink" : ""} ${wide ? "col-start-1 row-start-2" : "col-start-1 row-start-1"}`}
+              className={`flex size-7 shrink-0 items-center justify-center justify-self-start text-ink-3 transition-[background-color,color,transform] duration-150 hover:bg-hover hover:text-ink active:scale-[0.94] rounded-[8px] ${plusOpen ? "bg-hover text-ink" : ""} ${wide ? "col-start-1 row-start-2" : "col-start-1 row-start-1"}`}
             >
               <Icon size={16} strokeWidth={2}>
                 <path d="M12 5v14M5 12h14" />
@@ -979,7 +872,7 @@ export default function PromptBar({
                 listening ? "Listening…" : (placeholder ?? "Write a message…")
               }
               aria-label="Prompt"
-              className={`${tall ? "min-h-[44px] px-2 py-2 text-[14px] leading-5" : "min-h-7 px-1 py-[5px] text-[13px] leading-[18px]"} min-w-0 w-full resize-none bg-transparent text-ink outline-none [overflow-wrap:anywhere] placeholder:text-ink-3 ${
+              className={`min-h-7 px-1 py-[5px] text-[13px] leading-[18px] min-w-0 w-full resize-none bg-transparent text-ink outline-none [overflow-wrap:anywhere] placeholder:text-ink-3 ${
                 wide
                   ? "col-span-full col-start-1 row-start-1"
                   : "col-start-2 row-start-1"
@@ -989,7 +882,9 @@ export default function PromptBar({
             {/* model picker + reasoning effort (one grid cell) */}
             <div
               className={`flex items-center gap-0.5 ${
-                wide ? "col-start-2 row-start-2 justify-self-start" : "col-start-3 row-start-1"
+                wide
+                  ? "col-start-2 row-start-2 justify-self-start"
+                  : "col-start-3 row-start-1"
               }`}
             >
               {efforts.length > 0 && (
@@ -1003,9 +898,7 @@ export default function PromptBar({
                     setModelOpen(false);
                     setEffortOpen((current) => !current);
                   }}
-                  className={`flex h-7 shrink-0 items-center px-1.5 text-[11px] font-medium uppercase tracking-wide transition-colors duration-150 ${
-                    pill ? "rounded-full" : "rounded-[8px]"
-                  } ${
+                  className={`flex h-7 shrink-0 items-center px-1.5 text-[11px] font-medium uppercase tracking-wide transition-colors duration-150 rounded-[8px] ${
                     effortOpen
                       ? "bg-hover text-ink"
                       : "text-ink-3 hover:bg-hover hover:text-ink"
@@ -1019,16 +912,15 @@ export default function PromptBar({
                 type="button"
                 aria-expanded={modelOpen}
                 aria-label="Choose model"
+                disabled={catalog.length === 0}
                 onClick={() => {
                   setPlusOpen(false);
                   setEffortOpen(false);
                   setModelOpen((current) => !current);
                 }}
-                className={`flex h-7 shrink-0 items-center gap-1 px-1.5 text-[12px] font-medium text-ink-2 transition-colors duration-150 hover:bg-hover hover:text-ink ${
-                  pill ? "rounded-full" : "rounded-[8px]"
-                }`}
+                className={`flex h-7 shrink-0 items-center gap-1 px-1.5 text-[12px] font-medium text-ink-2 transition-colors duration-150 hover:bg-hover hover:text-ink rounded-[8px]`}
               >
-                {model.name}
+                {model?.name ?? "Loading…"}
                 <span className="text-ink-3">
                   <Icon size={11} strokeWidth={2.4}>
                     <path d="M6 9l6 6 6-6" />
@@ -1043,9 +935,7 @@ export default function PromptBar({
               aria-label={listening ? "Stop dictation" : "Start dictation"}
               aria-pressed={listening}
               onClick={() => setListening((current) => !current)}
-              className={`flex size-7 shrink-0 items-center justify-center transition-[background-color,color,transform] duration-150 active:scale-[0.94] ${
-                pill ? "rounded-full" : "rounded-[8px]"
-              } ${listening ? "bg-accent-tint text-accent-ink" : "text-ink-3 hover:bg-hover hover:text-ink"} ${wide ? "col-start-4 row-start-2" : "col-start-4 row-start-1"}`}
+              className={`flex size-7 shrink-0 items-center justify-center transition-[background-color,color,transform] duration-150 active:scale-[0.94] rounded-[8px] ${listening ? "bg-accent-tint text-accent-ink" : "text-ink-3 hover:bg-hover hover:text-ink"} ${wide ? "col-start-4 row-start-2" : "col-start-4 row-start-1"}`}
             >
               {listening ? (
                 <span className="flex h-3.5 items-center gap-[2.5px]">
@@ -1070,15 +960,13 @@ export default function PromptBar({
               )}
             </button>
 
-            {/* send — tactile square (round in the pill variant) */}
+            {/* send — tactile square */}
             <button
               type="button"
               aria-label="Send"
               disabled={!canSend}
               onClick={send}
-              className={`flex size-7 shrink-0 items-center justify-center transition-[background-color,color,transform] duration-200 enabled:active:scale-[0.94] ${
-                pill ? "rounded-full" : "rounded-[8px]"
-              } ${wide ? "col-start-5 row-start-2" : "col-start-5 row-start-1"}`}
+              className={`flex size-7 shrink-0 items-center justify-center transition-[background-color,color,transform] duration-200 enabled:active:scale-[0.94] rounded-[8px] ${wide ? "col-start-5 row-start-2" : "col-start-5 row-start-1"}`}
               style={{
                 background: canSend ? "var(--ink)" : "var(--line-strong)",
                 color: canSend ? "var(--surface)" : "var(--ink-2)",

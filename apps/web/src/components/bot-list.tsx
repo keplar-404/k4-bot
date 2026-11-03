@@ -1,6 +1,7 @@
 "use client";
 
 import { MoreHorizontalIcon, PencilIcon, Trash2Icon } from "lucide-react";
+import Link from "next/link";
 import { BloubAvatar } from "@/components/bloub-avatar";
 import {
   DropdownMenu,
@@ -32,7 +33,7 @@ function BotItem({
       <SidebarMenuButton
         size="lg"
         className="[&_svg]:size-8"
-        render={<a href={`/dashboard/bot/${bot.id}`} />}
+        render={<Link href={`/dashboard/bot/${bot.id}`} />}
       >
         <BloubAvatar
           size={32}
@@ -43,7 +44,9 @@ function BotItem({
         <span>{bot.name}</span>
       </SidebarMenuButton>
       <DropdownMenu>
-        <DropdownMenuTrigger render={<SidebarMenuAction className="cursor-pointer" />}>
+        <DropdownMenuTrigger
+          render={<SidebarMenuAction className="cursor-pointer" />}
+        >
           <MoreHorizontalIcon />
           <span className="sr-only">More options for {bot.name}</span>
         </DropdownMenuTrigger>

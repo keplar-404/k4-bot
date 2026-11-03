@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { fetchBots, saveBotModel } from "@/lib/bots";
 import {
   ChatHttpError,
   createThread,
@@ -93,6 +94,7 @@ export function useChat(botId: string) {
   const [isLoading, setIsLoading] = useState(true);
   const [models, setModels] = useState<ModelRow[]>([]);
   const [modelId, setModelId] = useState<string | undefined>(undefined);
+  const [reasoningEffort, setReasoningEffort] = useState<string | null>(null);
   const modelIdRef = useRef<string | undefined>(undefined);
   const reasoningEffortRef = useRef<string | undefined>(undefined);
 
@@ -527,20 +529,40 @@ export function useChat(botId: string) {
   const approve = useCallback(() => decide("approve"), [decide]);
   const reject = useCallback(() => decide("reject"), [decide]);
 
-  /** Catalog comes from GET /api/v1/models; PromptBar shows exactly this list. */
+  /** Applies a model choice locally (state for the prompt bar, refs for the next send). */
+  const select = useCallback((id: string, effort: string | null) => {
+    modelIdRef.current = id;
+    reasoningEffortRef.current = effort ?? undefined;
+    setModelId(id);
+    setReasoningEffort(effort);
+  }, []);
+
+  /**
+   * Catalog from GET /api/v1/models (PromptBar shows exactly this list), and this bot's saved choice.
+   * A saved model that left the catalog, or a level that model does not offer, falls back to the default.
+   */
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       try {
-        const res = await listModels();
+        const [res, bots] = await Promise.all([listModels(), fetchBots()]);
         if (cancelled) return;
         setModels(res.models);
-        const initial =
-          res.models.find((m) => m.id === res.defaultModel) ?? res.models[0];
-        if (initial) {
-          modelIdRef.current = initial.id;
-          setModelId(initial.id);
-        }
+        const saved = bots.ok
+          ? bots.bots.find((b) => b.id === botId)
+          : undefined;
+        const model =
+          res.models.find((m) => m.id === saved?.modelId) ??
+          res.models.find((m) => m.id === res.defaultModel) ??
+          res.models[0];
+        if (!model) return;
+        const effort =
+          saved?.modelId === model.id &&
+          saved.reasoningEffort &&
+          model.reasoningEfforts.includes(saved.reasoningEffort)
+            ? saved.reasoningEffort
+            : (model.reasoningEfforts[0] ?? null);
+        select(model.id, effort);
       } catch {
         // A missing catalog must not block chatting: the server falls back to
         // its own default model when modelId is omitted.
@@ -549,18 +571,43 @@ export function useChat(botId: string) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [botId, select]);
 
-  const chooseModel = useCallback((id: string, effort?: string) => {
-    modelIdRef.current = id;
-    setModelId(id);
-    // A model change invalidates the previous effort level.
-    reasoningEffortRef.current = effort;
-  }, []);
+  // Saving is debounced: clicking through models or levels writes once. A pending save still runs on leave.
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingSaveRef = useRef<(() => void) | null>(null);
+  useEffect(
+    () => () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      pendingSaveRef.current?.();
+    },
+    [],
+  );
 
-  const chooseReasoningEffort = useCallback((effort: string) => {
-    reasoningEffortRef.current = effort;
-  }, []);
+  /** The user picked a model or a reasoning level: use it now, and save it on the bot for next time. */
+  const chooseModel = useCallback(
+    (id: string, effort: string | null) => {
+      select(id, effort);
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      const save = () => {
+        pendingSaveRef.current = null;
+        saveBotModel(botId, id, effort).catch(() =>
+          setError({
+            kind: "server",
+            message:
+              "Couldn't save the model for this bot. It is used for now, but not kept.",
+            retryable: false,
+          }),
+        );
+      };
+      pendingSaveRef.current = save;
+      saveTimerRef.current = setTimeout(() => {
+        saveTimerRef.current = null;
+        save();
+      }, 500);
+    },
+    [botId, select],
+  );
 
   return {
     messages,
@@ -574,8 +621,8 @@ export function useChat(botId: string) {
     error,
     models,
     modelId,
+    reasoningEffort,
     chooseModel,
-    chooseReasoningEffort,
     send,
     retry,
     dismissError,

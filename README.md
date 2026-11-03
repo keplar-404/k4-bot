@@ -103,7 +103,6 @@ Without `RESEND_API_KEY`, verification and reset links are printed in the API lo
 | `COOKIE_DOMAIN` | no | Share the session cookie across sibling subdomains (production) |
 | `MAX_RUNS_PER_USER` | no | Messages per user per day (default 50) |
 | `MAX_DAILY_TOKENS_PER_USER` | no | Token budget per user per day (default 2,000,000) |
-| `RUN_TIMEOUT_SECONDS` | no | Agent step timeout (default 900) |
 | `NEXT_PUBLIC_AUTH_URL` | web | API URL for the browser (default `http://localhost:8787`) |
 
 Models are listed in `apps/backend/src/agent/models.json`. The only free option is

@@ -1,7 +1,11 @@
 import { BaseSandbox } from "deepagents";
+import type { Env } from "../lib/env";
 import type { UserComputerDurableObject } from "./user-computer";
 
 export type ComputerStub = DurableObjectStub<UserComputerDurableObject>;
+
+/** The user's one computer (a Durable Object named by user id): a user can only ever reach their own. */
+export const computerFor = (env: Env, userId: string): ComputerStub => env.USER_COMPUTER.get(env.USER_COMPUTER.idFromName(userId));
 
 type ErrorCode = "file_not_found" | "permission_denied" | "is_directory" | "invalid_path";
 

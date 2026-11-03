@@ -3,7 +3,8 @@
 import { Loader2Icon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -25,6 +26,17 @@ export default function SignInPage() {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const submittingRef = useRef(false);
+
+  // The account-deletion email link lands here once the account is gone.
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("deleted") !== "1") return;
+    toast.success("Your account was deleted", {
+      description: "Your bots, their chats and your computer were removed.",
+    });
+    url.searchParams.delete("deleted");
+    window.history.replaceState(null, "", url);
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

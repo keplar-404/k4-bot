@@ -8,6 +8,7 @@ import {
   ListChecksIcon,
   MessageCircleQuestionIcon,
   MonitorIcon,
+  PowerIcon,
   SearchIcon,
   TerminalIcon,
   WrenchIcon,
@@ -91,6 +92,16 @@ function describe(
   switch (part.name) {
     case "computer":
       return { icon: <MonitorIcon />, title: computerSentence(a, done) };
+    case "turn_on_computer":
+      return {
+        icon: <PowerIcon />,
+        title: done ? "Turned on the computer" : "Turning on the computer",
+      };
+    case "turn_off_computer":
+      return {
+        icon: <PowerIcon />,
+        title: done ? "Turned off the computer" : "Turning off the computer",
+      };
     case "execute":
       return {
         icon: <TerminalIcon />,
@@ -168,6 +179,14 @@ function prettyInput(part: ToolPart): string {
   // The shell and search tools are clearer as the command itself than as JSON.
   if (part.name === "execute" && typeof a.command === "string")
     return a.command;
+  // The plan (Deep Agents' write_todos) as a checklist instead of JSON.
+  if (part.name === "write_todos" && Array.isArray(a.todos))
+    return (a.todos as { content?: string; status?: string }[])
+      .map(
+        (t) =>
+          `${t.status === "completed" ? "[x]" : t.status === "in_progress" ? "[~]" : "[ ]"} ${t.content ?? ""}`,
+      )
+      .join("\n");
   if (Object.keys(a).length === 0) return part.input;
   return JSON.stringify(a, null, 2);
 }

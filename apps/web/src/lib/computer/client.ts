@@ -35,7 +35,19 @@ const post = <T>(path: string, body?: unknown) =>
 export const getStatus = () => request<ComputerStatus>("");
 /** The only call that can start billing: it wakes (or creates) the user's computer. */
 export const wake = () => post<ComputerStatus>("/wake");
+/** Sleeps the computer now; its open apps and files are saved. */
 export const pause = () => post<ComputerStatus>("/pause");
+/** The session is ending: the bots are told to finish and summarise, then it sleeps. */
+export const wrapUp = () => post<ComputerStatus>("/session/wrap");
+
+/** The screen saved when the computer last went to sleep, as an object URL (revoke it when done). */
+export async function snapshotUrl(at: number): Promise<string | null> {
+  const res = await fetch(`${BASE}/api/v1/computer/snapshot?at=${at}`, {
+    credentials: "include",
+  }).catch(() => null);
+  if (!res?.ok) return null;
+  return URL.createObjectURL(await res.blob());
+}
 export const takeControl = () =>
   post<{ ok: boolean; message?: string }>("/control/take");
 export const keepControl = () => post<{ held: boolean }>("/control/keep");
@@ -59,6 +71,8 @@ export async function viewerUrl(mode: "watch" | "control"): Promise<string> {
     autoconnect: "true",
     resize: "scale",
     reconnect: "true",
+    // noVNC waits 5 s before retrying a dropped or failed connection by default.
+    reconnect_delay: "1000",
     view_only: String(mode === "watch"),
     path: `${path.slice(1)}websockify`,
   });

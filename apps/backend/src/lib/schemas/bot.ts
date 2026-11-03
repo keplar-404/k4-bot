@@ -10,3 +10,9 @@ export const createBotSchema = z.object({
 });
 
 export type CreateBotInput = z.infer<typeof createBotSchema>;
+
+/** The model (and reasoning level) the user picked in the prompt bar. Checked against the catalog by the route. */
+export const setBotModelSchema = z.object({
+  modelId: z.string().min(1).max(200),
+  reasoningEffort: z.string().min(1).max(32).nullable(),
+});

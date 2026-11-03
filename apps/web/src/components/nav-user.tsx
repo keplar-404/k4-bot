@@ -1,13 +1,15 @@
 "use client";
 
-import { ChevronsUpDownIcon, LogOutIcon } from "lucide-react";
+import { ChevronsUpDownIcon, LogOutIcon, Trash2Icon } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { DeleteAccountDialog } from "@/components/delete-account-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuGroup,
+  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
@@ -28,6 +30,8 @@ export function NavUser() {
   const name = user?.name ?? "Guest";
   const email = user?.email ?? "";
   const avatar = (user as { image?: string | null } | undefined)?.image ?? "";
+
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   async function handleSignOut() {
     await signOut();
@@ -80,8 +84,20 @@ export function NavUser() {
               <LogOutIcon />
               Log out
             </DropdownMenuItem>
+            <DropdownMenuItem
+              variant="destructive"
+              onClick={() => setDeleteOpen(true)}
+            >
+              <Trash2Icon />
+              Delete account
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        <DeleteAccountDialog
+          open={deleteOpen}
+          onOpenChange={setDeleteOpen}
+          email={email}
+        />
       </SidebarMenuItem>
     </SidebarMenu>
   );

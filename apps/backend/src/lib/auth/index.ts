@@ -1,6 +1,10 @@
 import { betterAuth } from "better-auth/minimal";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { eq } from "drizzle-orm";
+import { computerFor } from "../../computer/sandbox-backend";
 import { createDb } from "../../db";
+import { chatThread } from "../../db/schema";
+import { cleanupThreads } from "../cleanup";
 import { sendEmail } from "../mail";
 import type { Env } from "../env";
 
@@ -10,6 +14,16 @@ export function createAuth(
 ) {
   const db = createDb(env.DATABASE_URL);
   const googleEnabled = Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
+  // Bindings exist only inside the Worker (not in the CLI config that reuses this function).
+  const hasComputer = Boolean(env.USER_COMPUTER);
+
+  /** A verified user gets their own fresh computer. Only schedules it: the request never waits on E2B. */
+  const provisionComputer = async (userId: string) => {
+    if (!hasComputer) return;
+    await computerFor(env, userId)
+      .provision()
+      .catch((e: unknown) => console.error("[auth] computer provisioning not scheduled", e));
+  };
 
   return betterAuth({
     appName: "K4 Bot",
@@ -37,6 +51,8 @@ export function createAuth(
     emailVerification: {
       sendOnSignUp: true,
       autoSignInAfterVerification: true,
+      // Not on sign-up: an unverified (possibly fake) account must not cost a computer.
+      afterEmailVerification: async (user) => provisionComputer(user.id),
       sendVerificationEmail: async ({ user, url }) => {
         await sendEmail(
           env,
@@ -99,7 +115,39 @@ export function createAuth(
             console.log(
               JSON.stringify({ event: "user.created", userId: user.id }),
             );
+            // Google sign-ups arrive already verified, so they never pass afterEmailVerification.
+            if (user.emailVerified) await provisionComputer(user.id);
           },
+        },
+      },
+    },
+    user: {
+      deleteUser: {
+        enabled: true,
+        // Every deletion is confirmed from the account's inbox: it is irreversible, and it is the only
+        // proof of intent for Google users, who have no password.
+        sendDeleteAccountVerification: async ({ user, url }) => {
+          await sendEmail(
+            env,
+            user.email,
+            "Confirm deleting your K4 Bot account",
+            `Click the link to permanently delete your account, all your bots, their chats and your computer: ${url}\n\nIf you did not ask for this, ignore this email.`,
+          );
+        },
+        // Runs on both deletion paths, before the user row goes (cascading bots, threads, messages,
+        // events and usage). Here: stop the runs, delete agent memory, destroy the computer.
+        beforeDelete: async (user) => {
+          const threads = await db
+            .select({ id: chatThread.id })
+            .from(chatThread)
+            .where(eq(chatThread.userId, user.id));
+          await cleanupThreads(db, env, threads.map((t) => t.id));
+          if (hasComputer) {
+            await computerFor(env, user.id)
+              .deleteAll()
+              .catch((e: unknown) => console.error("[auth] computer not destroyed", user.id, e));
+          }
+          console.log(JSON.stringify({ event: "user.deleted", userId: user.id }));
         },
       },
     },

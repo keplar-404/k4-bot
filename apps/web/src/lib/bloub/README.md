@@ -10,7 +10,7 @@ Ported from `jeremy-prt/bloub` (MIT). Framework-free engine preserved under `bot
 - `bot/states.ts` — `STATES`, `POSES`, `SEQUENCE` (animated states).
 - `bot/profiles.ts`, `shape.ts`, `math.ts`, `repere.ts`, `face.ts`, `eyefit.ts`, `decor.ts` — geometry/measurement constants (do not alter).
 - `bot/cycles.ts` — montage/cycle model (animation timeline).
-- `ui/gaze.ts`, `ui/intro.ts`, `ui/stockage.ts` — gaze/intro/storage helpers.
+- `ui/gaze.ts` — gaze helpers.
 
 ## Frozen avatar (current usage)
 
