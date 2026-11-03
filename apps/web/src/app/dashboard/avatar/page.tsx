@@ -1,13 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { BloubAvatar } from "@/components/bloub-avatar";
+import { DEFAULT_EXPRESSION } from "@/features/avatar/bloub/bot/expressions";
+import {
+  DEFAULT_COLOR,
+  DEFAULT_SHAPE,
+} from "@/features/avatar/bloub/bot/skins";
+import { BloubAvatar } from "@/features/avatar/components/bloub-avatar";
 import {
   BloubCustomizer,
   type BloubCustomizerValue,
-} from "@/components/bloub-customizer";
-import { DEFAULT_EXPRESSION } from "@/lib/bloub/bot/expressions";
-import { DEFAULT_COLOR, DEFAULT_SHAPE } from "@/lib/bloub/bot/skins";
+} from "@/features/avatar/components/bloub-customizer";
 
 const STORAGE_KEY = "k4bloub:avatar";
 

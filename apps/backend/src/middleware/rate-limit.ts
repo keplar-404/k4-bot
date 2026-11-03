@@ -1,6 +1,6 @@
 import { createMiddleware } from "hono/factory";
 import type { Context, Env as HonoEnv } from "hono";
-import type { Env } from "../lib/env";
+import type { Env } from "../config/env";
 import type { AuthGuardEnv } from "./auth-guard";
 
 const warned = new Set<string>();

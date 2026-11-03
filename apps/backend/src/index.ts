@@ -8,20 +8,22 @@ import { corsMiddleware } from "./middleware/cors";
 import { ipLimit } from "./middleware/rate-limit";
 import routes from "./routes";
 import { scheduled } from "./scheduled";
-import type { Env } from "./lib/env";
+import type { Env } from "./config/env";
 
 // Wrangler resolves the Durable Object and Workflow bindings from these exports.
-export { ChatRelayDurableObject } from "./durable/chat-relay";
-export { ChatRunWorkflow } from "./workflows/chat-run";
-export { UserComputerDurableObject } from "./computer/user-computer";
+export { ChatRelayDurableObject } from "./modules/chat/relay";
+export { ChatRunWorkflow } from "./modules/chat/run/workflow";
+export { UserComputerDurableObject } from "./modules/computer/user-computer";
 
 // The live view of the computer: token-gated, framed by the web app, and ~60 asset requests per page load.
+// Stored images are shown by the web app (another origin) in <img>: the default same-origin policy would block them.
+const isFileBytes = (path: string) => /^\/api\/v1\/files\/[^/]+\/content$/.test(path);
 const isStream = (path: string) => path.startsWith("/api/v1/computer/stream/");
 
 const app = new Hono<{ Bindings: Env }>()
   .use("*", corsMiddleware)
   // The stream route sets its own framing headers (secureHeaders would forbid the iframe).
-  .use("*", (c, next) => (isStream(c.req.path) ? next() : secureHeaders()(c, next)))
+  .use("*", (c, next) => (isStream(c.req.path) ? next() : secureHeaders(isFileBytes(c.req.path) ? { crossOriginResourcePolicy: "cross-origin" } : undefined)(c, next)))
   .use("*", bodyLimit({ maxSize: 1024 * 1024 }))
   // /auth/* is rate limited by Better Auth itself (database-backed rules).
   .use("/api/v1/*", (c, next) =>

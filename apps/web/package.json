@@ -9,7 +9,7 @@
     "lint": "biome check",
     "format": "biome format --write",
     "check-types": "tsc --noEmit",
-    "check:chat": "bun run src/lib/chat/outbox.check.ts && bun run src/lib/chat/stream.check.ts && bun run src/components/markdown.check.tsx"
+    "check:chat": "bun run src/features/chat/lib/outbox.check.ts && bun run src/features/chat/lib/stream-basic.check.ts && bun run src/features/chat/lib/stream-done.check.ts && bun run src/features/chat/lib/stream-resume.check.ts && bun run src/features/chat/lib/stream-failed.check.ts && bun run src/features/chat/lib/stream-provider.check.ts && bun run src/components/markdown.check.tsx"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",

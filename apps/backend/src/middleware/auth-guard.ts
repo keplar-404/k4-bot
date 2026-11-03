@@ -1,7 +1,7 @@
 import { createMiddleware } from "hono/factory";
-import { getRequestContext } from "../lib/context";
-import type { Env } from "../lib/env";
-import type { Session } from "../lib/auth";
+import { getRequestContext } from "../shared/context";
+import type { Env } from "../config/env";
+import type { Session } from "../modules/auth/auth";
 
 export type AuthGuardEnv = {
   Bindings: Env;

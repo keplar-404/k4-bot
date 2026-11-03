@@ -1,7 +1,7 @@
 import { getSessionCookie } from "better-auth/cookies";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { safeCallback } from "@/lib/auth-redirect";
+import { safeCallback } from "@/features/auth/auth-redirect";
 
 const API = process.env.NEXT_PUBLIC_AUTH_URL ?? "http://localhost:8787";
 

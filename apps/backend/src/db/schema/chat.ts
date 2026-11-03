@@ -1,4 +1,3 @@
-import { relations } from "drizzle-orm";
 import {
   bigint,
   index,
@@ -23,6 +22,8 @@ export const chatThread = pgTable(
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
     title: text("title").notNull().default("New chat"),
+    /** Tokens of the latest model call: how full the context window is (the chat's context meter). */
+    contextTokens: integer("context_tokens").notNull().default(0),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()
@@ -93,18 +94,6 @@ export const agentUsage = pgTable(
     index("agent_usage_userId_createdAt_idx").on(table.userId, table.createdAt),
   ],
 );
-
-export const chatThreadRelations = relations(chatThread, ({ one, many }) => ({
-  bot: one(bot, { fields: [chatThread.botId], references: [bot.id] }),
-  messages: many(chatMessage),
-}));
-
-export const chatMessageRelations = relations(chatMessage, ({ one }) => ({
-  thread: one(chatThread, {
-    fields: [chatMessage.threadId],
-    references: [chatThread.id],
-  }),
-}));
 
 export type ChatThread = typeof chatThread.$inferSelect;
 export type ChatMessage = typeof chatMessage.$inferSelect;

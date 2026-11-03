@@ -1,4 +1,3 @@
-import { relations } from "drizzle-orm";
 import { boolean, integer, pgTable, text, timestamp, index } from "drizzle-orm/pg-core";
 import { user } from "./auth";
 
@@ -11,11 +10,11 @@ export const bot = pgTable(
       .references(() => user.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     description: text("description"),
-    /** What the bot is for (an id from lib/bot-roles.ts); shapes its system prompt. */
+    /** What the bot is for (an id from modules/bots/roles.ts); shapes its system prompt. */
     role: text("role").notNull().default("assistant"),
     /** The user's own role title when role is "custom". */
     roleTitle: text("role_title"),
-    /** May spawn groups of sub-agents (spawn_subagents). New bots take their role's default (agent/domains). */
+    /** May spawn groups of sub-agents (spawn_subagents). New bots take their role's default (modules/agent/domains). */
     subagentsEnabled: boolean("subagents_enabled").notNull().default(false),
     /** Largest sub-agent group, 1-20. */
     maxSubagents: integer("max_subagents").notNull().default(5),
@@ -36,13 +35,6 @@ export const bot = pgTable(
   },
   (table) => [index("bot_userId_idx").on(table.userId)],
 );
-
-export const botRelations = relations(bot, ({ one }) => ({
-  user: one(user, {
-    fields: [bot.userId],
-    references: [user.id],
-  }),
-}));
 
 export type Bot = typeof bot.$inferSelect;
 export type NewBot = typeof bot.$inferInsert;

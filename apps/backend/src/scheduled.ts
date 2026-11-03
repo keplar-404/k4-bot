@@ -1,7 +1,7 @@
 import { and, lt, sql } from "drizzle-orm";
 import { createDb, type Db } from "./db";
 import { chatEvent } from "./db/schema";
-import { parseEnv, type Env } from "./lib/env";
+import { parseEnv, type Env } from "./config/env";
 
 /** Live events only matter for resuming a dropped stream; history is in chat_message. */
 const EVENT_RETENTION_DAYS = 7;

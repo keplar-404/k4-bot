@@ -1,8 +1,8 @@
 import { Suspense } from "react";
-import { AppSidebar } from "@/components/app-sidebar";
-import { AuthGuard } from "@/components/auth-guard";
+import { AppSidebar } from "@/components/layout/app-sidebar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Skeleton } from "@/components/ui/skeleton";
+import { AuthGuard } from "@/features/auth/components/auth-guard";
 
 export default function DashboardLayout({
   children,

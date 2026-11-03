@@ -1,13 +1,13 @@
 "use client";
 
-import { useParams } from "next/navigation";
-import { Suspense } from "react";
-import { ChatView } from "@/components/chat-view";
-import { ComputerProvider } from "@/components/computer/computer-provider";
-import { ComputerSidebar } from "@/components/computer/computer-sidebar";
-import { SessionWrapUp } from "@/components/computer/session-wrap-up";
+import { useParams, useRouter } from "next/navigation";
+import { Suspense, useEffect } from "react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ChatView } from "@/features/chat/components/chat-view";
+import { ComputerProvider } from "@/features/computer/components/computer-provider";
+import { ComputerSidebar } from "@/features/computer/components/computer-sidebar";
+import { SessionWrapUp } from "@/features/computer/components/session-wrap-up";
 
 /**
  * `useParams()` is runtime-only data. With Cache Components enabled it must sit
@@ -15,13 +15,19 @@ import { Skeleton } from "@/components/ui/skeleton";
  * the whole route fails to build.
  */
 function BotChat() {
+  const router = useRouter();
   const params = useParams<{ id: string }>();
   const botId = typeof params.id === "string" ? params.id : "";
 
+  useEffect(() => {
+    if (!botId) {
+      router.replace("/dashboard");
+      return;
+    }
+  }, [botId, router]);
+
   if (!botId) {
-    return (
-      <p className="p-4 text-sm text-muted-foreground">No bot selected.</p>
-    );
+    return null;
   }
   return (
     // The chat keeps its own column exactly as before; the computer is a side bar next to it.

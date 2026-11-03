@@ -1,0 +1,76 @@
+[
+  {
+    "provider": "openrouter",
+    "modelId": "anthropic/claude-sonnet-4.6",
+    "vision": true,
+    "reasoning": true,
+    "reasoningEfforts": [
+      "high",
+      "medium",
+      "low"
+    ],
+    "contextLength": 200000
+  },
+  {
+    "provider": "openrouter",
+    "modelId": "google/gemini-2.5-pro",
+    "vision": true,
+    "reasoning": true,
+    "reasoningEfforts": [
+      "high",
+      "medium",
+      "low"
+    ],
+    "contextLength": 1048576
+  },
+  {
+    "provider": "openrouter",
+    "modelId": "openai/gpt-4o",
+    "vision": true,
+    "reasoning": false,
+    "reasoningEfforts": [],
+    "contextLength": 128000
+  },
+  {
+    "provider": "openrouter",
+    "modelId": "anthropic/claude-haiku-4.5",
+    "vision": true,
+    "reasoning": true,
+    "reasoningEfforts": [
+      "high",
+      "medium",
+      "low"
+    ],
+    "contextLength": 200000
+  },
+  {
+    "provider": "openrouter",
+    "modelId": "google/gemini-2.5-flash",
+    "vision": true,
+    "reasoning": true,
+    "reasoningEfforts": [
+      "high",
+      "medium",
+      "low"
+    ],
+    "contextLength": 1048576
+  },
+  {
+    "provider": "openrouter",
+    "modelId": "openai/gpt-4o-mini",
+    "vision": true,
+    "reasoning": false,
+    "reasoningEfforts": [],
+    "contextLength": 128000
+  },
+  {
+    "provider": "openrouter",
+    "modelId": "openrouter/free",
+    "name": "Free (auto-routed)",
+    "free": true,
+    "vision": true,
+    "reasoning": false,
+    "reasoningEfforts": [],
+    "contextLength": 32768
+  }
+]

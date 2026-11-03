@@ -5,14 +5,14 @@ description: How this project builds domain-specific bots (research, coding, wri
 
 # Domain bots (this project)
 
-Every bot is the same Deep Agent (`apps/backend/src/agent/agent.ts`). Its **role** picks a **domain spec** that
+Every bot is the same Deep Agent (`apps/backend/src/modules/modules/agent/agent.ts`). Its **role** picks a **domain spec** that
 changes only configuration: the playbook in the prompt, the web tools, sub-agent briefing, and the defaults a new
 bot of that role starts with. Users can still change every capability per bot.
 
 ## Layout
 
 ```
-apps/backend/src/agent/
+apps/backend/src/modules/agent/
   domains/
     types.ts            DomainSpec + hard limits (MAX_SUBAGENTS 20, MAX_PARALLEL_TOOLS 10)
     index.ts            registry: domainFor(role), publicDomains() for GET /bots/domains
@@ -34,10 +34,10 @@ apps/backend/src/agent/
 
 ## Add a domain bot
 
-1. Role id in `apps/backend/src/lib/bot-roles.ts` (`ROLE_IDS`) and its label/icon in `apps/web/src/lib/bot-roles.ts`.
+1. Role id in `apps/backend/src/modules/bots/roles.ts` (`ROLE_IDS`) and its label/icon in `apps/web/src/features/bots/roles.ts`.
 2. A spec: `domains/<id>.ts`, or `domains/<id>/` when it has several prompts or its own tools. Fill `instructions`
-   (short: it is sent every step), `web`, `defaults`, `recommended` (catalog ids from `lib/catalog/skills.ts` and
-   `lib/catalog/mcp.ts`), and `subagentBrief` if its sub-agents need a playbook.
+   (short: it is sent every step), `web`, `defaults`, `recommended` (catalog ids from `modules/integrations/catalog/skills.ts` and
+   `modules/integrations/catalog/mcp.ts`), and `subagentBrief` if its sub-agents need a playbook.
 3. Register it in `domains/index.ts`. The bot form reads defaults from `GET /api/v1/bots/domains`; nothing else changes.
 4. Domain-only tools: build them in the spec's folder and add them in `agent.ts` from the spec (keep `agent.ts` generic).
 

@@ -1,0 +1,1 @@
+ALTER TABLE "chat_thread" ADD COLUMN "context_tokens" integer DEFAULT 0 NOT NULL;

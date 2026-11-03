@@ -50,6 +50,13 @@
       "when": 1793702147735,
       "tag": "0006_fluffy_guardian",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793733545682,
+      "tag": "0007_stale_gladiator",
+      "breakpoints": true
     }
   ]
 }

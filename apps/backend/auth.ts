@@ -1,5 +1,5 @@
 /// <reference types="node" />
-import { createAuth } from "./src/lib/auth";
+import { createAuth } from "./src/modules/auth/auth";
 
 export const auth = createAuth({
   DATABASE_URL: process.env.DATABASE_URL ?? "",

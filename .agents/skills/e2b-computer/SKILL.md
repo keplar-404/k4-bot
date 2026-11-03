@@ -6,7 +6,7 @@ description: How this project gives each user one E2B desktop computer shared by
 # E2B computer (this project)
 
 One E2B **Desktop** sandbox per user, owned by the `UserComputerDurableObject`
-(`apps/backend/src/computer/user-computer.ts`, named by user id). Every bot of that user
+(`apps/backend/src/modules/computer/user-computer.ts`, named by user id). Every bot of that user
 shares it. Docs: https://e2b.dev/docs and the `e2b-docs` MCP server in `.mcp.json`.
 Package: `@e2b/desktop` (wraps `e2b`).
 
@@ -31,7 +31,7 @@ Package: `@e2b/desktop` (wraps `e2b`).
   can still fill the disk or use a lot of memory, and any process with DISPLAY can drive the shared X screen.
 - **One mouse**: a single lease (bot id or user). Bots wait up to 20s for it; the user's "Take control"
   takes it (heartbeat every 15s, 5 min expiry).
-- **Live view**: noVNC through `routes/computer.ts` (`/computer/stream/:mode/:userId/:token/*`).
+- **Live view**: noVNC through `modules/computer/routes` (`/computer/stream/:mode/:userId/:token/*`).
   `watch` = our own `x11vnc -viewonly` on 5911/6091 (read-only is enforced on the VM, not in the browser);
   `control` = 5912/6092, only while the user holds the lease. The default port 6080 is NOT usable
   until `stream.start()` runs, so do not depend on it. The token is in the path so noVNC's relative
@@ -46,7 +46,7 @@ Package: `@e2b/desktop` (wraps `e2b`).
 - **xdotool**: use `mousemove --sync` style helpers sparingly; `--sync` can stall 15s. Chrome is launched per bot
   with `--class=k4_<user> --user-data-dir=<home>/.chrome`; a cold start takes several seconds, so
   `open_url` waits for the window (`xdotool search --onlyvisible --class`).
-- **Screenshots** go to the model as a transient user message (`screen-middleware.ts`), never into the
+- **Screenshots** go to the model as a transient user message (`modules/computer/screen-middleware.ts`), never into the
   checkpoint or the database. Coordinates are whole pixels on a 1280x800 screen; models often send fractions,
   so the validation error says so.
 
@@ -80,9 +80,9 @@ the bot's final message, Yes/No on `turn_off_computer`, warning plus exact shutd
 - **Bot rights come from Linux, not the tools**: `copy_to_computer` writes through the DO's `upload` (runs as the bot's
   user), so writing into another bot's home is refused (verified); `share_file` reads through `download` as the bot, so
   other bots' files are shareable (verified) but private folders are not. Limit 25 MB per file (DO RPC messages cap at 32 MiB).
-- **File cards reach the UI through the tool result text**: a `FILE_REF {json}` line (`fileMarker` in `agent/parts.ts`),
-  lifted into `ToolPart.files` by `run-stream.ts`. A ToolMessage artifact would be dropped by the event stream.
-- **Images the model sees** (attachments, `view_image`) are added per model call by `agent/view-middleware.ts`, never
+- **File cards reach the UI through the tool result text**: a `FILE_REF {json}` line (`fileMarker` in `modules/agent/parts.ts`),
+  lifted into `ToolPart.files` by `modules/agent/run-stream/index.ts`. A ToolMessage artifact would be dropped by the event stream.
+- **Images the model sees** (attachments, `view_image`) are added per model call by `modules/agent/view-middleware.ts`, never
   saved in the checkpoint (same reason as screenshots).
 - **Serving**: only PNG/JPEG/GIF/WebP/AVIF are inline; everything else (HTML, SVG) is `application/octet-stream` +
   attachment + `CSP: sandbox`, so a stored file can never run as a page of the API origin (verified).

@@ -105,7 +105,7 @@ Without `RESEND_API_KEY`, verification and reset links are printed in the API lo
 | `MAX_DAILY_TOKENS_PER_USER` | no | Token budget per user per day (default 2,000,000) |
 | `NEXT_PUBLIC_AUTH_URL` | web | API URL for the browser (default `http://localhost:8787`) |
 
-Models are listed in `apps/backend/src/agent/models.json`. The only free option is
+Models are listed in `apps/backend/src/modules/agent/models.json`. The only free option is
 `openrouter/free`, which lets OpenRouter pick one of its free models per request. It is
 rate-limited upstream, so paid models are the reliable choice.
 
@@ -124,12 +124,39 @@ rate-limited upstream, so paid models are the reliable choice.
 
 ```
 src/
-  agent/        Deep Agent factory, model catalog, checkpointer, tools, event-stream reader (run-stream)
-  computer/     UserComputer Durable Object, sandbox backend, computer tools, guards
-  db/           Drizzle client and schema
-  durable/      ChatRelay Durable Object
-  lib/          env, auth, request context, schemas, shared helpers
-  middleware/   auth guard, CORS, rate limits
-  routes/       bots, models, auth, computer, chat/{threads,runs,realtime}
-  workflows/    ChatRunWorkflow
+  index.ts      Hono app + exports of the 3 Cloudflare classes (names fixed by wrangler.jsonc)
+  routes.ts     mounts /health (inline) + each module's router under /api/v1
+  scheduled.ts  daily cron: prune chat_event
+  config/       env.ts (zod env schema, Env type, parseEnv)
+  shared/       context, validate, relay-token, secrets, mail
+  middleware/   auth-guard, cors, rate-limit
+  db/           client (index.ts) and schema/{auth,bot,chat,checkpoint,file,integrations,relations}
+  modules/
+    auth/       auth (Better Auth), email, limits, routes
+    bots/       roles, bloub-ids, schemas, queries, routes/{index,list,manage}
+    chat/       threads, schemas, cleanup, routes/, relay/ (ChatRelay DO), run/ (workflow, slices, ...)
+    computer/   types, sandbox-backend, screen-middleware, user-computer DO, guards/, tools/, routes/, durable/ (layered DO base classes)
+    files/      index (barrel), mime, store, usage, routes/{index,upload,browse}
+    integrations/ catalog/{mcp,skills}, skills/{index,source,files,install}, routes/
+    agent/      agent (buildAgent), options, approvals, chat-model, workspace, models, parts, prompts/, domains/, mcp/, middleware/, checkpointer/, run-stream/, tools/{files,shadcn,subagents,web}/, routes (GET /models), cli
+```
+
+## Web layout
+
+```
+src/
+  app/          Next.js routes (thin pages): (auth)/{sign-in,sign-up,...}, dashboard/{bot/[id],files,avatar,mcp,skills,vm}
+  components/
+    ui/         shadcn-generated (do not edit)
+    layout/     app-sidebar, nav-*, theme-*
+    markdown/   index, code-block
+  hooks/, lib/  shared hooks and helpers (api-client, utils, highlighter)
+  features/
+    auth/       auth-client, auth-redirect, components, hooks
+    avatar/     bloub/ (ported engine, do not modify), components, hooks
+    bots/       api/{index,types,cache,mutations}, roles, domains, components, hooks
+    chat/       components/{chat-view,agent-parts,prompt-bar}, hooks, lib/{protocol,stream,outbox,client}
+    computer/   api, components, hooks
+    files/      api, components, hooks
+    integrations/ api, components
 ```
