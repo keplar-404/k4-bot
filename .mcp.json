@@ -20,6 +20,14 @@
     "e2b-docs": {
       "type": "http",
       "url": "https://docs.e2b.dev/mcp"
+    },
+    "codegraph": {
+      "type": "stdio",
+      "command": "codegraph",
+      "args": [
+        "serve",
+        "--mcp"
+      ]
     }
   }
 }

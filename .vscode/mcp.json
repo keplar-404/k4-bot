@@ -1,0 +1,14 @@
+{
+  "servers": {
+    "codegraph": {
+      "type": "stdio",
+      "command": "codegraph",
+      "args": [
+        "serve",
+        "--mcp",
+        "--path",
+        "C:\\Users\\Sales_Handy 2nd\\Desktop\\k4-bot"
+      ]
+    }
+  }
+}
