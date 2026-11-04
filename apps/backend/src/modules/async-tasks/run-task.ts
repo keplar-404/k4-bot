@@ -6,7 +6,9 @@ import { chatModelFor } from "../agent/chat-model";
 import { DEFAULT_MODEL_ID } from "../agent/models";
 import { createParallelToolsMiddleware } from "../agent/middleware/parallel-tools";
 import { createToolErrorsMiddleware } from "../agent/middleware/tool-errors";
-import { createWebTools } from "../agent/tools/web";
+import { createDb } from "../../db";
+import { pgBudgetStore } from "../agent/tools/web/budget";
+import { createWebTools, webAccess } from "../agent/tools/web";
 import type { AsyncTaskRegistry } from "./registry";
 
 /** Graph steps and time one background task may take. */
@@ -23,7 +25,7 @@ export interface TaskParams {
   modelId?: string;
 }
 
-/** Follow-ups the lead sent with update_async_task, added before each model call (mid-flight steering). */
+/** Follow-ups the lead sent with update_background_task, added before each model call (mid-flight steering). */
 const inboxMiddleware = (registry: DurableObjectStub<AsyncTaskRegistry>, taskId: string) =>
   createMiddleware({
     name: "AsyncTaskInboxMiddleware",
@@ -40,9 +42,11 @@ const inboxMiddleware = (registry: DurableObjectStub<AsyncTaskRegistry>, taskId:
  */
 export async function runTask(env: Env, p: TaskParams, registry: DurableObjectStub<AsyncTaskRegistry>) {
   const { createModel } = chatModelFor({ modelId: p.modelId ?? DEFAULT_MODEL_ID, apiKey: env.OPENROUTER_API_KEY ?? "", maxOutputTokens: env.MAX_OUTPUT_TOKENS });
+  // Its own run scope ("task:<id>"), under the same per-user and app-wide daily caps as the chat.
+  const web = webAccess(env, pgBudgetStore(createDb(env.DATABASE_URL)), { userId: p.userId, runId: `task:${p.taskId}` });
   const agent = createAgent({
     model: createModel(),
-    tools: env.TAVILY_API_KEY ? createWebTools(env.TAVILY_API_KEY, "advanced") : [],
+    tools: web ? createWebTools(web) : [],
     middleware: [createToolErrorsMiddleware(), createParallelToolsMiddleware(4), inboxMiddleware(registry, p.taskId), createFilesystemMiddleware({ backend: new StateBackend() })],
     systemPrompt: [
       `You are "${p.agent}", a background sub-agent working for "${p.botName}". Today is ${new Date().toISOString().slice(0, 10)}.`,

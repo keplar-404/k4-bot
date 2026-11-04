@@ -8,7 +8,7 @@ import { registryFor } from "./registry-stub";
 import { runTask, type TaskParams } from "./run-task";
 
 /**
- * One background task (start_async_task), as its own Workflow: it runs while the parent bot keeps talking to the user,
+ * One background task (start_background_task), as its own Workflow: it runs while the parent bot keeps talking to the user,
  * and survives the parent's run ending. No automatic retry: a half-done research run would be paid for twice.
  * When it ends, the registry records the result and the chat gets an `async.task` event.
  */

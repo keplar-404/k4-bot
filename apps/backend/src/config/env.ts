@@ -15,6 +15,13 @@ export const envSchema = z.object({
   MAIL_FROM: z.string().optional(),
   OPENROUTER_API_KEY: z.string().optional(),
   TAVILY_API_KEY: z.string().optional(),
+  // Tavily spend caps, in Tavily credits (about $0.008 each on pay-as-you-go). Every web tool call reserves its
+  // worst-case cost against all three before it is sent (agent/tools/web/guard.ts).
+  TAVILY_CREDITS_PER_DAY: z.coerce.number().int().positive().default(5_000),
+  TAVILY_CREDITS_PER_USER_PER_DAY: z.coerce.number().int().positive().default(400),
+  TAVILY_CREDITS_PER_RUN: z.coerce.number().int().positive().default(150),
+  /** /deep-research runs per user per day (each may use up to 250 credits, outside the per-run cap). */
+  TAVILY_RESEARCH_PER_USER_PER_DAY: z.coerce.number().int().positive().default(5),
   // Agent guardrails (cost + abuse containment)
   MAX_DAILY_TOKENS_PER_USER: z.coerce.number().int().positive().default(2_000_000),
   /** Per model reply. OpenRouter reserves credit for the full amount, so keep it modest. */
@@ -74,7 +81,7 @@ export const envSchema = z.object({
 export type Env = z.infer<typeof envSchema> & {
   CHAT_RELAY: DurableObjectNamespace<import("../modules/chat/relay").ChatRelayDurableObject>;
   CHAT_RUN: Workflow;
-  /** Background sub-agent tasks (start_async_task): one Workflow each, and one registry per chat thread. */
+  /** Background sub-agent tasks (start_background_task): one Workflow each, and one registry per chat thread. */
   ASYNC_TASK: Workflow;
   ASYNC_TASKS: DurableObjectNamespace<import("../modules/async-tasks/registry").AsyncTaskRegistry>;
   /** Per-IP limiter for every API request. */

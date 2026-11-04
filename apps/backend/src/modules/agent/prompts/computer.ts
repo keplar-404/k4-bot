@@ -13,7 +13,8 @@ export function filesSection(canSee: boolean, hasComputer: boolean): string {
     hasComputer
       ? `
 - copy_to_computer puts an attached or created file in your folder on the computer, so the shell and apps can use it.
-- To give the user any file from the computer (yours or another bot's), call share_file: they get a download button that keeps working. Never tell them to fetch it from the computer themselves.`
+- To give the user any file from the computer (yours or another bot's), call share_file: they get a download button that keeps working. Never tell them to fetch it from the computer themselves.
+- Share only the final deliverable, in the format the user asked for: one request for an Excel sheet means one .xlsx, not also a CSV. Helper files you made on the way (a CSV you converted, scripts, temp files, screenshots) stay on the computer, and files from earlier requests are not shared again.`
       : ""
   }
 - Files reach the user as cards in the chat: never invent download links.

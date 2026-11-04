@@ -20,6 +20,9 @@ export type PromptBarProps = {
   attachments?: ComposerAttachment[];
   onRemoveAttachment?: (key: string) => void;
   busy?: boolean;
+  /** The bot is working on a message: the send button becomes Stop. */
+  responding?: boolean;
+  onStop?: () => void;
   models?: ModelOption[];
   modelKey?: string;
   effort?: string | null;

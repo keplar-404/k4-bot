@@ -46,6 +46,7 @@ export type ChatCtx = ChatState & {
   flush: () => Promise<void>;
   decide: (type: "approve" | "reject") => Promise<void>;
   answer: (text: string) => Promise<void>;
+  stop: () => Promise<void>;
   dismissError: () => void;
   approve: () => void;
   reject: () => void;

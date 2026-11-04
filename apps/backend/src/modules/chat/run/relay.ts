@@ -35,3 +35,8 @@ export async function appendParts(db: Db, params: ChatRunParams, parts: Part[]) 
     // jsonb array concatenation: the message grows as the run goes on, across slices.
     .onConflictDoUpdate({ target: chatMessage.id, set: { parts: sql`${chatMessage.parts} || excluded.parts` } });
 }
+
+/** Whether the user pressed Stop on this run. */
+export function stopRequested(env: Env, threadId: string, runId: string): Promise<boolean> {
+  return env.CHAT_RELAY.get(env.CHAT_RELAY.idFromName(threadId)).stopRequested(runId);
+}

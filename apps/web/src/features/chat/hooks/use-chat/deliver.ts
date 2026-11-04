@@ -14,7 +14,7 @@ export async function deliverImpl(
   if (ctx.inflightRef.current.has(messageId)) return;
   ctx.inflightRef.current.add(messageId);
   try {
-    await sendMessage({
+    const started = await sendMessage({
       threadId,
       messageId,
       content,
@@ -24,6 +24,7 @@ export async function deliverImpl(
       retry: rerun || undefined,
       compact: content.trim() === "/compact" || undefined,
     });
+    ctx.runIdRef.current = started.runId;
     ctx.streamRef.current = {
       ...ctx.streamRef.current,
       run: "running",

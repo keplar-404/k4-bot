@@ -22,6 +22,8 @@ export default function PromptBar({
   onAttach,
   onRemoveAttachment,
   busy = false,
+  responding = false,
+  onStop,
 }: {
   placeholder?: string;
   onSend?: (text: string) => void;
@@ -29,6 +31,8 @@ export default function PromptBar({
   attachments?: ComposerAttachment[];
   onRemoveAttachment?: (key: string) => void;
   busy?: boolean;
+  responding?: boolean;
+  onStop?: () => void;
   models?: ModelOption[];
   modelKey?: string;
   effort?: string | null;
@@ -46,6 +50,8 @@ export default function PromptBar({
     onAttach,
     onRemoveAttachment,
     busy,
+    responding,
+    onStop,
   };
   const h = usePromptHandlers(state, props);
   const h2 = usePromptHandlers2(state, props, h);

@@ -1,8 +1,17 @@
 "use client";
 
-import { PanelRightIcon } from "lucide-react";
-import { useState, useSyncExternalStore } from "react";
-import { Button } from "@/components/ui/button";
+import {
+  type ReactNode,
+  useEffect,
+  useState,
+  useSyncExternalStore,
+} from "react";
+import { usePanelRef } from "react-resizable-panels";
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/components/ui/resizable";
 import {
   Sheet,
   SheetContent,
@@ -13,7 +22,7 @@ import { cn } from "@/lib/utils";
 import { useWorkspace } from "./use-workspace";
 import { WorkspacePanels } from "./workspace-panels";
 
-const WIDE = "(min-width: 1280px)";
+const WIDE = "(min-width: 1024px)";
 
 function useWide() {
   return useSyncExternalStore(
@@ -28,41 +37,84 @@ function useWide() {
 }
 
 /**
- * The bot page's right side bar: Computer, Browser, Files and open files as tabs. Beside the chat on wide screens
- * (wider while a page or file is shown); on narrow ones it opens from a button, with the same tabs.
+ * The chat and its right side bar. On wide screens the side bar is a resizable panel (drag the divider; it keeps
+ * between 320px and 60% of the width, and the chat keeps at least 360px) that the header button hides and shows.
+ * On narrow ones the same tabs open in a sheet from a button.
  */
-export function WorkspaceSidebar({ botId }: { botId: string }) {
+export function WorkspaceSidebar({
+  botId,
+  children,
+}: {
+  botId: string;
+  children: ReactNode;
+}) {
   const wide = useWide();
-  const [open, setOpen] = useState(false);
-  const { tabs, activeId } = useWorkspace();
-  const roomy = tabs.find((t) => t.id === activeId)?.kind !== "computer";
+  const panel = usePanelRef();
+  const { sidebarOpen, setSidebarOpen } = useWorkspace();
+
+  // Shown on wide screens, hidden on narrow ones (where it is a sheet) until the header button asks for it.
+  useEffect(() => setSidebarOpen(wide), [wide, setSidebarOpen]);
+
+  // The header button drives the panel. The slide class goes on first and the resize happens two frames later, so the
+  // browser sees a change to animate (the same 200ms linear slide as the app side bar). A drag never slides: a
+  // transition then would make the divider lag behind the pointer.
+  const [sliding, setSliding] = useState(false);
+  useEffect(() => {
+    const p = panel.current;
+    if (!p || sidebarOpen !== p.isCollapsed()) return;
+    setSliding(true);
+    let inner = 0;
+    const outer = requestAnimationFrame(() => {
+      inner = requestAnimationFrame(() => {
+        const live = panel.current;
+        if (sidebarOpen) live?.expand();
+        else live?.collapse();
+      });
+    });
+    const done = setTimeout(() => setSliding(false), 300);
+    return () => {
+      cancelAnimationFrame(outer);
+      cancelAnimationFrame(inner);
+      clearTimeout(done);
+    };
+  }, [sidebarOpen, panel]);
+  const slide = sliding && "transition-[flex-grow] duration-200 ease-linear";
 
   if (wide) {
     return (
-      <aside
-        aria-label="Workspace"
-        className={cn(
-          "flex shrink-0 flex-col border-l transition-[width] duration-200",
-          roomy ? "w-[34rem]" : "w-80",
-        )}
-      >
-        <WorkspacePanels botId={botId} />
-      </aside>
+      <ResizablePanelGroup orientation="horizontal" className="min-h-0 flex-1">
+        <ResizablePanel id="chat" minSize={360} className={cn(slide)}>
+          {children}
+        </ResizablePanel>
+        <ResizableHandle
+          withHandle
+          disabled={!sidebarOpen}
+          className={cn(!sidebarOpen && "pointer-events-none opacity-0")}
+        />
+        <ResizablePanel
+          id="workspace"
+          aria-label="Workspace"
+          panelRef={panel}
+          defaultSize={480}
+          minSize={320}
+          maxSize="60%"
+          collapsible
+          collapsedSize={0}
+          onResize={() => setSidebarOpen(!panel.current?.isCollapsed())}
+          className={cn("flex flex-col overflow-hidden", slide)}
+        >
+          <div className="flex h-full min-w-80 flex-1 flex-col">
+            <WorkspacePanels botId={botId} />
+          </div>
+        </ResizablePanel>
+      </ResizablePanelGroup>
     );
   }
 
   return (
     <>
-      <Button
-        variant="outline"
-        size="icon"
-        aria-label="Open the workspace"
-        className="fixed right-4 bottom-24 z-30 rounded-full shadow-md"
-        onClick={() => setOpen(true)}
-      >
-        <PanelRightIcon />
-      </Button>
-      <Sheet open={open} onOpenChange={setOpen}>
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>
+      <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
         <SheetContent
           side="right"
           className="flex w-full flex-col p-0 sm:max-w-lg"
@@ -71,7 +123,7 @@ export function WorkspaceSidebar({ botId }: { botId: string }) {
           <SheetDescription className="sr-only">
             Your computer, a browser and this bot&apos;s files.
           </SheetDescription>
-          {open && <WorkspacePanels botId={botId} />}
+          {sidebarOpen && <WorkspacePanels botId={botId} />}
         </SheetContent>
       </Sheet>
     </>

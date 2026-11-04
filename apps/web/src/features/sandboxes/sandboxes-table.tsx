@@ -43,7 +43,7 @@ export function SandboxesTable({
       </TableHeader>
       <TableBody>
         {rows.map((r) => (
-          <TableRow key={r.botId}>
+          <TableRow key={r.botId} className="h-12">
             <TableCell className="font-medium">{r.botName}</TableCell>
             <TableCell className="max-w-64 truncate" title={r.purpose}>
               {r.purpose}

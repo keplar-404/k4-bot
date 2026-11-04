@@ -16,7 +16,7 @@ import { attachedImages, peersOf, subagentContext } from "./context";
 import { pauseFor } from "./interrupt";
 import { createRecorder } from "./recorder";
 import { createUsageReporter } from "./usage-events";
-import { publishEvent } from "./relay";
+import { publishEvent, stopRequested } from "./relay";
 import { agentInput, createSink } from "./sink";
 import { classifyProviderError, isTransient } from "./provider-error";
 import { type ChatRunParams, type Publish, SLICE_WALL_MS, type SliceResult } from "./types";
@@ -29,14 +29,42 @@ export async function runSlice(env: Env, params: ChatRunParams, botRow: AgentBot
   const rec = createRecorder(db, params, publish);
   const stub = env.COMPUTER_ENABLED && env.E2B_API_KEY ? env.USER_COMPUTER.get(env.USER_COMPUTER.idFromName(userId)) : undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
+  // Stop button: polled while the agent works (the stop request comes in on another request).
+  let stopped = false;
+  let poll: ReturnType<typeof setInterval> | undefined;
+  let markStopped: () => void = () => {};
+  const stoppedPromise = new Promise<void>((resolve) => (markStopped = resolve));
   let apps: BotApps | undefined;
   // This segment's sub-agent groups. They live only while the segment runs, so they must end before it does.
   const sliceDeadline = Date.now() + SLICE_WALL_MS;
   const hub = new GroupHub();
 
+  /**
+   * Stop was pressed: what the run produced so far is saved like any other progress (the message, and the agent's
+   * checkpoint for what the model had only streamed, so the next message sees it), and the chat is told it ended.
+   */
+  async function endStopped(agent?: ReturnType<typeof buildRunAgent>): Promise<SliceResult> {
+    clearInterval(poll);
+    await rec.flushAll().catch(() => undefined);
+    for (const part of rec.acc.parts) if (part.type === "tool" && part.status === "running") part.status = "error";
+    await rec.saveProgress().catch(() => undefined);
+    const last = rec.acc.parts.at(-1);
+    if (agent && last?.type === "text") {
+      // The aborted model call never reached the checkpoint: add its partial answer so the conversation stays whole.
+      await agent.updateState({ configurable: { thread_id: threadId } }, { messages: [{ role: "assistant", content: last.text }] }).catch(() => undefined);
+    }
+    await publish("run.stopped", { messageId: `${runId}:assistant` });
+    return { status: "done" };
+  }
+
   try {
     // The bot was deleted while this run waited or slept: stop quietly (there is no chat left to tell).
     if (!(await getOwnedThread(db, threadId, userId))) return { status: "failed" };
+    // Stop was pressed between two slices: end here without calling the model.
+    if (await stopRequested(env, threadId, runId).catch(() => false)) {
+      await publish("run.stopped", { messageId: `${runId}:assistant` });
+      return { status: "done" };
+    }
     // Its name for /home/BOTS.md. Storage only in the Durable Object: no E2B call.
     await stub?.registerBot(botRow.id, botRow.name).catch(() => undefined);
     const free = isFreeModel(params.modelId ?? DEFAULT_MODEL_ID);
@@ -75,7 +103,14 @@ export async function runSlice(env: Env, params: ChatRunParams, botRow: AgentBot
     const config = { version: "v3", configurable: { thread_id: threadId }, recursionLimit: env.RUN_SLICE_STEPS, durability: "sync" };
     const stream = await agent.streamEvents(agentInput(params, attached, slice, resume), config);
     timer = setTimeout(() => stream.abort?.(), sliceDeadline - Date.now());
-    let { interrupt } = await consumeRun(stream, sink, rec.acc);
+    poll = setInterval(async () => {
+      if (stopped || !(await stopRequested(env, threadId, runId).catch(() => false))) return;
+      stopped = true;
+      stream.abort?.();
+      markStopped();
+    }, 500);
+    let { interrupt } = await consumeRun(stream, sink, rec.acc, stoppedPromise);
+    if (stopped) return await endStopped(agent);
     await rec.flushAll();
     await rec.saveProgress();
 
@@ -93,6 +128,7 @@ export async function runSlice(env: Env, params: ChatRunParams, botRow: AgentBot
     await publish("run.done", { messageId: `${runId}:assistant` });
     return { status: "done" };
   } catch (error) {
+    if (stopped) return await endStopped();
     await rec.flushAll().catch(() => undefined);
     await rec.saveProgress().catch(() => undefined);
     // The slice hit its step limit (or its time limit). The checkpoint is intact; carry on in the next slice.
@@ -107,6 +143,7 @@ export async function runSlice(env: Env, params: ChatRunParams, botRow: AgentBot
     return { status: "failed" };
   } finally {
     clearTimeout(timer);
+    clearInterval(poll);
     await apps?.close();
     await rec.saveUsage(params.modelId ?? DEFAULT_MODEL_ID);
     // Hand the mouse and keyboard back so the user's other bots are not blocked between slices.

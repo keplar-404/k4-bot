@@ -60,6 +60,7 @@ export function reduceEvent(
     case "run.sleeping":
     case "run.waiting_approval":
     case "run.done":
+    case "run.stopped":
     case "run.failed":
       next = handleRunEvent(next, runId, event.type, payload);
       break;

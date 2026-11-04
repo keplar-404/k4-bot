@@ -7,3 +7,4 @@ export * from "./integrations";
 export * from "./relations";
 export * from "./memory";
 export * from "./sandbox";
+export * from "./web";

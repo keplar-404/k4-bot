@@ -12,6 +12,8 @@ export async function consumeRun(
   stream: RunStream,
   sink: RunSink,
   acc: { parts: Part[]; usage: PartsUsage },
+  /** Resolves when the user stops the run: running tool calls end as stopped and the partial text is kept. */
+  stopped: Promise<void> = new Promise(() => {}),
 ): Promise<{ interrupt?: PendingInterrupt }> {
   const toolEnds: Promise<void>[] = [];
 
@@ -19,22 +21,33 @@ export async function consumeRun(
     for await (const message of stream.messages) {
       let text = "";
       let reasoning = "";
-      await Promise.all([
-        (async () => {
-          for await (const delta of message.reasoning) {
-            reasoning += delta;
-            await sink.reasoning?.(delta);
-          }
-        })(),
-        (async () => {
-          for await (const delta of message.text) {
-            text += delta;
-            await sink.text?.(delta);
-          }
-        })(),
-      ]);
-      if (reasoning) acc.parts.push({ type: "reasoning", text: reasoning });
-      if (text) acc.parts.push({ type: "text", text });
+      // What was streamed so far is a real part of the answer, also when the model call is cut short (stopped).
+      const keep = () => {
+        if (reasoning) acc.parts.push({ type: "reasoning", text: reasoning });
+        if (text) acc.parts.push({ type: "text", text });
+        reasoning = "";
+        text = "";
+      };
+      try {
+        await Promise.all([
+          (async () => {
+            for await (const delta of message.reasoning) {
+              reasoning += delta;
+              await sink.reasoning?.(delta);
+            }
+          })(),
+          (async () => {
+            for await (const delta of message.text) {
+              text += delta;
+              await sink.text?.(delta);
+            }
+          })(),
+        ]);
+      } catch (error) {
+        keep();
+        throw error;
+      }
+      keep();
       await sink.partsChanged?.();
       const usage = await message.usage;
       acc.usage.input += usage?.input_tokens ?? 0;
@@ -51,10 +64,13 @@ export async function consumeRun(
       await sink.toolStart?.(part);
       toolEnds.push(
         (async () => {
-          const status = await call.status;
-          const error = await call.error;
+          // A stopped run never hears back from its running tools: they end here as stopped.
+          const status = await Promise.race([call.status, stopped.then(() => "stopped")]);
+          const error = status === "stopped" ? null : await call.error;
           part.status = status === "finished" && !error ? "done" : "error";
-          if (error) {
+          if (status === "stopped") {
+            part.output = "Stopped by the user.";
+          } else if (error) {
             part.output = clip(String((error as Error)?.message ?? error));
           } else {
             const raw = await call.output;
@@ -70,8 +86,12 @@ export async function consumeRun(
     }
   })();
 
-  const settled = await Promise.allSettled([messages, tools, Promise.resolve(stream.output)]);
-  await Promise.allSettled(toolEnds);
+  // After a stop the stream may never close by itself: give it a moment, then go on with what was received.
+  const grace = stopped.then(() => new Promise<"late">((r) => setTimeout(() => r("late"), 3000)));
+  const all = Promise.allSettled([messages, tools, Promise.resolve(stream.output)]);
+  const settled = await Promise.race([all, grace.then(() => null)]);
+  await Promise.race([Promise.allSettled(toolEnds), grace]);
+  if (!settled) return {};
   const failed = settled.find((s): s is PromiseRejectedResult => s.status === "rejected");
   if (failed) throw failed.reason;
 

@@ -1,18 +1,24 @@
-import type { WorkspaceTab } from "./types";
+import type { PickableKind, WorkspaceTab } from "./types";
 
 /** The side bar's tab rules as pure functions (checked in workspace-state.check.ts), and their per-browser storage. */
 
 export type WorkspaceState = { tabs: WorkspaceTab[]; activeId: string };
 
-export const FIXED_TABS: WorkspaceTab[] = [
-  { id: "computer", kind: "computer", title: "Computer" },
-  { id: "browser", kind: "browser", title: "Browser" },
-  { id: "files", kind: "files", title: "Files" },
-  { id: "code", kind: "code", title: "Code" },
-];
+export const START_ID = "start";
+export const startTab = (id: string): WorkspaceTab => ({
+  id,
+  kind: "start",
+  title: "Start",
+});
+export const TOOLS: Record<PickableKind, WorkspaceTab> = {
+  computer: { id: "computer", kind: "computer", title: "Computer" },
+  browser: { id: "browser", kind: "browser", title: "Browser" },
+  files: { id: "files", kind: "files", title: "Files" },
+  code: { id: "code", kind: "code", title: "Code" },
+};
 export const INITIAL: WorkspaceState = {
-  tabs: FIXED_TABS,
-  activeId: "computer",
+  tabs: [startTab(START_ID)],
+  activeId: START_ID,
 };
 
 /** Older file tabs close when more are opened. */
@@ -32,17 +38,38 @@ export function addTab(s: WorkspaceState, tab: WorkspaceTab): WorkspaceState {
   };
 }
 
-/** Closing a background tab keeps the current one; closing the current one shows the tab before it. */
+/** Closing a background tab keeps the current one; closing the current one shows the tab before it. The last tab closed leaves a Start tab. */
 export function closeTab(s: WorkspaceState, id: string): WorkspaceState {
-  if (FIXED_TABS.some((f) => f.id === id)) return s;
   const i = s.tabs.findIndex((t) => t.id === id);
+  if (i < 0) return s;
   const tabs = s.tabs.filter((t) => t.id !== id);
+  if (tabs.length === 0) return INITIAL;
   return {
     tabs,
-    activeId:
-      s.activeId === id
-        ? (tabs[Math.max(0, i - 1)]?.id ?? "computer")
-        : s.activeId,
+    activeId: s.activeId === id ? tabs[Math.max(0, i - 1)].id : s.activeId,
+  };
+}
+
+/** A new Start tab, shown. */
+export function newStart(s: WorkspaceState, id: string): WorkspaceState {
+  return addTab(s, startTab(id));
+}
+
+/** The Start tab becomes the chosen tool in the same place; a tool already open is shown instead. */
+export function pickTool(
+  s: WorkspaceState,
+  startId: string,
+  kind: PickableKind,
+  browserId: string,
+): WorkspaceState {
+  const tool =
+    kind === "browser" ? { ...TOOLS.browser, id: browserId } : TOOLS[kind];
+  if (s.tabs.some((t) => t.id === tool.id)) {
+    return { ...closeTab(s, startId), activeId: tool.id };
+  }
+  return {
+    tabs: s.tabs.map((t) => (t.id === startId ? tool : t)),
+    activeId: tool.id,
   };
 }
 
@@ -55,17 +82,13 @@ export function restoreState(botId: string): WorkspaceState {
       localStorage.getItem(key(botId)) ?? "null",
     ) as WorkspaceState | null;
     if (!saved || !Array.isArray(saved.tabs)) return INITIAL;
-    const tabs = [
-      ...FIXED_TABS,
-      ...saved.tabs
-        .filter((t) => !FIXED_TABS.some((f) => f.id === t.id))
-        .slice(-MAX_FILE_TABS),
-    ];
+    const tabs = saved.tabs.slice(-(MAX_FILE_TABS + 8));
+    if (tabs.length === 0) return INITIAL;
     return {
       tabs,
       activeId: tabs.some((t) => t.id === saved.activeId)
         ? saved.activeId
-        : "computer",
+        : tabs[0].id,
     };
   } catch {
     return INITIAL;

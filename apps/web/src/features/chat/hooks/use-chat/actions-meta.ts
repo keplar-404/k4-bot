@@ -3,7 +3,7 @@
 import { useCallback } from "react";
 import { saveBotModel } from "@/features/bots/api";
 import { toInfo } from "./helpers";
-import { answerImpl, decideImpl } from "./resume";
+import { answerImpl, decideImpl, stopImpl } from "./resume";
 import { scheduleModelSave } from "./save-model";
 
 import type { ChatCtx, ChatState } from "./types";
@@ -22,6 +22,8 @@ export function useChatActionsMeta(
     (text: string) => answerImpl(ctxRef.current!, text),
     [],
   );
+  // biome-ignore lint/correctness/useExhaustiveDependencies: refs and setters are stable; deps preserved from original
+  const stop = useCallback(() => stopImpl(ctxRef.current!), []);
   const dismissError = useCallback(
     () => state.setError(null),
     [state.setError],
@@ -44,5 +46,14 @@ export function useChatActionsMeta(
     },
     [botId, select, state],
   );
-  return { decide, answer, dismissError, approve, reject, select, chooseModel };
+  return {
+    decide,
+    answer,
+    stop,
+    dismissError,
+    approve,
+    reject,
+    select,
+    chooseModel,
+  };
 }

@@ -3,6 +3,7 @@ import type { ComputerStub } from "../../computer/sandbox-backend";
 import type { FileRef, SubagentStatus } from "../../agent/parts";
 import type { RunSink } from "../../agent/run-stream";
 import { formatBytes } from "../../files";
+import { deepResearchQuestion, researchInstruction } from "../commands";
 import { describeActivity } from "./activity";
 import type { createRecorder } from "./recorder";
 import type { ChatRunParams, Publish } from "./types";
@@ -49,6 +50,8 @@ export function agentInput(params: ChatRunParams, attached: FileRef[], slice: nu
     const confirm = "[The user ran /compact: the conversation so far was summarized to free context.] Reply in one or two short sentences: confirm it, and say in a few words what you still remember.";
     return { messages: [{ role: "user", content: confirm }], skillsMetadata: null };
   }
+  const question = params.research ? deepResearchQuestion(params.content) : null;
+  if (question) return { messages: [{ role: "user", content: researchInstruction(question) }], skillsMetadata: null };
   // Attached files are listed under the message, so the model knows their ids.
   const content = attached.length
     ? `${params.content}\n\n[Attached files]\n${attached.map((f) => `- "${f.name}" (${f.mimeType}, ${formatBytes(f.size)}, file id ${f.id})`).join("\n")}`

@@ -40,6 +40,8 @@ export function useChatState() {
   const streamRef = useRef<StreamState>(initialStreamState());
   const wsRef = useRef<WebSocket | null>(null);
   const threadRef = useRef<string | null>(null);
+  /** The run the last sent message started (what Stop stops). */
+  const runIdRef = useRef<string | null>(null);
   const attemptsRef = useRef(0);
   const closedRef = useRef(false);
   const outboxRef = useRef<OutboxItem[]>([]);
@@ -86,6 +88,7 @@ export function useChatState() {
     streamRef,
     wsRef,
     threadRef,
+    runIdRef,
     attemptsRef,
     closedRef,
     outboxRef,

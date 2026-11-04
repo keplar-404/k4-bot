@@ -10,6 +10,7 @@ import { DEFAULT_MODEL_ID, isFreeModel, modelError } from "../../agent/models";
 import { chatMessage, chatThread } from "../../../db/schema";
 import type { ChatRunParams } from "../run/workflow";
 import { ACTIVE_RUN_STATES } from "../cleanup";
+import { deepResearchQuestion } from "../commands";
 
 const runs = new Hono<AuthGuardEnv>()
   // Start a run. Returns 202 immediately; the answer streams over the socket.
@@ -26,6 +27,10 @@ const runs = new Hono<AuthGuardEnv>()
       if (!(await getOwnedThread(db, threadId, userId))) {
         return c.json({ error: "NOT_FOUND" }, 404);
       }
+
+      // /deep-research needs a question: an empty one would spend a research task on nothing.
+      const question = deepResearchQuestion(data.content);
+      if (question === "") return c.json({ error: "INVALID_INPUT", message: "Write your research question after /deep-research." }, 400);
 
       const invalid = data.modelId ? modelError(data.modelId, data.reasoningEffort) : null;
       if (invalid) return c.json({ error: "INVALID_INPUT", message: invalid }, 400);
@@ -70,6 +75,7 @@ const runs = new Hono<AuthGuardEnv>()
             modelId: data.modelId,
             reasoningEffort: data.reasoningEffort,
             compact: data.compact,
+            research: question !== null || undefined,
           } satisfies ChatRunParams,
         });
       } catch (error) {

@@ -44,21 +44,42 @@ export function ComposerSend({
           </Icon>
         )}
       </button>
-      <button
-        type="button"
-        aria-label="Send"
-        disabled={!h.canSend}
-        onClick={h.send}
-        className={`flex size-7 shrink-0 items-center justify-center transition-[background-color,color,transform] duration-200 enabled:active:scale-[0.94] rounded-[8px] ${state.wide ? "col-start-5 row-start-2" : "col-start-5 row-start-1"}`}
-        style={{
-          background: h.canSend ? "var(--ink)" : "var(--line-strong)",
-          color: h.canSend ? "var(--surface)" : "var(--ink-2)",
-        }}
-      >
-        <Icon size={16} strokeWidth={2.4}>
-          <path d="M12 19V5M5 12l7-7 7 7" />
-        </Icon>
-      </button>
+      {props.responding && props.onStop ? (
+        <button
+          type="button"
+          aria-label="Stop"
+          title="Stop"
+          onClick={props.onStop}
+          className={`flex size-7 shrink-0 items-center justify-center transition-[background-color,color,transform] duration-200 active:scale-[0.94] rounded-[8px] ${state.wide ? "col-start-5 row-start-2" : "col-start-5 row-start-1"}`}
+          style={{ background: "var(--ink)", color: "var(--surface)" }}
+        >
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            aria-hidden="true"
+          >
+            <rect x="4" y="4" width="16" height="16" rx="3" />
+          </svg>
+        </button>
+      ) : (
+        <button
+          type="button"
+          aria-label="Send"
+          disabled={!h.canSend}
+          onClick={h.send}
+          className={`flex size-7 shrink-0 items-center justify-center transition-[background-color,color,transform] duration-200 enabled:active:scale-[0.94] rounded-[8px] ${state.wide ? "col-start-5 row-start-2" : "col-start-5 row-start-1"}`}
+          style={{
+            background: h.canSend ? "var(--ink)" : "var(--line-strong)",
+            color: h.canSend ? "var(--surface)" : "var(--ink-2)",
+          }}
+        >
+          <Icon size={16} strokeWidth={2.4}>
+            <path d="M12 19V5M5 12l7-7 7 7" />
+          </Icon>
+        </button>
+      )}
     </>
   );
 }

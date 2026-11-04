@@ -20,7 +20,7 @@ import { createWorkspace } from "./workspace";
 export type { AgentBot, BuildAgentOptions } from "./options";
 
 export function buildAgent(options: BuildAgentOptions) {
-  const { bot, openrouterApiKey, tavilyApiKey, checkpointer, computer } = options;
+  const { bot, openrouterApiKey, checkpointer, computer } = options;
   if (!openrouterApiKey) {
     throw new Error("OPENROUTER_API_KEY is not configured; the agent has no model to call.");
   }
@@ -43,7 +43,8 @@ export function buildAgent(options: BuildAgentOptions) {
           maxParallelTools: bot.maxParallelTools,
           today,
           brief: domain.subagentBrief,
-          tavilyApiKey,
+          // Sub-agents share the lead's guard (one budget per run) but never get tavily_research.
+          webTools: options.web ? createWebTools({ ...options.web, research: false }) : [],
           botApps: options.apps as BotApps | undefined,
           saveFiles: saveGroupFiles,
         })
@@ -58,7 +59,7 @@ export function buildAgent(options: BuildAgentOptions) {
     : [];
   const features = featureTools(options);
   const tools = [
-    ...(tavilyApiKey ? createWebTools(tavilyApiKey, domain.web) : []),
+    ...(options.web ? createWebTools(options.web) : []),
     ...subagentTools,
     ...computerTools.filter((t) => model.vision || t.name !== "computer"),
     ...fileTools,

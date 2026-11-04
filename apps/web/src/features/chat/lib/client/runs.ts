@@ -49,6 +49,17 @@ export function resumeRun(
   });
 }
 
+/** Stops a run now: the bot stops working, and what it produced so far stays in the chat. */
+export function stopRun(
+  runId: string,
+  threadId: string,
+): Promise<{ ok: boolean }> {
+  return request(`/api/v1/chat/runs/${runId}/stop`, {
+    method: "POST",
+    body: JSON.stringify({ threadId }),
+  });
+}
+
 /** ws:// for the relay, with an optional cursor so a reconnect can replay. */
 export function wsUrl(args: {
   threadId: string;

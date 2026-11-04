@@ -8,7 +8,6 @@ import { RESEARCH_INSTRUCTIONS, RESEARCHER_BRIEF } from "./prompts";
 export const research: DomainSpec = {
   id: "research",
   instructions: () => RESEARCH_INSTRUCTIONS,
-  web: "advanced",
   // Parallel by default: the playbook relies on batched searches and sub-agents for broad questions.
   defaults: { subagents: true, maxSubagents: 6, maxParallelTools: 10 },
   recommended: {

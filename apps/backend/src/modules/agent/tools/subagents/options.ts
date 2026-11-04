@@ -1,3 +1,4 @@
+import type { StructuredToolInterface } from "@langchain/core/tools";
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import type { Db } from "../../../../db";
 import type { Env } from "../../../../config/env";
@@ -32,7 +33,8 @@ export interface SubagentToolsOptions {
   today: string;
   /** The domain's brief for its sub-agents (e.g. the researcher playbook). */
   brief?: string;
-  tavilyApiKey?: string;
+  /** The lead's web tools (same spend guard), given to every member. */
+  webTools: StructuredToolInterface[];
   /** Every skill the user installed (the lead may give any of them). */
   installedSkills: Array<InstalledSkillRef & { description: string }>;
   /** Every app the user connected (the lead may give any of them; sub-agents get read-only tools). */

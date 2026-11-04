@@ -82,6 +82,16 @@ export class ChatRelayDurableObject extends DurableObject<Env> {
     return event;
   }
 
+  /** The user pressed Stop on this run. RPC: only this Worker's own binding can call it. */
+  async requestStop(runId: string): Promise<void> {
+    await this.ctx.storage.put(`stop:${runId}`, Date.now());
+  }
+
+  /** Whether Stop was pressed for this run (polled by its running slice). */
+  async stopRequested(runId: string): Promise<boolean> {
+    return (await this.ctx.storage.get(`stop:${runId}`)) !== undefined;
+  }
+
   /**
    * The thread was deleted (with its bot): close its live sockets and drop this object's storage.
    * RPC, so only this Worker's own binding can call it. Its events are rows that cascade in Postgres.

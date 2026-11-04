@@ -15,7 +15,7 @@ export function notifyFor(event: WireEvent) {
     );
   }
   if (event.type === "async.task") {
-    // A background task (start_async_task) ended; the bot hears about it before its next step.
+    // A background task (start_background_task) ended; the bot hears about it before its next step.
     const ok = p.status === "success";
     const title = `Background task "${String(p.agent ?? "task")}" ${ok ? "finished" : p.status === "cancelled" ? "was cancelled" : "failed"}`;
     (ok ? toast.success : toast.info)(title, {

@@ -70,6 +70,12 @@ export const COMMANDS = [
     name: "/compact",
     desc: "Summarize the chat to free up context",
   },
+  // Real: the server sees "/deep-research <question>" and hands it to Tavily's research agent (chat/commands.ts).
+  {
+    key: "deep-research",
+    name: "/deep-research",
+    desc: "In-depth research with a cited report",
+  },
   { key: "compare", name: "/compare", desc: "Flavor vs. last summer" },
   { key: "churn-plan", name: "/churn-plan", desc: "Draft a churn schedule" },
   { key: "restock", name: "/restock", desc: "Build a reorder list" },

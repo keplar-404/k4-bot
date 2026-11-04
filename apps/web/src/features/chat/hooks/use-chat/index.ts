@@ -67,6 +67,7 @@ export function useChat(botId: string) {
     sleeping: state.sleeping,
     usage: state.usage,
     answer: actions.answer,
+    stop: actions.stop,
     connection: state.connection,
     error: state.error,
     models: state.models,

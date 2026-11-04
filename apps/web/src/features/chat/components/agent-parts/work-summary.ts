@@ -3,6 +3,7 @@ import { describe } from "./describe";
 
 /** Short verb phrases for the collapsed row ("Edited a file, shared a file"). */
 const PHRASES: Array<[RegExp, string]> = [
+  [/^tavily_research$/, "researched in depth"],
   [/^tavily_|search/, "searched the web"],
   [/^(write_file|edit_file)$/, "edited files"],
   [/^share_file$/, "shared a file"],

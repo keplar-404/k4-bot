@@ -4,6 +4,7 @@ import threads from "./threads";
 import history from "./history";
 import runs from "./runs";
 import resume from "./resume";
+import stop from "./stop";
 import realtime from "./realtime";
 
 const chat = new Hono<AuthGuardEnv>()
@@ -17,6 +18,7 @@ const chat = new Hono<AuthGuardEnv>()
   .route("/", history)
   .route("/", runs)
   .route("/", resume)
+  .route("/", stop)
   .route("/", realtime);
 
 export default chat;

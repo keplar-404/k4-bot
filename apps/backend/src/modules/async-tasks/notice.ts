@@ -13,7 +13,7 @@ export function createAsyncNoticeMiddleware(env: Env, threadId: string) {
     beforeModel: async () => {
       const ended = await registryFor(env, threadId).unseen();
       if (!ended.length) return;
-      const lines = ended.map((t) => `- ${t.id} "${t.agent}" ${t.status}. Call check_async_task("${t.id}") for its result.`);
+      const lines = ended.map((t) => `- ${t.id} "${t.agent}" ${t.status}. Call check_background_task("${t.id}") for its result.`);
       return { messages: [new HumanMessage(`[Automatic update] Background tasks ended:\n${lines.join("\n")}\nTell the user what they found when it fits the conversation.`)] };
     },
   });

@@ -42,7 +42,7 @@ export function usePromptEffects(
     state.setModelMenuLeft(
       Math.max(
         0,
-        Math.min(triggerRect.left - anchorRect.left, anchorRect.width - 176),
+        Math.min(triggerRect.left - anchorRect.left, anchorRect.width - 256),
       ),
     );
     state.setModelMenuBottom(anchorRect.bottom - triggerRect.top + 8);

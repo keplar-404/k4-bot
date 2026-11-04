@@ -20,7 +20,6 @@ export interface DomainDefaults {
 /** What a role means for a new bot: its default capabilities and the skills/apps suggested for it. */
 export interface DomainInfo {
   id: RoleId;
-  web: "standard" | "advanced";
   defaults: DomainDefaults;
   recommended: { skills: string[]; apps: string[] };
 }

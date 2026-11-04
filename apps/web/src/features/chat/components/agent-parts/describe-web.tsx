@@ -1,6 +1,11 @@
 "use client";
 
-import { GlobeIcon, NetworkIcon, SearchIcon } from "lucide-react";
+import {
+  GlobeIcon,
+  NetworkIcon,
+  SearchIcon,
+  TelescopeIcon,
+} from "lucide-react";
 import type { ToolPart } from "./util";
 import { hostOf, parse, str, type ToolDesc } from "./util";
 
@@ -28,6 +33,13 @@ export function describeWeb(part: ToolPart, done: boolean): ToolDesc | null {
       return {
         icon: <GlobeIcon />,
         title: `${done ? "Crawled" : "Crawling"} ${hostOf(a.url)}`,
+      };
+    case "tavily_research":
+      return {
+        icon: <TelescopeIcon />,
+        title: done
+          ? "Researched in depth"
+          : "Researching in depth (this can take a few minutes)",
       };
     default:
       return null;

@@ -1,5 +1,4 @@
 import type { RoleId } from "../../bots/roles";
-import type { WebLevel } from "../tools/web";
 
 /** Hard ceilings on the bot capabilities, whatever a bot is set to. */
 export const MAX_SUBAGENTS = 20;
@@ -18,8 +17,6 @@ export interface DomainSpec {
   id: RoleId;
   /** The role section of the system prompt: who the bot is in this domain and how it works. Kept short: it is sent every step. */
   instructions(bot: { roleTitle: string | null }): string;
-  /** Which web tools it gets. */
-  web: WebLevel;
   /** A new bot of this role starts with these; the user can change them in the bot form. */
   defaults: DomainDefaults;
   /** Catalog ids the bot form suggests first for this role. */

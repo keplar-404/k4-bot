@@ -22,6 +22,7 @@ export function Prompts({
   modelId,
   reasoningEffort,
   send,
+  onStop,
   onAnswer,
   onApprove,
   onReject,
@@ -41,6 +42,7 @@ export function Prompts({
   modelId: string | undefined;
   reasoningEffort: string | null | undefined;
   send: (text: string, files?: FileRef[]) => void | Promise<void>;
+  onStop: () => void;
   onAnswer: (text: string) => void;
   onApprove: () => void;
   onReject: () => void;
@@ -78,6 +80,8 @@ export function Prompts({
         attachments={attachments.items}
         onAttach={attachments.add}
         onRemoveAttachment={attachments.remove}
+        responding={run !== "idle" && run !== "done" && run !== "failed"}
+        onStop={onStop}
         busy={
           attachments.uploading ||
           (run !== "idle" && run !== "done" && run !== "failed")

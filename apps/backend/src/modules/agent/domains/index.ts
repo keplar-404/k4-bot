@@ -12,4 +12,4 @@ const DOMAINS: Record<RoleId, DomainSpec> = { assistant, advisor, coding, resear
 export const domainFor = (role: string): DomainSpec => DOMAINS[role as RoleId] ?? DOMAINS[DEFAULT_ROLE];
 
 /** What the web app needs to set up the bot form: defaults and suggestions per role (no prompts). */
-export const publicDomains = () => Object.values(DOMAINS).map(({ id, web, defaults, recommended }) => ({ id, web, defaults, recommended }));
+export const publicDomains = () => Object.values(DOMAINS).map(({ id, defaults, recommended }) => ({ id, defaults, recommended }));

@@ -18,10 +18,10 @@ apps/backend/src/modules/agent/
     index.ts            registry: domainFor(role), publicDomains() for GET /bots/domains
     general.ts          assistant, advisor, coding, writing, custom (playbook + defaults)
     research/           a domain with its own prompts gets a folder
-      index.ts          spec (web "advanced", sub-agents on, 6 / 10)
+      index.ts          spec (sub-agents on, 6 / 10)
       prompts.ts        lead playbook + RESEARCHER_BRIEF for its sub-agents
   tools/
-    web/                Tavily REST client + tavily_search/extract (+ map/crawl for "advanced")
+    web/                Tavily tools for every bot (search/extract/map/crawl; research only in /deep-research) + spend guard
     subagents/          sub-agent groups (only bots with the capability get these tools)
       index.ts          lead tools: spawn_subagents, wait_for_subagents, message_subagents; saving + collecting
       member.ts         one member: its agent, inbox, send_message / ask_lead, own files + /shared/
@@ -36,7 +36,7 @@ apps/backend/src/modules/agent/
 
 1. Role id in `apps/backend/src/modules/bots/roles.ts` (`ROLE_IDS`) and its label/icon in `apps/web/src/features/bots/roles.ts`.
 2. A spec: `domains/<id>.ts`, or `domains/<id>/` when it has several prompts or its own tools. Fill `instructions`
-   (short: it is sent every step), `web`, `defaults`, `recommended` (catalog ids from `modules/integrations/catalog/skills.ts` and
+   (short: it is sent every step), `defaults`, `recommended` (catalog ids from `modules/integrations/catalog/skills.ts` and
    `modules/integrations/catalog/mcp.ts`), and `subagentBrief` if its sub-agents need a playbook.
 3. Register it in `domains/index.ts`. The bot form reads defaults from `GET /api/v1/bots/domains`; nothing else changes.
 4. Domain-only tools: build them in the spec's folder and add them in `agent.ts` from the spec (keep `agent.ts` generic).
@@ -45,7 +45,11 @@ apps/backend/src/modules/agent/
 
 - **Web tools** call Tavily's REST API directly (the @langchain/tavily 1.2 wrapper lacks `fast` depth, dates and
   extract `chunks_per_source`). Names match Tavily's own MCP tools, so the Tavily skills (`tavily-ai/skills:
-  tavily-search`, `tavily-research`, in the skills catalog) work unchanged. Tool descriptions carry Tavily's best
+  tavily-search`, `tavily-research`, in the skills catalog) work unchanged. Every bot, sub-agent and background task
+  gets all four tools; `tavily_research` (Tavily's research agent, up to 250 credits) exists only in a run the user
+  started with `/deep-research` (chat/commands.ts). Every call passes `WebGuard` (web/guard.ts): it reserves the
+  documented worst-case cost against the app's day, the user's day and the run (research: a daily count instead),
+  atomically in `web_usage`, then settles to Tavily's reported `usage.credits`; identical calls in a run are free. Tool descriptions carry Tavily's best
   practices (advanced depth, 10 results, one focused query per part, extract before citing). Reference copies of
   Tavily's skills are in `.agents/skills/tavily-*`.
 - **Parallel tools**: ToolNode runs a step's tool calls with Promise.all; the middleware queues beyond the bot's

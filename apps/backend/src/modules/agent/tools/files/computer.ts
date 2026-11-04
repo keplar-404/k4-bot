@@ -66,7 +66,10 @@ export function createComputerFileTools(o: FileToolsOptions, computer: NonNullab
       name: "share_file",
       description:
         "Give the user a file from the computer: it appears in the chat with a download button and stays in their files. " +
-        "Works for your files and other bots' files. For a folder, zip it first.",
+        "Works for your files and other bots' files. For a folder, zip it first. " +
+        "Share ONLY the finished file(s) the user asked for, in the format they asked for (an Excel sheet = one .xlsx). " +
+        "Never share intermediate or helper files (a CSV used to build a spreadsheet, scripts, temp files, screenshots), " +
+        "and never re-share files from earlier requests. Share a second format only if the user asked for it.",
       schema: z.object({ path: z.string().min(1).max(500).describe("Absolute path of the file on the computer.") }),
     },
   );

@@ -1,7 +1,6 @@
 import type { StructuredToolInterface } from "@langchain/core/tools";
 import { agentUsage } from "../../../../db/schema";
 import { connectApps } from "../../mcp";
-import { createWebTools } from "../web";
 import type { Group } from "./group";
 import { runMember } from "./member";
 import { createSkillLoader } from "./skill-loader";
@@ -46,7 +45,7 @@ export async function runGroup(o: SubagentToolsOptions, g: Group, agents: AgentS
         today: o.today,
         brief: o.brief,
         model: o.createModel(),
-        tools: [...(o.tavilyApiKey ? createWebTools(o.tavilyApiKey, "advanced") : []), ...(a.apps ?? []).flatMap(appTools)],
+        tools: [...o.webTools, ...(a.apps ?? []).flatMap(appTools)],
         skills: await skillsFor(a),
         maxParallelTools: o.maxParallelTools,
         timeoutMs: Math.min(MEMBER_TIMEOUT_MS, left),

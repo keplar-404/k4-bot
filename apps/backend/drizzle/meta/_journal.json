@@ -78,6 +78,13 @@
       "when": 1793789305313,
       "tag": "0010_lively_the_twelve",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1793811750428,
+      "tag": "0011_first_callisto",
+      "breakpoints": true
     }
   ]
 }

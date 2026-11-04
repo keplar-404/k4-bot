@@ -6,6 +6,7 @@ import { BrowserTab } from "./browser/browser-tab";
 import { CodeTab } from "./code/code-tab";
 import { FilesTab } from "./files/files-tab";
 import { FilePreview } from "./files/preview/file-preview";
+import { StartTab } from "./start-tab";
 import { useWorkspace } from "./use-workspace";
 import { WorkspaceTabList } from "./workspace-tab-list";
 
@@ -29,6 +30,7 @@ export function WorkspacePanels({ botId }: { botId: string }) {
           keepMounted={t.kind === "browser"}
           className="min-h-0 flex-1 overflow-y-auto data-[hidden]:hidden"
         >
+          {t.kind === "start" && <StartTab id={t.id} />}
           {t.kind === "computer" && (
             <ComputerPanel botId={botId} className="flex-1" />
           )}

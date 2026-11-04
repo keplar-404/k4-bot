@@ -4,11 +4,14 @@ import { buildAgent, type BuildAgentOptions } from "../../agent/agent";
 import { NeonHttpCheckpointer } from "../../agent/checkpointer/neon-http-checkpointer";
 import type { RunStream } from "../../agent/run-stream";
 import type { ComputerStub } from "../../computer/sandbox-backend";
+import { pgBudgetStore } from "../../agent/tools/web/budget";
+import { type WebAccess, webAccess } from "../../agent/tools/web";
 import { fileOptions } from "./context";
 import type { ChatRunParams } from "./types";
 
 type Streamable = {
   streamEvents(input: unknown, config: object): Promise<RunStream & { abort?: () => void }>;
+  updateState(config: object, values: unknown): Promise<unknown>;
   getState(config: object): Promise<{ tasks?: Array<{ interrupts?: unknown[] }> }>;
 };
 
@@ -28,7 +31,7 @@ export function buildRunAgent(
     compact: params.compact,
     openrouterApiKey: env.OPENROUTER_API_KEY,
     freeVisionModel: env.FREE_VISION_MODEL,
-    tavilyApiKey: env.TAVILY_API_KEY,
+    web: withResearch(webAccess(env, pgBudgetStore(db), { userId: params.userId, runId: params.runId }), params.research),
     maxOutputTokens: env.MAX_OUTPUT_TOKENS,
     checkpointer: new NeonHttpCheckpointer(db),
     ...(stub ? { computer: { stub, runId: params.runId } } : {}),
@@ -37,3 +40,6 @@ export function buildRunAgent(
     files: fileOptions(env, db, params, images),
   }) as unknown as Streamable;
 }
+
+/** tavily_research is offered only in a run the user started with /deep-research. */
+const withResearch = (web: WebAccess | undefined, research?: boolean) => (web ? { ...web, research: Boolean(research) } : undefined);

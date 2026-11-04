@@ -3,13 +3,12 @@ export type WorkspaceFile = { id: string; name: string; mimeType: string };
 
 /** One tab of the bot page's side bar: the fixed Computer / Browser / Files tabs, extra browser tabs, and files. */
 export type WorkspaceTab =
-  | {
-      id: "computer" | "browser" | "files" | "code";
-      kind: "computer" | "browser" | "files" | "code";
-      title: string;
-    }
-  | { id: string; kind: "browser"; title: string; url: string }
+  | { id: string; kind: "computer" | "files" | "code"; title: string }
+  | { id: string; kind: "start"; title: string }
+  | { id: string; kind: "browser"; title: string; url?: string }
   | { id: string; kind: "file"; title: string; file: WorkspaceFile };
+
+export type PickableKind = "computer" | "browser" | "files" | "code";
 
 export interface WorkspaceApi {
   tabs: WorkspaceTab[];
@@ -18,6 +17,13 @@ export interface WorkspaceApi {
   openUrl: (url: string) => void;
   close: (id: string) => void;
   setActive: (id: string) => void;
+  /** Opens a new Start tab (the picker of what to open). */
+  newTab: () => void;
+  /** Turns the Start tab `startId` into the chosen tool (or shows it if already open). */
+  pick: (startId: string, kind: PickableKind) => void;
+  /** Whether the right side bar is shown (a panel on wide screens, a sheet on narrow ones). */
+  sidebarOpen: boolean;
+  setSidebarOpen: (open: boolean) => void;
   /** The full-page code editor over this bot's sandbox (not remembered: it wakes the sandbox). */
   editorOpen: boolean;
   setEditorOpen: (open: boolean) => void;

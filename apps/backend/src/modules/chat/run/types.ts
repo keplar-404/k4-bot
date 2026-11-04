@@ -12,6 +12,8 @@ export interface ChatRunParams {
   reasoningEffort?: string;
   /** The user ran /compact: summarize the conversation before answering. */
   compact?: boolean;
+  /** The user ran /deep-research: this run hands the question to Tavily's research agent. */
+  research?: boolean;
 }
 
 /** What the user (or the clock) must supply before the run can go on, or how it ended. */

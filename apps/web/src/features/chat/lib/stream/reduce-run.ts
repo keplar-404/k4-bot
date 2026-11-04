@@ -41,6 +41,8 @@ export function handleRunEvent(
         approval: { runId, actions },
       };
     }
+    // Stopped by the user: like done, but a tool call still running ends as stopped.
+    case "run.stopped":
     case "run.done": {
       // A repeated terminal event must not create a second assistant bubble.
       if (state.run === "done" && state.draftId === null) return state;
@@ -52,7 +54,17 @@ export function handleRunEvent(
         draftId: null,
         ...going,
         messages: next.messages.map((m) =>
-          m.id === draftId ? { ...m, state: "sent" } : m,
+          m.id === draftId
+            ? {
+                ...m,
+                parts: m.parts?.map((p) =>
+                  p.type === "tool" && p.status === "running"
+                    ? { ...p, status: "error" as const }
+                    : p,
+                ),
+                state: "sent",
+              }
+            : m,
         ),
       };
     }

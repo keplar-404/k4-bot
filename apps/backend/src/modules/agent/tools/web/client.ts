@@ -10,11 +10,12 @@ const API = "https://api.tavily.com";
 
 export class TavilyError extends Error {}
 
-export async function call<T>(apiKey: string, path: string, body: Record<string, unknown>, timeoutMs: number): Promise<T> {
+/** POST with `body`, or GET when `body` is null (research status). */
+export async function call<T>(apiKey: string, path: string, body: Record<string, unknown> | null, timeoutMs: number): Promise<T> {
   const response = await fetch(`${API}${path}`, {
-    method: "POST",
-    headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
-    body: JSON.stringify(body),
+    method: body ? "POST" : "GET",
+    headers: { authorization: `Bearer ${apiKey}`, ...(body ? { "content-type": "application/json" } : {}) },
+    body: body ? JSON.stringify(body) : undefined,
     signal: AbortSignal.timeout(timeoutMs),
   });
   const data = (await response.json().catch(() => null)) as (T & { detail?: { error?: string } | string }) | null;

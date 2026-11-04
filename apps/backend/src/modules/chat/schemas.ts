@@ -46,3 +46,6 @@ export const resumeRunSchema = z.union([
   }),
   z.object({ threadId: z.string().min(1), answer: z.string().max(8000) }),
 ]);
+
+/** Stop a run: the thread it belongs to is checked against the user. */
+export const stopRunSchema = z.object({ threadId: z.string().min(1) });

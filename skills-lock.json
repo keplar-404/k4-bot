@@ -253,26 +253,41 @@
       "skillPath": "config/skills/swarm/SKILL.md",
       "computedHash": "1839bb3cb12115e36b4f7873d9bc4b3d97c5cd1140860f4f0032672dc1ec5241"
     },
+    "tavily-entity": {
+      "source": "tavily-ai/skills",
+      "sourceType": "github",
+      "skillPath": "skills/tasks/tavily-entity/SKILL.md",
+      "computedHash": "89ab93a697e73167e2e2e35cb5378d0a206e0d3355406f3e02557920d67e42c5"
+    },
+    "tavily-list": {
+      "source": "tavily-ai/skills",
+      "sourceType": "github",
+      "skillPath": "skills/tasks/tavily-list/SKILL.md",
+      "computedHash": "2d6772dc8367e2964e7fb6ce6689244b9fb438e246bfd66df7ce0e349150a959"
+    },
+    "tavily-monitor": {
+      "source": "tavily-ai/skills",
+      "sourceType": "github",
+      "skillPath": "skills/tasks/tavily-monitor/SKILL.md",
+      "computedHash": "ffea471d88f952454a9b5aa3611f2fea47fc3152a9733f128f6b918fe3e6c96d"
+    },
     "tavily-research": {
       "source": "tavily-ai/skills",
       "sourceType": "github",
       "skillPath": "skills/tasks/tavily-research/SKILL.md",
-      "computedHash": "bddb8779230c8865dbe12a43b9b9cadd794cb2cd5ee8043d2f9e90ff09398d77",
-      "installMode": "copy"
+      "computedHash": "9d116a6b5d85b1faeaf22edc1176e38aa27c4457c2d8a134017b2331147e1326"
     },
     "tavily-sdk": {
       "source": "tavily-ai/skills",
       "sourceType": "github",
       "skillPath": "skills/developers/tavily-sdk/SKILL.md",
-      "computedHash": "de3e2baadd4b4575741e77c2aacf229e91b28a215c6e419fd0fe7cf90fcaa08a",
-      "installMode": "copy"
+      "computedHash": "baf983d973f8dee589b17461ded030f5dc0656929ca3839be079bd1e8277c82b"
     },
     "tavily-search": {
       "source": "tavily-ai/skills",
       "sourceType": "github",
       "skillPath": "skills/core/tavily-search/SKILL.md",
-      "computedHash": "d992cc8a8f74d38359a72392c98ffcf8e85ccc4641761156f3ed1955fbc60e1c",
-      "installMode": "copy"
+      "computedHash": "33af51b14ad25bcb0de77969455d17f91103f62651b742cec41843e31f292475"
     },
     "turborepo": {
       "source": "vercel/turborepo",

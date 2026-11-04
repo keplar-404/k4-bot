@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
 import type { WorkspaceTab } from "./types";
-import { addTab, closeTab, INITIAL, MAX_FILE_TABS } from "./workspace-state";
+import {
+  addTab,
+  closeTab,
+  INITIAL,
+  MAX_FILE_TABS,
+  newStart,
+  pickTool,
+} from "./workspace-state";
 
 const file = (n: number): WorkspaceTab => ({
   id: `f${n}`,
@@ -36,6 +43,16 @@ assert.equal(
   "f4",
   "closing the shown tab shows the one before it",
 );
-assert.equal(closeTab(shown, "computer"), shown, "fixed tabs cannot be closed");
+
+const picked = pickTool(INITIAL, "start", "files", "b1");
+assert.equal(picked.activeId, "files", "a Start tab becomes the chosen tool");
+assert.equal(picked.tabs.length, 1, "in the same place");
+const second = pickTool(newStart(picked, "start2"), "start2", "files", "b2");
+assert.equal(second.tabs.length, 1, "an open tool is shown, not duplicated");
+assert.equal(
+  closeTab(picked, "files").tabs[0].kind,
+  "start",
+  "the last tab leaves a Start tab",
+);
 
 console.log("workspace tabs: all checks passed");

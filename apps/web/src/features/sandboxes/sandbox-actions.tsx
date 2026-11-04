@@ -6,11 +6,27 @@ import type { SandboxRow } from "./api";
 import type { SandboxAction } from "./use-sandboxes";
 
 /** Start or Pause (whichever applies) and Delete for one sandbox; a spinner while its action runs. */
-export function SandboxActions({ row, busy, onAction, onDelete }: { row: SandboxRow; busy: boolean; onAction: (a: SandboxAction, botId: string) => void; onDelete: (row: SandboxRow) => void }) {
-  if (busy) return <Loader2Icon className="ml-auto size-4 animate-spin" aria-label="Working" />;
+export function SandboxActions({
+  row,
+  busy,
+  onAction,
+  onDelete,
+}: {
+  row: SandboxRow;
+  busy: boolean;
+  onAction: (a: SandboxAction, botId: string) => void;
+  onDelete: (row: SandboxRow) => void;
+}) {
+  // Same box as the two buttons, so the row keeps its height and width while an action runs.
+  if (busy)
+    return (
+      <span className="inline-flex h-7 w-15 items-center justify-center">
+        <Loader2Icon className="size-4 animate-spin" aria-label="Working" />
+      </span>
+    );
   const running = row.status === "running";
   return (
-    <span className="inline-flex gap-1">
+    <span className="inline-flex h-7 w-15 items-center justify-end gap-1">
       <Button
         size="icon-sm"
         variant="ghost"
@@ -19,7 +35,12 @@ export function SandboxActions({ row, busy, onAction, onDelete }: { row: Sandbox
       >
         {running ? <PauseIcon /> : <PlayIcon />}
       </Button>
-      <Button size="icon-sm" variant="ghost" aria-label={`Delete ${row.botName}'s sandbox`} onClick={() => onDelete(row)}>
+      <Button
+        size="icon-sm"
+        variant="ghost"
+        aria-label={`Delete ${row.botName}'s sandbox`}
+        onClick={() => onDelete(row)}
+      >
         <Trash2Icon />
       </Button>
     </span>

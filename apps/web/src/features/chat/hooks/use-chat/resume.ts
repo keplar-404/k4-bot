@@ -1,4 +1,4 @@
-import { resumeRun } from "@/features/chat/lib/client";
+import { resumeRun, stopRun } from "@/features/chat/lib/client";
 import type { ChatCtx } from "./types";
 
 export async function decideImpl(
@@ -36,6 +36,23 @@ export async function answerImpl(ctx: ChatCtx, text: string): Promise<void> {
       prompt: null,
     };
     ctx.sync();
+  } catch (e) {
+    ctx.setError(ctx.toInfo(e));
+  }
+}
+
+/** Stop: ends the current run now. The chat is told by the run's own `run.stopped` event. */
+export async function stopImpl(ctx: ChatCtx): Promise<void> {
+  const threadId = ctx.threadRef.current;
+  const s = ctx.streamRef.current;
+  const runId =
+    ctx.runIdRef.current ??
+    s.approval?.runId ??
+    s.prompt?.runId ??
+    s.draftId?.replace(/:assistant$/, "");
+  if (!threadId || !runId) return;
+  try {
+    await stopRun(runId, threadId);
   } catch (e) {
     ctx.setError(ctx.toInfo(e));
   }

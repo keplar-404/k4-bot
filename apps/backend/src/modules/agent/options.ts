@@ -5,6 +5,7 @@ import type { Db } from "../../db";
 import type { BotApps } from "./mcp";
 import type { FileToolsOptions, ViewHolder } from "./tools/files";
 import type { MemoryToolsOptions } from "./tools/memory";
+import type { WebAccess } from "./tools/web";
 import type { AsyncToolOptions } from "../async-tasks/tools";
 import type { SubagentToolsOptions } from "./tools/subagents";
 
@@ -37,8 +38,8 @@ export interface BuildAgentOptions {
   maxOutputTokens?: number;
   /** With the free router: the free vision model for calls that carry pictures (middleware/free-vision.ts). */
   freeVisionModel?: string;
-  /** Web search is offered only when a key is configured. */
-  tavilyApiKey?: string;
+  /** Tavily web tools (with their spend guard), when a key is configured. `research`: this is a /deep-research run. */
+  web?: WebAccess & { research?: boolean };
   checkpointer: BaseCheckpointSaver;
   /** Present when this run may use the user's shared computer. */
   computer?: { stub: ComputerStub; runId: string };

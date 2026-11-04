@@ -37,6 +37,7 @@ export function ChatView({
     sleeping,
     usage,
     answer,
+    stop,
     connection,
     error,
     isLoading,
@@ -85,6 +86,7 @@ export function ChatView({
         modelId={modelId}
         reasoningEffort={reasoningEffort}
         send={send}
+        onStop={() => void stop()}
         onAnswer={(text) => void answer(text)}
         onApprove={() => void approve()}
         onReject={() => void reject()}
