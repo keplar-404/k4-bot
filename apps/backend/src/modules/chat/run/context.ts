@@ -77,6 +77,8 @@ export const fileOptions = (env: Env, db: Db, params: ChatRunParams, attached: A
         runId: params.runId,
         imageModel: env.IMAGE_MODEL,
         maxImagesPerDay: env.MAX_IMAGES_PER_DAY,
+        pdfOcr: env.PDF_OCR,
+        maxOcrPagesPerDay: env.MAX_OCR_PAGES_PER_DAY,
         maxStorageBytes: env.MAX_STORAGE_MB_PER_USER * 1024 * 1024,
         attached,
       }

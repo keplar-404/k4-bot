@@ -6,7 +6,6 @@ import {
   LayoutDashboardIcon,
   MonitorIcon,
   PuzzleIcon,
-  ServerIcon,
   UserIcon,
 } from "lucide-react";
 import type * as React from "react";
@@ -29,19 +28,15 @@ import { IntegrationsDialog } from "@/features/integrations/components/integrati
 
 const navItems = [
   { title: "Dashboard", url: "/dashboard", icon: <LayoutDashboardIcon /> },
-  // Skills and MCP open one dialog (tabs), on the tab that was clicked.
+  // Plugins: skills and MCP servers, one dialog with a tab for each.
   {
-    title: "Skills",
+    title: "Plugins",
     icon: <PuzzleIcon />,
     onSelect: () => openIntegrations("skills"),
   },
-  {
-    title: "MCP",
-    icon: <ServerIcon />,
-    onSelect: () => openIntegrations("mcp"),
-  },
   { title: "VM machine", url: "/dashboard/vm", icon: <MonitorIcon /> },
   { title: "Files", url: "/dashboard/files", icon: <FolderOpenIcon /> },
+  { title: "Sandboxes", url: "/dashboard/sandboxes", icon: <MonitorIcon /> },
   { title: "Avatar", url: "/dashboard/avatar", icon: <UserIcon /> },
 ];
 

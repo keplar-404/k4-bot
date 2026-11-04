@@ -78,7 +78,10 @@ export function Prompts({
         attachments={attachments.items}
         onAttach={attachments.add}
         onRemoveAttachment={attachments.remove}
-        busy={attachments.uploading}
+        busy={
+          attachments.uploading ||
+          (run !== "idle" && run !== "done" && run !== "failed")
+        }
         models={catalog.length > 0 ? catalog : undefined}
         modelKey={modelId}
         effort={reasoningEffort}

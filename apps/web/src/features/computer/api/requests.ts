@@ -1,5 +1,7 @@
 import type {
   ActivityEvent,
+  ComputerSettings,
+  ComputerSettingsInput,
   ComputerStatus,
   WorkingBot,
 } from "@backend/modules/computer/types";
@@ -7,7 +9,13 @@ import { redirectToSignIn } from "@/features/auth/auth-redirect";
 import { ChatHttpError } from "@/features/chat/lib/client";
 import { mapHttpError, networkError } from "@/features/chat/lib/protocol";
 
-export type { ActivityEvent, ComputerStatus, WorkingBot };
+export type {
+  ActivityEvent,
+  ComputerSettings,
+  ComputerSettingsInput,
+  ComputerStatus,
+  WorkingBot,
+};
 
 export const BASE = process.env.NEXT_PUBLIC_AUTH_URL ?? "http://localhost:8787";
 
@@ -49,10 +57,26 @@ export type CloseResult =
  * Sleeps the computer; its open apps and files are saved. While bots are using it the server refuses
  * (409 + who) unless `force` is set, so the page can ask first and a stale screen can never kill their work.
  */
-export async function closeComputer(force: boolean): Promise<CloseResult> {
+export const closeComputer = (force: boolean) => forceable("/pause", force);
+
+/**
+ * Wipes the computer to a brand-new one: every bot's files and open apps are gone. Same rule as closing:
+ * while bots are working the server refuses (409 + who) unless `force`, and forced it stops their runs.
+ */
+export const resetComputer = (force: boolean) => forceable("/reset", force);
+
+export const getSettings = () => request<ComputerSettings>("/settings");
+export const saveSettings = (input: ComputerSettingsInput) =>
+  request<ComputerSettings>("/settings", {
+    method: "PUT",
+    body: JSON.stringify(input),
+  });
+
+/** A POST that bots at work can refuse: 409 BOTS_WORKING returns who, so the page can ask before forcing. */
+async function forceable(path: string, force: boolean): Promise<CloseResult> {
   let res: Response;
   try {
-    res = await fetch(`${BASE}/api/v1/computer/pause`, {
+    res = await fetch(`${BASE}/api/v1/computer${path}`, {
       method: "POST",
       credentials: "include",
       headers: { "content-type": "application/json" },

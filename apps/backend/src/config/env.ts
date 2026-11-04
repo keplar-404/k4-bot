@@ -43,10 +43,21 @@ export const envSchema = z.object({
   // --- Files (uploads, generated images, files shared from the computer; kept in R2) ---
   /** OpenRouter image model for generate_image (POST /api/v1/images). */
   IMAGE_MODEL: z.string().default("google/gemini-3.1-flash-image"),
+  /** With the free router, calls that carry pictures go to this free vision model (the router may pick one that cannot see). */
+  FREE_VISION_MODEL: z.string().default("google/gemma-4-31b-it:free"),
   /** Images a user's bots may create per UTC day: every image is billed by OpenRouter. */
   MAX_IMAGES_PER_DAY: z.coerce.number().int().positive().default(20),
+  /** Paid OCR (Mistral, $2 per 1,000 pages) for scanned PDF pages the free readers cannot read; "off" disables it. */
+  PDF_OCR: z.enum(["mistral-ocr", "off"]).default("mistral-ocr"),
+  /** Pages one user may OCR per day (UTC). */
+  MAX_OCR_PAGES_PER_DAY: z.coerce.number().int().nonnegative().default(50),
   /** Total size of one user's stored files. */
   MAX_STORAGE_MB_PER_USER: z.coerce.number().int().positive().default(1024),
+  // --- Sandboxes (one E2B code sandbox per bot) ---
+  SANDBOX_MAX_PER_USER: z.coerce.number().int().positive().default(3),
+  SANDBOX_IDLE_MINUTES: z.coerce.number().int().positive().default(10),
+  SANDBOX_TEMPLATE: z.string().default("base"),
+  SANDBOX_MAX_MINUTES_PER_DAY: z.coerce.number().int().positive().default(240),
   // --- Secrets users give us (MCP tokens): AES-256-GCM, see lib/secrets.ts ---
   /** 32 random bytes, base64. Generate with: openssl rand -base64 32 */
   SECRETS_ENCRYPTION_KEY: z.string().optional(),
@@ -63,12 +74,17 @@ export const envSchema = z.object({
 export type Env = z.infer<typeof envSchema> & {
   CHAT_RELAY: DurableObjectNamespace<import("../modules/chat/relay").ChatRelayDurableObject>;
   CHAT_RUN: Workflow;
+  /** Background sub-agent tasks (start_async_task): one Workflow each, and one registry per chat thread. */
+  ASYNC_TASK: Workflow;
+  ASYNC_TASKS: DurableObjectNamespace<import("../modules/async-tasks/registry").AsyncTaskRegistry>;
   /** Per-IP limiter for every API request. */
   RL: RateLimit;
   /** Per-user limiter for mutating/expensive routes. */
   RL_WRITE: RateLimit;
   /** One computer per user: addressed by user id. */
   USER_COMPUTER: DurableObjectNamespace<import("../modules/computer/user-computer").UserComputerDurableObject>;
+  /** One sandbox per bot: addressed by bot id. */
+  BOT_SANDBOX: DurableObjectNamespace<import("../modules/sandbox").BotSandbox>;
   /** Stored files. Without the binding, uploads and the file tools are off. */
   FILES?: R2Bucket;
 };

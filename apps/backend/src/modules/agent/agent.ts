@@ -1,8 +1,8 @@
 import { createDeepAgent } from "deepagents";
 import { botHome, botUnixUser } from "../computer/guards";
 import { createComputerTools, type ScreenHolder } from "../computer/tools";
-import { computerApprovals, fileApprovals } from "./approvals";
-import { chatModelFor } from "./chat-model";
+import { computerApprovals, fileApprovals, sandboxApprovals } from "./approvals";
+import { chatModelFor, extraModel } from "./chat-model";
 import { domainFor } from "./domains";
 import type { BotApps } from "./mcp";
 import { botMiddleware } from "./middleware/stack";
@@ -11,6 +11,8 @@ import { computerPrompt } from "./prompts/computer";
 import { systemPrompt } from "./prompts/system";
 import { SKILLS_ROOT } from "./skills-backend";
 import { createFileTools, type ViewHolder } from "./tools/files";
+import { createAsyncNoticeMiddleware } from "../async-tasks/notice";
+import { featureTools } from "./feature-tools";
 import { createSubagentTools } from "./tools/subagents";
 import { createWebTools } from "./tools/web";
 import { createWorkspace } from "./workspace";
@@ -54,14 +56,15 @@ export function buildAgent(options: BuildAgentOptions) {
   const fileTools = options.files
     ? createFileTools({ ...options.files, botId: bot.id, openrouterApiKey, vision: model.vision, view, ...(computer && home ? { computer: { stub: computer.stub, home } } : {}) })
     : [];
+  const features = featureTools(options);
   const tools = [
     ...(tavilyApiKey ? createWebTools(tavilyApiKey, domain.web) : []),
     ...subagentTools,
     ...computerTools.filter((t) => model.vision || t.name !== "computer"),
     ...fileTools,
-    ...(options.apps?.tools ?? []),
+    ...features.tools,
   ];
-  const approvals = { ...(computer ? computerApprovals : fileApprovals), ...(options.apps?.approvals ?? {}) };
+  const approvals = { ...(computer ? computerApprovals : fileApprovals), ...(options.sandbox ? sandboxApprovals : {}), ...(options.apps?.approvals ?? {}) };
 
   return createDeepAgent({
     model: createModel(),
@@ -75,7 +78,10 @@ export function buildAgent(options: BuildAgentOptions) {
       pausing: options.subagents ? { hub: options.subagents.hub, names: [...Object.keys(approvals), "ask_user", "wait_for", "spawn_subagents"] } : undefined,
       computer: computer ? { stub: computer.stub, screen } : undefined,
       view: model.vision && options.files ? view : undefined,
-      compact: options.compact ? { model: createModel(), backend } : undefined,
+      summarize: { model: createModel(["nostream"]), backend, now: options.compact },
+      freeVision: model.id === "openrouter/free" && options.freeVisionModel ? extraModel(options.freeVisionModel, openrouterApiKey, options.maxOutputTokens) : undefined,
+      extra: features.asyncTasks ? [createAsyncNoticeMiddleware(features.asyncTasks.env, features.asyncTasks.threadId)] : [],
+      appReadOnlyTools: Object.values(options.apps?.readOnly ?? {}).flatMap((ts) => ts.map((t) => t.name)),
     }),
     systemPrompt: systemPrompt({
       bot,
@@ -85,6 +91,7 @@ export function buildAgent(options: BuildAgentOptions) {
       capabilities: { maxParallelTools: bot.maxParallelTools, maxSubagents: subagentTools.length ? bot.maxSubagents : undefined },
       today,
       computer: home ? computerPrompt(home, model.vision, options.peers) : undefined,
+      memory: options.memory ? { memory: options.memory.memory, preferences: options.memory.preferences } : undefined,
     }),
     // Connected-app tools that change the user's data (e.g. Airtable record updates) ask first, like waking the computer.
     interruptOn: approvals,

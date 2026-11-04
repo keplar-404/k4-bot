@@ -13,7 +13,7 @@ export interface RunStream {
   messages: AsyncIterable<{
     text: AsyncIterable<string>;
     reasoning: AsyncIterable<string>;
-    usage: PromiseLike<{ input_tokens?: number; output_tokens?: number } | undefined>;
+    usage: PromiseLike<{ input_tokens?: number; output_tokens?: number; input_token_details?: { cache_read?: number } } | undefined>;
   }>;
   toolCalls: AsyncIterable<{
     name: string;
@@ -36,7 +36,7 @@ export interface RunSink {
   /** A model message finished or a tool call completed: a good moment to save progress. */
   partsChanged?: () => void | Promise<void>;
   /** One model call finished, with its tokens: its input is how full the context window is now. */
-  usage?: (usage: { input: number; output: number }) => void | Promise<void>;
+  usage?: (usage: { input: number; output: number; cached: number }) => void | Promise<void>;
 }
 
 export interface PendingInterrupt {

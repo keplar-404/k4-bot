@@ -1,14 +1,15 @@
 import { Hono } from "hono";
-import { eq, sql } from "drizzle-orm";
+import { desc, eq, isNotNull, and, sql } from "drizzle-orm";
 import { getRequestContext } from "../../../shared/context";
 import { getOwnedThread, quotaExceeded } from "../threads";
 import { validate } from "../../../shared/validate";
 import { sendMessageSchema } from "../schemas";
 import { userLimit } from "../../../middleware/rate-limit";
 import type { AuthGuardEnv } from "../../../middleware/auth-guard";
-import { modelError } from "../../agent/models";
-import { chatThread } from "../../../db/schema";
+import { DEFAULT_MODEL_ID, isFreeModel, modelError } from "../../agent/models";
+import { chatMessage, chatThread } from "../../../db/schema";
 import type { ChatRunParams } from "../run/workflow";
+import { ACTIVE_RUN_STATES } from "../cleanup";
 
 const runs = new Hono<AuthGuardEnv>()
   // Start a run. Returns 202 immediately; the answer streams over the socket.
@@ -29,8 +30,27 @@ const runs = new Hono<AuthGuardEnv>()
       const invalid = data.modelId ? modelError(data.modelId, data.reasoningEffort) : null;
       if (invalid) return c.json({ error: "INVALID_INPUT", message: invalid }, 400);
 
-      const quota = await quotaExceeded(db, env, userId);
+      // Free models are not limited here (OpenRouter limits them itself, and the chat explains its errors).
+      const quota = isFreeModel(data.modelId ?? DEFAULT_MODEL_ID) ? null : await quotaExceeded(db, env, userId);
       if (quota) return c.json({ error: "QUOTA_EXCEEDED", message: quota }, 402);
+
+      // One run at a time per thread: two would share one checkpoint and interleave their messages.
+      const runId0 = data.retry ? null : (data.messageId ?? null);
+      const [last] = await db
+        .select({ runId: chatMessage.runId })
+        .from(chatMessage)
+        .where(and(eq(chatMessage.threadId, threadId), isNotNull(chatMessage.runId)))
+        .orderBy(desc(chatMessage.seq))
+        .limit(1);
+      // A resend of the message that started that run is the idempotent case handled below.
+      if (last?.runId && last.runId !== runId0) {
+        const status = await env.CHAT_RUN.get(last.runId)
+          .then((i) => i.status())
+          .catch(() => null);
+        if (status && ACTIVE_RUN_STATES.has(status.status)) {
+          return c.json({ error: "RUN_ACTIVE", message: "The bot is still working on your last message." }, 409);
+        }
+      }
 
       // The run id is the message id, so a resend of a message the server
       // already accepted (its response was lost on a dropped connection) is a

@@ -1,7 +1,13 @@
 "use client";
 
-import { MoreHorizontalIcon, PencilIcon, Trash2Icon } from "lucide-react";
+import {
+  BrainIcon,
+  MoreHorizontalIcon,
+  PencilIcon,
+  Trash2Icon,
+} from "lucide-react";
 import Link from "next/link";
+import { useState } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,8 +23,9 @@ import {
 } from "@/components/ui/sidebar";
 import { BloubAvatar } from "@/features/avatar/components/bloub-avatar";
 import type { Bot } from "@/features/bots/api";
+import { MemoryDialog } from "@/features/memory/memory-dialog";
 
-/** One bot in the sidebar: a link to its chat, and a menu with Settings and Delete. */
+/** One bot in the sidebar: a link to its chat, and a menu with Settings, Memory and Delete. */
 export function BotItem({
   bot,
   active,
@@ -30,6 +37,7 @@ export function BotItem({
   onEdit: (bot: Bot) => void;
   onDelete: (id: string) => void;
 }) {
+  const [memoryOpen, setMemoryOpen] = useState(false);
   return (
     <SidebarMenuItem>
       <SidebarMenuButton
@@ -58,6 +66,10 @@ export function BotItem({
               <PencilIcon />
               Settings
             </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setMemoryOpen(true)}>
+              <BrainIcon />
+              Memory
+            </DropdownMenuItem>
             <DropdownMenuItem
               variant="destructive"
               onClick={() => onDelete(bot.id)}
@@ -68,6 +80,12 @@ export function BotItem({
           </DropdownMenuGroup>
         </DropdownMenuContent>
       </DropdownMenu>
+      <MemoryDialog
+        target={{ kind: "bot", botId: bot.id }}
+        title={`${bot.name}'s memory`}
+        open={memoryOpen}
+        onOpenChange={setMemoryOpen}
+      />
     </SidebarMenuItem>
   );
 }

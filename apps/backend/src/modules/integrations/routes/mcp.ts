@@ -5,7 +5,7 @@ import { validate } from "../../../shared/validate";
 import type { AuthGuardEnv } from "../../../middleware/auth-guard";
 import { userLimit } from "../../../middleware/rate-limit";
 import { catalogMcp, MCP_CATALOG, publicMcp } from "../catalog/mcp";
-import { encryptSecret } from "../../../shared/secrets";
+import { decryptSecret, encryptSecret } from "../../../shared/secrets";
 import { mcpSecretContext, testConnection } from "../../agent/mcp";
 import { userMcpServer } from "../../../db/schema";
 import { connectSchema, hintOf, pick, secretsSchema, unavailable } from "./mcp-input";
@@ -80,6 +80,27 @@ const mcp = new Hono<AuthGuardEnv>()
       return c.json(unavailable(error), 503);
     }
     return c.json({ ok: true, tools: check.tools });
+  })
+
+  // Test a connected app with its saved token: a real call to the app (testConnection), nothing is changed.
+  .post("/mcp/:id/test", userLimit, async (c) => {
+    const { db, env } = getRequestContext(c);
+    const userId = c.get("session").user.id;
+    const id = c.req.param("id");
+    const [row] = await db
+      .select({ serverId: userMcpServer.serverId, secrets: userMcpServer.secrets })
+      .from(userMcpServer)
+      .where(and(eq(userMcpServer.id, id), eq(userMcpServer.userId, userId)))
+      .limit(1);
+    const entry = row && catalogMcp(row.serverId);
+    if (!entry) return c.json({ error: "NOT_FOUND" }, 404);
+    let secrets: Record<string, string> = {};
+    try {
+      if (row.secrets) secrets = JSON.parse(await decryptSecret(env, row.secrets, mcpSecretContext(userId, id))) as Record<string, string>;
+    } catch {
+      return c.json({ ok: false, message: "The saved token could not be read. Replace it." });
+    }
+    return c.json(await testConnection(entry, secrets));
   })
 
   // Disconnect: the encrypted token is deleted and every bot loses the app.

@@ -56,6 +56,11 @@ export function UsageMeter({
           {compact(used)}
           {contextLength ? ` / ${compact(contextLength)} · ${pct}%` : ""}
         </span>
+        {(usage?.cachedTokens ?? 0) > 0 && (
+          <span title="Input tokens read from the model provider's prompt cache on the last call: cheaper and faster">
+            · {compact(usage?.cachedTokens ?? 0)} cached
+          </span>
+        )}
         {level !== "ok" && (
           <span
             className={

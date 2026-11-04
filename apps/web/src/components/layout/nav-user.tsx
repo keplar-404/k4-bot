@@ -1,6 +1,11 @@
 "use client";
 
-import { ChevronsUpDownIcon, LogOutIcon } from "lucide-react";
+import {
+  ChevronsUpDownIcon,
+  LogOutIcon,
+  SlidersHorizontalIcon,
+} from "lucide-react";
+import { useState } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,6 +23,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { signOut, useSession } from "@/features/auth/auth-client";
+import { MemoryDialog } from "@/features/memory/memory-dialog";
 import { UserIdentity } from "./user-identity";
 
 export function NavUser() {
@@ -27,6 +33,7 @@ export function NavUser() {
   const name = user?.name ?? "";
   const email = user?.email ?? "";
   const avatar = (user as { image?: string | null } | undefined)?.image ?? "";
+  const [prefsOpen, setPrefsOpen] = useState(false);
 
   async function handleSignOut() {
     await signOut();
@@ -76,12 +83,21 @@ export function NavUser() {
               </DropdownMenuLabel>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => setPrefsOpen(true)}>
+              <SlidersHorizontalIcon />
+              Preferences
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={handleSignOut}>
               <LogOutIcon />
               Log out
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        <MemoryDialog
+          target={{ kind: "preferences" }}
+          open={prefsOpen}
+          onOpenChange={setPrefsOpen}
+        />
       </SidebarMenuItem>
     </SidebarMenu>
   );

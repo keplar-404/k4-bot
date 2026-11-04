@@ -1,5 +1,5 @@
 import { ensureDraft } from "./drafts";
-import { friendlyProviderError } from "./provider-error";
+import { friendlyProviderError, reasonMessage } from "./provider-error";
 import type { StreamState } from "./types";
 import { going } from "./types";
 
@@ -80,9 +80,13 @@ export function handleRunEvent(
                 state: "failed",
                 error: {
                   kind: "server",
-                  message: raw
-                    ? friendlyProviderError(raw, status)
-                    : "The run stopped before finishing.",
+                  // `notice`: the server wrote it for the user (daily budget, stopped by a reset): shown as is.
+                  message: !raw
+                    ? "The run stopped before finishing."
+                    : payload.notice === true
+                      ? raw
+                      : (reasonMessage(payload.reason) ??
+                        friendlyProviderError(raw, status)),
                   detail: raw || undefined,
                   retryable: true,
                 },

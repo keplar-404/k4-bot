@@ -1,6 +1,8 @@
-import type { WorkingBot } from "../types";
+import { Sandbox } from "@e2b/desktop";
+import type { ComputerSettings, ComputerSettingsInput, WorkingBot } from "../types";
 import type { Closed } from "./constants";
 import { ComputerPower } from "./power";
+import { killOwnSandboxes } from "./sandbox";
 import { closedText, quotaNotice, wrapUpNotice } from "./texts";
 
 /** Ending a session: shutting down on someone's say-so, wrapping up, and what bots are told before the end. */
@@ -22,6 +24,60 @@ export class ComputerSession extends ComputerPower {
     await this.rememberClosed(options.cause, busy);
     await this.pause(options.reason);
     return { closed: true };
+  }
+
+  /**
+   * Wipes the computer: the sandbox is destroyed (every bot's files, accounts and open apps go with it) and the
+   * next wake creates a brand-new one. Like `close`, it needs `force` while bots are working and returns them
+   * otherwise. Forced, those bots are told it was reset; the route stops their runs.
+   */
+  async reset(force: boolean): Promise<{ reset: true; stopped: WorkingBot[] } | { reset: false; working: WorkingBot[] }> {
+    this.assertEnabled();
+    if (this.state === "starting") throw new Error("The computer is starting. Try again in a moment.");
+    const busy = this.state === "running" ? this.working() : [];
+    if (busy.length > 0 && !force) return { reset: false, working: busy };
+    await this.rememberClosed("reset", busy);
+    this.pausing = true;
+    try {
+      const id = this.sbx?.sandboxId ?? (await this.ctx.storage.get<string>("sandboxId"));
+      this.sbx = undefined;
+      this.lease = null;
+      this.vncFor = undefined;
+      this.hardenedFor = undefined;
+      this.lastDriver = undefined;
+      this.sessionEndsAt = 0;
+      this.warned = false;
+      this.wrapping = false;
+      this.botUsers.clear();
+      this.marked.clear();
+      this.runActions.clear();
+      const apiKey = this.cfg.E2B_API_KEY;
+      if (id) await Sandbox.kill(id, { apiKey }).catch(() => undefined);
+      await killOwnSandboxes(apiKey, this.ctx.id.name);
+      await this.ctx.storage.delete(["sandboxId", "snapshot"]);
+      this.snapshotAt = undefined;
+      this.tables.clearWorkers();
+      this.tables.clearActivity();
+      // A fresh disk has no accounts left to purge.
+      this.tables.markPurged();
+      this.directoryDirty = true;
+      await this.setState("off", "Reset to a brand-new computer. Wake it to start fresh.");
+      this.broadcast({ type: "activity-batch", events: [] });
+    } finally {
+      this.pausing = false;
+    }
+    return { reset: true, stopped: busy };
+  }
+
+  async settings(): Promise<ComputerSettings> {
+    const cfg = this.cfg;
+    return { ...(await this.limits()), maxIdleMinutes: cfg.COMPUTER_IDLE_MINUTES, maxSessionMinutes: cfg.COMPUTER_SESSION_MINUTES };
+  }
+
+  /** Saved for the next tick and the next session; a session already running keeps its end time. */
+  async saveSettings(input: ComputerSettingsInput): Promise<ComputerSettings> {
+    await this.ctx.storage.put("settings", input);
+    return this.settings();
   }
 
   /** Who is using the computer besides `botId`, and whether the user holds the mouse. For a bot about to turn it off. */

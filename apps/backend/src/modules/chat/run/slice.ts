@@ -4,11 +4,12 @@ import type { Env } from "../../../config/env";
 import type { AgentBot } from "../../agent/agent";
 import { connectBotApps, type BotApps } from "../../agent/mcp";
 import { contextLengthOf } from "../../agent/model-context";
-import { DEFAULT_MODEL_ID } from "../../agent/models";
+import { DEFAULT_MODEL_ID, isFreeModel } from "../../agent/models";
 import type { FileRef, SubagentStatus } from "../../agent/parts";
 import { consumeRun } from "../../agent/run-stream";
 import { collectUnfinished, GroupHub } from "../../agent/tools/subagents";
 import { loadBotSkills } from "../../integrations/skills";
+import { loadMemory, saveBotMemory, savePreferences } from "../../memory/store";
 import { getOwnedThread, tokensUsedToday } from "../threads";
 import { buildRunAgent } from "./agent";
 import { attachedImages, peersOf, subagentContext } from "./context";
@@ -17,6 +18,7 @@ import { createRecorder } from "./recorder";
 import { createUsageReporter } from "./usage-events";
 import { publishEvent } from "./relay";
 import { agentInput, createSink } from "./sink";
+import { classifyProviderError, isTransient } from "./provider-error";
 import { type ChatRunParams, type Publish, SLICE_WALL_MS, type SliceResult } from "./types";
 
 /** One durable slice: drives the agent up to RUN_SLICE_STEPS graph steps, then reports how the run goes on. */
@@ -37,9 +39,11 @@ export async function runSlice(env: Env, params: ChatRunParams, botRow: AgentBot
     if (!(await getOwnedThread(db, threadId, userId))) return { status: "failed" };
     // Its name for /home/BOTS.md. Storage only in the Durable Object: no E2B call.
     await stub?.registerBot(botRow.id, botRow.name).catch(() => undefined);
+    const free = isFreeModel(params.modelId ?? DEFAULT_MODEL_ID);
     const todayBase = await tokensUsedToday(db, userId);
-    if (todayBase >= env.MAX_DAILY_TOKENS_PER_USER) {
-      await publish("run.failed", { error: `Daily token budget of ${env.MAX_DAILY_TOKENS_PER_USER} reached. It resets at 00:00 UTC.` });
+    if (!free && todayBase >= env.MAX_DAILY_TOKENS_PER_USER) {
+      // `notice`: written by this app for the user, so the chat shows it as is (not as a provider error).
+      await publish("run.failed", { error: `Today's token budget (${env.MAX_DAILY_TOKENS_PER_USER}) is used up, so the bot stopped. It resets at 00:00 UTC.`, notice: true });
       return { status: "failed" };
     }
 
@@ -52,10 +56,21 @@ export async function runSlice(env: Env, params: ChatRunParams, botRow: AgentBot
     const subagents = botRow.subagentsEnabled ? await subagentContext(env, db, params, { publish, hub, sliceDeadline, progress }) : undefined;
     // The model's real context window: sizes the automatic summary and the chat's context meter.
     const contextLength = await contextLengthOf(params.modelId ?? DEFAULT_MODEL_ID);
-    const agent = buildRunAgent(env, db, params, { bot: botRow, skills, apps, subagents, peers, stub, images, contextLength });
+    // Long-term memory: this bot's own notes and the user's global preferences, read for the prompt, saved by its tools.
+    const memory = {
+      ...(await loadMemory(db, userId, botRow.id)),
+      saveMemory: async (content: string) => void (await saveBotMemory(db, userId, botRow.id, content)),
+      savePreferences: (content: string) => savePreferences(db, userId, content),
+    };
+    const agent = buildRunAgent(env, db, params, { bot: botRow, skills, apps, subagents, peers, stub, images, contextLength, memory });
 
+    // A retried slice may carry an answer the failed one already used: only send it while the agent still waits for it.
+    if (resume !== undefined && slice > 0) {
+      const state = await agent.getState({ configurable: { thread_id: threadId } });
+      if (!state.tasks?.some((t) => t.interrupts?.length)) resume = undefined;
+    }
     if (resume !== undefined) await publish("run.resumed", {});
-    const onUsage = createUsageReporter({ db, threadId, publish, contextLength, todayBase, todayLimit: env.MAX_DAILY_TOKENS_PER_USER });
+    const onUsage = createUsageReporter({ db, threadId, publish, contextLength, todayBase, counted: !free, todayLimit: env.MAX_DAILY_TOKENS_PER_USER });
     const sink = createSink(rec, publish, stub, botRow.id, progress, onUsage);
     const config = { version: "v3", configurable: { thread_id: threadId }, recursionLimit: env.RUN_SLICE_STEPS, durability: "sync" };
     const stream = await agent.streamEvents(agentInput(params, attached, slice, resume), config);
@@ -83,8 +98,12 @@ export async function runSlice(env: Env, params: ChatRunParams, botRow: AgentBot
     // The slice hit its step limit (or its time limit). The checkpoint is intact; carry on in the next slice.
     if (error instanceof GraphRecursionError || (error as Error)?.name === "AbortError") return { status: "continue" };
     console.error("[chat-run] failed", error);
-    // `status`: HTTP status of the model provider, when the failure came from it.
-    await publish("run.failed", { error: error instanceof Error ? error.message : "agent run failed", status: (error as { status?: number }).status });
+    // The provider let us down for a moment: the workflow waits and runs a new slice from the last checkpoint.
+    // `reason`: which limit or failure it was, so the chat can say so (provider-error.ts); `status`: the provider's HTTP status.
+    const { reason, status } = classifyProviderError(error);
+    const message = error instanceof Error ? error.message : String(error);
+    if (isTransient(error)) return { status: "retry", error: message, httpStatus: status, reason };
+    await publish("run.failed", { error: message || "agent run failed", status, reason });
     return { status: "failed" };
   } finally {
     clearTimeout(timer);

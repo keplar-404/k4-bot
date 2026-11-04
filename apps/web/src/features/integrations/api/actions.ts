@@ -49,3 +49,12 @@ export async function disconnectMcp(id: string) {
   await request(`/mcp/${id}`, { method: "DELETE" });
   await refreshIntegrations();
 }
+
+export type McpTestResult =
+  | { ok: true; tools: string[]; ms: number }
+  | { ok: false; message: string };
+
+/** A real call to the connected app with its saved token (the server lists its tools); nothing is changed. */
+export function testMcp(id: string) {
+  return request<McpTestResult>(`/mcp/${id}/test`, { method: "POST" });
+}

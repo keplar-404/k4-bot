@@ -23,6 +23,8 @@ balance. A capped key returns 402 once the cap is used. Check Settings → Keys.
 ## 2. What changed
 
 ### Backend (`apps/backend`)
+> Paths in this section are historical: the code later moved to feature folders (`src/modules/chat/{relay,run,routes}`, `src/modules/agent`, `src/config/env.ts`, `src/shared`).
+
 - **Relay (`durable/chat-relay.ts`)**: the thread id is persisted in Durable Object storage and bound before
   the sequence counter is read. Every event is saved to `chat_event` before it is acknowledged, and replay
   always comes from the database. The in-memory buffer was removed.

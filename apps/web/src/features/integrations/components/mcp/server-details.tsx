@@ -18,6 +18,7 @@ import {
   type InstalledMcp,
 } from "@/features/integrations/api";
 import { ServerCapabilities } from "./server-capabilities";
+import { TestConnectionButton } from "./test-connection-button";
 import { TokenSection } from "./token-section";
 
 export function ServerDetails({
@@ -69,10 +70,13 @@ export function ServerDetails({
           </p>
         </div>
         {installed ? (
-          <Badge variant="secondary">
-            <CheckIcon />
-            Connected
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary">
+              <CheckIcon />
+              Connected
+            </Badge>
+            <TestConnectionButton id={installed.id} name={server.name} />
+          </div>
         ) : (
           server.fields.length === 0 && (
             <Button

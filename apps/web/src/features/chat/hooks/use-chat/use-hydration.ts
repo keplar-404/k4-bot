@@ -33,8 +33,10 @@ export function useHydration(
         void ctx.connect(tid);
       } catch (e) {
         if (cancelled) return;
-        ctx.setError(ctx.toInfo(e));
-        ctx.setConnection("offline");
+        const info = ctx.toInfo(e);
+        ctx.setError(info);
+        // Only a failed request is "offline"; a server error has its own toast and must not claim the user lost the network.
+        if (info.kind === "network") ctx.setConnection("offline");
         ctx.setIsLoading(false);
       }
     })();

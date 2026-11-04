@@ -51,6 +51,13 @@ export const models: ModelConfig[] = z
 export const resolveModel = (modelId: string) =>
   models.find((m) => m.id === modelId);
 
+/**
+ * Free models (`openrouter/free` and any `:free` id) cost nothing, so this app's daily limits (messages and tokens)
+ * do not apply to them. OpenRouter's own free-model limits still do (20 requests/minute; 50 or 1000 a day).
+ * https://openrouter.ai/docs/api-reference/limits
+ */
+export const isFreeModel = (modelId: string) => resolveModel(modelId)?.free === true || modelId.endsWith(":free");
+
 /** Why a request may not use this model and reasoning level (for a 400), or null when it may. */
 export function modelError(modelId: string, reasoningEffort?: string | null): string | null {
   const model = resolveModel(modelId);

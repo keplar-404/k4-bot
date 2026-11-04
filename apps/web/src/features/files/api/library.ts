@@ -49,12 +49,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return (await res.json()) as T;
 }
 
-export function listFiles(cursor?: string | null): Promise<{
+export function listFiles(cursor?: string | null, botId?: string): Promise<{
   files: LibraryFile[];
   nextCursor: string | null;
 }> {
   const q = new URLSearchParams({ limit: "40" });
   if (cursor) q.set("cursor", cursor);
+  if (botId) q.set("botId", botId);
   return request(`/api/v1/files?${q.toString()}`);
 }
 

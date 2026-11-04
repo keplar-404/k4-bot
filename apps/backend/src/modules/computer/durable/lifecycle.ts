@@ -80,7 +80,7 @@ export class ComputerLifecycle extends ComputerMachine {
     this.expiresAt = now + SESSION_MS;
     this.lastActivity = now;
     this.lastTick = now;
-    this.sessionEndsAt = now + this.cfg.COMPUTER_SESSION_MINUTES * 60_000;
+    this.sessionEndsAt = now + (await this.limits()).sessionMinutes * 60_000;
     this.warned = false;
     this.wrapping = false;
     this.tables.clearWorkers();

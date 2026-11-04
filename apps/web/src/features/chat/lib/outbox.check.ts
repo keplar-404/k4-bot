@@ -63,6 +63,7 @@ const cases: Array<[number, string, boolean]> = [
   [402, "quota", false],
   [403, "forbidden", false],
   [404, "not_found", false],
+  [409, "busy", false],
   [413, "too_large", false],
   [429, "rate_limit", true],
   [500, "server", true],

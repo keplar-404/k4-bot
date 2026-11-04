@@ -37,6 +37,15 @@ export async function findOwnSandbox(apiKey: string | undefined, userId: string 
   return Sandbox.connect(keep.sandboxId, { apiKey, timeoutMs: SESSION_MS });
 }
 
+/** Kills every computer of this user (a reset must not leave one behind for `findOwnSandbox` to adopt). */
+export async function killOwnSandboxes(apiKey: string | undefined, userId: string | undefined): Promise<void> {
+  if (!userId) return;
+  const found = await Sandbox.list({ apiKey, query: { metadata: { app: "k4-bot", userId } } })
+    .nextItems()
+    .catch(() => []);
+  await Promise.allSettled(found.map((s) => Sandbox.kill(s.sandboxId, { apiKey })));
+}
+
 /** A brand new desktop for the user. */
 export async function createSandbox(cfg: Env, userId: string | undefined): Promise<Sandbox> {
   const allowed = parseAllowedHosts(cfg.COMPUTER_ALLOWED_HOSTS);

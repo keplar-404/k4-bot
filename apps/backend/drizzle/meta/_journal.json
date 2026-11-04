@@ -57,6 +57,27 @@
       "when": 1793733545682,
       "tag": "0007_stale_gladiator",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1793777402925,
+      "tag": "0008_tricky_eternals",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1793785826904,
+      "tag": "0009_shiny_the_liberteens",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1793789305313,
+      "tag": "0010_lively_the_twelve",
+      "breakpoints": true
     }
   ]
 }

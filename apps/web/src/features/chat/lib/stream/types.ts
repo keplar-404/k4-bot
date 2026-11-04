@@ -23,6 +23,8 @@ export interface Prompt {
 /** The context meter: tokens of the latest model call, and today's tokens against the daily budget. */
 export interface ChatUsage {
   contextTokens: number;
+  /** Input tokens of the latest call read from the provider's prompt cache (0 when it does not cache). */
+  cachedTokens?: number;
   todayUsed: number;
   todayLimit: number;
 }

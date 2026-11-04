@@ -24,6 +24,9 @@ export interface FileToolsOptions {
   openrouterApiKey: string;
   imageModel: string;
   maxImagesPerDay: number;
+  /** Paid OCR fallback for scanned PDF pages (read_document), and its daily page cap. */
+  pdfOcr: "mistral-ocr" | "off";
+  maxOcrPagesPerDay: number;
   maxStorageBytes: number;
   /** The model can look at images (offers view_image). */
   vision: boolean;

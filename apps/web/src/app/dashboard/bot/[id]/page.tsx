@@ -6,8 +6,11 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChatView } from "@/features/chat/components/chat-view";
 import { ComputerProvider } from "@/features/computer/components/computer-provider";
-import { ComputerSidebar } from "@/features/computer/components/computer-sidebar";
+
 import { SessionWrapUp } from "@/features/computer/components/session-wrap-up";
+import { CodeEditorMount } from "@/features/workspace/code/code-editor-mount";
+import { WorkspaceProvider } from "@/features/workspace/workspace-provider";
+import { WorkspaceSidebar } from "@/features/workspace/workspace-sidebar";
 
 /**
  * `useParams()` is runtime-only data. With Cache Components enabled it must sit
@@ -30,20 +33,24 @@ function BotChat() {
     return null;
   }
   return (
-    // The chat keeps its own column exactly as before; the computer is a side bar next to it.
-    // One connection to the computer serves both (the chat shows its end-of-session prompt).
+    // The chat keeps its own column exactly as before; the workspace (computer, browser, files) is a side bar next to
+    // it. One connection to the computer serves both (the chat shows its end-of-session prompt), and the workspace
+    // context lets file cards in the chat open in the side bar.
     <ComputerProvider>
-      <div className="flex min-h-0 min-w-0 flex-1">
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          {/* Keyed by bot: switching bots (client-side) starts a fresh chat instead of reusing the last one's state and socket. */}
-          <ChatView
-            key={botId}
-            botId={botId}
-            beforeComposer={<SessionWrapUp />}
-          />
+      <WorkspaceProvider botId={botId}>
+        <div className="flex min-h-0 min-w-0 flex-1">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+            {/* Keyed by bot: switching bots (client-side) starts a fresh chat instead of reusing the last one's state and socket. */}
+            <ChatView
+              key={botId}
+              botId={botId}
+              beforeComposer={<SessionWrapUp />}
+            />
+          </div>
+          <WorkspaceSidebar botId={botId} />
+          <CodeEditorMount botId={botId} />
         </div>
-        <ComputerSidebar botId={botId} />
-      </div>
+      </WorkspaceProvider>
     </ComputerProvider>
   );
 }

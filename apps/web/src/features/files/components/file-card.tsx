@@ -2,6 +2,7 @@
 
 import { ImageOffIcon } from "lucide-react";
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
 import {
   Item,
   ItemActions,
@@ -11,6 +12,7 @@ import {
   ItemTitle,
 } from "@/components/ui/item";
 import { type FileRef, formatBytes, isPreviewable } from "@/features/files/api";
+import { useOptionalWorkspace } from "@/features/workspace/use-workspace";
 import { DownloadButton } from "./download-button";
 import { FileKindIcon } from "./file-kind-icon";
 import { ImagePreview } from "./image-preview";
@@ -34,6 +36,8 @@ export function FileCard({
   compact?: boolean;
 }) {
   const [broken, setBroken] = useState(false);
+  // On the bot page a file also opens in the side bar; elsewhere (the Files page) there is no workspace.
+  const ws = useOptionalWorkspace();
   if (isPreviewable(file.mimeType) && !broken) {
     return (
       <ImagePreview
@@ -63,6 +67,11 @@ export function FileCard({
       </ItemContent>
       {!broken && (
         <ItemActions>
+          {ws && (
+            <Button size="sm" variant="ghost" onClick={() => ws.open(file)}>
+              Open
+            </Button>
+          )}
           <DownloadButton file={file} />
         </ItemActions>
       )}

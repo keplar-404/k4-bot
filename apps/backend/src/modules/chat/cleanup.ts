@@ -1,7 +1,8 @@
-import { and, gte, inArray, isNotNull } from "drizzle-orm";
+import { and, eq, gte, inArray, isNotNull } from "drizzle-orm";
 import { NeonHttpCheckpointer } from "../agent/checkpointer/neon-http-checkpointer";
 import type { Db } from "../../db";
-import { chatMessage } from "../../db/schema";
+import { chatMessage, chatThread } from "../../db/schema";
+import { publishEvent } from "./run/relay";
 import type { Env } from "../../config/env";
 
 /** A run can wait on the user for up to 7 days per step; anything older has finished or will stop by itself. */
@@ -36,4 +37,37 @@ export async function cleanupThreads(db: Db, env: Env, threadIds: string[]): Pro
   const checkpointer = new NeonHttpCheckpointer(db);
   await Promise.all(threadIds.map((id) => checkpointer.deleteThread(id)));
   await Promise.allSettled(threadIds.map((id) => env.CHAT_RELAY.get(env.CHAT_RELAY.idFromName(id)).purge()));
+  // Their background tasks' records (running task workflows end on their own within 15 minutes).
+  await Promise.allSettled(threadIds.map((id) => env.ASYNC_TASKS.get(env.ASYNC_TASKS.idFromName(id)).purge()));
+}
+
+/** Workflow states in which a run can still produce output. */
+export const ACTIVE_RUN_STATES = new Set(["queued", "running", "waiting", "waitingForPause"]);
+
+/**
+ * Stops the runs these bots of this user still have going (the computer was reset under them). A terminated
+ * workflow reports nothing itself, so each chat is told here, or it would show "Thinking…" forever.
+ */
+export async function stopBotRuns(db: Db, env: Env, userId: string, botIds: string[], reason: string): Promise<void> {
+  if (botIds.length === 0) return;
+  const runs = await db
+    .selectDistinct({ runId: chatMessage.runId, threadId: chatMessage.threadId })
+    .from(chatMessage)
+    .innerJoin(chatThread, eq(chatThread.id, chatMessage.threadId))
+    .where(
+      and(
+        eq(chatThread.userId, userId),
+        inArray(chatThread.botId, botIds),
+        isNotNull(chatMessage.runId),
+        gte(chatMessage.createdAt, new Date(Date.now() - ACTIVE_RUN_WINDOW_MS)),
+      ),
+    );
+  await Promise.allSettled(
+    runs.map(async ({ runId, threadId }) => {
+      const instance = await env.CHAT_RUN.get(runId!);
+      if (!ACTIVE_RUN_STATES.has((await instance.status()).status)) return;
+      await instance.terminate();
+      await publishEvent(env, threadId, "run.failed", { runId, error: reason, notice: true });
+    }),
+  );
 }

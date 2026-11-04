@@ -19,7 +19,8 @@ export class ComputerMeter extends ComputerSession {
     await this.ctx.storage.put("usage", { day: today(), seconds });
 
     const userInControl = this.holder()?.kind === "user";
-    const idleMs = this.cfg.COMPUTER_IDLE_MINUTES * 60_000;
+    const { idleMinutes, sessionMinutes } = await this.limits();
+    const idleMs = idleMinutes * 60_000;
 
     if (seconds >= this.cfg.COMPUTER_MAX_MINUTES_PER_DAY * 60) {
       await this.rememberClosed("quota", this.working());
@@ -27,7 +28,7 @@ export class ComputerMeter extends ComputerSession {
     } else if (this.sessionEndsAt && now >= this.sessionEndsAt) {
       const wrapped = this.wrapping;
       await this.rememberClosed("session", this.working());
-      await this.pause(wrapped ? "Wrapped up. Your work is saved." : `The ${this.cfg.COMPUTER_SESSION_MINUTES}-minute session ended. Your work is saved.`);
+      await this.pause(wrapped ? "Wrapped up. Your work is saved." : `The ${sessionMinutes}-minute session ended. Your work is saved.`);
     } else if (this.wrapping && this.working().length === 0) {
       await this.pause("Wrapped up. Your work is saved.");
     } else if (!userInControl && now - this.lastActivity > idleMs) {

@@ -51,6 +51,10 @@ export function reduceEvent(
     case "tool.end":
       next = handleToolEnd(next, runId, payload);
       break;
+    case "run.retrying":
+      // The model call failed and was never saved, but its text already streamed in. The run goes on from its
+      // last saved step, so the chat reloads what was saved (dropping that text) and keeps streaming from here.
+      return { state: { ...next, run: "running" }, effect: "resync" };
     case "run.resumed":
     case "run.waiting_input":
     case "run.sleeping":

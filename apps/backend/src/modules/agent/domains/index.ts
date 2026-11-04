@@ -1,5 +1,6 @@
 import { DEFAULT_ROLE, type RoleId } from "../../bots/roles";
-import { advisor, assistant, coding, custom, writing } from "./general";
+import { advisor, assistant, custom, writing } from "./general";
+import { coding } from "./coding";
 import { research } from "./research";
 import type { DomainSpec } from "./types";
 

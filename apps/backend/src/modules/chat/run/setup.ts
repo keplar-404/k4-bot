@@ -48,7 +48,7 @@ export async function saveUserMessage(db: Db, params: ChatRunParams, botId: stri
       role: "user",
       parts: [{ type: "text", text: params.content }, ...files.map((file) => ({ type: "file" as const, file }))],
       runId: params.runId,
-      seq: await nextMessageSeq(db, params.threadId),
+      seq: nextMessageSeq(params.threadId),
     })
     // A retried send reuses the id, so the message is stored once.
     .onConflictDoNothing();

@@ -39,7 +39,8 @@ export async function consumeRun(
       const usage = await message.usage;
       acc.usage.input += usage?.input_tokens ?? 0;
       acc.usage.output += usage?.output_tokens ?? 0;
-      await sink.usage?.({ input: usage?.input_tokens ?? 0, output: usage?.output_tokens ?? 0 });
+      // `cached`: input tokens the provider read from its prompt cache (chat-model.ts cachingFor).
+      await sink.usage?.({ input: usage?.input_tokens ?? 0, output: usage?.output_tokens ?? 0, cached: usage?.input_token_details?.cache_read ?? 0 });
     }
   })();
 

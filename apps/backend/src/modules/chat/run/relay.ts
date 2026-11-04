@@ -30,7 +30,7 @@ export async function appendParts(db: Db, params: ChatRunParams, parts: Part[]) 
       role: "assistant",
       parts,
       runId: params.runId,
-      seq: await nextMessageSeq(db, params.threadId),
+      seq: nextMessageSeq(params.threadId),
     })
     // jsonb array concatenation: the message grows as the run goes on, across slices.
     .onConflictDoUpdate({ target: chatMessage.id, set: { parts: sql`${chatMessage.parts} || excluded.parts` } });

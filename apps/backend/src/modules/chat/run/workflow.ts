@@ -4,7 +4,7 @@ import { parseEnv, type Env } from "../../../config/env";
 import { publishEvent } from "./relay";
 import { loadBot, saveUserMessage } from "./setup";
 import { runSlice } from "./slice";
-import { type ChatRunParams, MAX_SLEEP_MS, type UserInput } from "./types";
+import { type ChatRunParams, MAX_MODEL_RETRIES, MAX_SLEEP_MS, retryDelayMs, type UserInput } from "./types";
 
 export type { ChatRunParams, UserInput } from "./types";
 
@@ -44,6 +44,8 @@ export class ChatRunWorkflow extends WorkflowEntrypoint<Env, ChatRunParams> {
     const attached = await step.do("save-user-message", () => saveUserMessage(createDb(env.DATABASE_URL), params, botRow.id));
 
     let resume: unknown;
+    // Model failures in a row; any slice that gets through resets it.
+    let retries = 0;
     for (let slice = 0; slice < env.MAX_RUN_SLICES; slice++) {
       const result = await step.do(
         `slice-${slice}`,
@@ -51,6 +53,30 @@ export class ChatRunWorkflow extends WorkflowEntrypoint<Env, ChatRunParams> {
         { retries: { limit: 0, delay: 1 }, timeout: "25 minutes" },
         () => runSlice(env, params, botRow, attached, slice, resume),
       );
+      if (result.status === "retry") {
+        // `resume` is kept: an answer or approval the failed slice was carrying is delivered by the retry.
+        retries++;
+        if (retries > MAX_MODEL_RETRIES) {
+          await step.do(`give-up-${slice}`, () =>
+            publishEvent(env, params.threadId, "run.failed", {
+              runId: params.runId,
+              error: `The model failed ${MAX_MODEL_RETRIES} times in a row: ${result.error}`,
+              status: result.httpStatus,
+              reason: result.reason,
+            }),
+          );
+          return;
+        }
+        const ms = retryDelayMs(retries);
+        // The chat drops the text the failed call streamed (never saved) and reloads what was saved.
+        await step.do(`retrying-${slice}`, () =>
+          publishEvent(env, params.threadId, "run.retrying", { runId: params.runId, attempt: retries, maxAttempts: MAX_MODEL_RETRIES, inMs: ms, error: result.error }),
+        );
+        await step.sleep(`retry-wait-${slice}`, ms);
+        // Each slice checks the daily token budget, the thread and the computer's limits again before going on.
+        continue;
+      }
+      retries = 0;
       resume = undefined;
 
       if (result.status === "done" || result.status === "failed") return;
@@ -68,6 +94,7 @@ export class ChatRunWorkflow extends WorkflowEntrypoint<Env, ChatRunParams> {
     await publishEvent(env, params.threadId, "run.failed", {
       runId: params.runId,
       error: "This task reached the maximum length of one run. Ask the bot to continue.",
+      notice: true,
     });
   }
 }

@@ -50,7 +50,7 @@ export async function extract(apiKey: string, params: ExtractParams): Promise<st
     return `## ${r.url}\n${text}`;
   });
   const failed = data.failed_results?.length
-    ? `\n\nCould not read: ${data.failed_results.map((f) => `${f.url} (${f.error})`).join("; ")}. Try extract_depth "advanced" for pages built with JavaScript.`
+    ? `\n\nCould not read: ${data.failed_results.map((f) => `${f.url} (${f.error})`).join("; ")}. These pages may block automated readers; if the computer is available, open them in its browser.`
     : "";
   return (pages.join("\n\n") || "No content extracted.") + failed;
 }

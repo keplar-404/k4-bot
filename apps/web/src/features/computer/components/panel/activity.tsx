@@ -1,22 +1,31 @@
 import type { ActivityEvent } from "@/features/computer/api";
 import { cn } from "@/lib/utils";
 
-/** What the bots did on the computer, newest first; other bots' lines are dimmed. */
+/**
+ * What bots did on the computer, newest first. With `botId` (a bot's page) only that bot's own work is shown;
+ * without it (the computer page) every bot's, each line named after its bot.
+ */
 export function Activity({
   events,
   botId,
+  names,
   className,
 }: {
   events: ActivityEvent[];
-  botId: string;
+  botId?: string;
+  names?: Record<string, string>;
   className?: string;
 }) {
-  const shown = [...events].reverse();
+  const shown = (botId ? events.filter((e) => e.botId === botId) : events)
+    .slice()
+    .reverse();
   return (
     <ol className={cn("flex flex-col gap-1.5 overflow-y-auto", className)}>
       {shown.length === 0 && (
         <li className="text-xs text-muted-foreground">
-          Nothing yet. What your bots do on the computer shows up here.
+          {botId
+            ? "Nothing yet. What this bot does on the computer shows up here."
+            : "Nothing yet. What your bots do on the computer shows up here."}
         </li>
       )}
       {shown.map((e) => (
@@ -28,13 +37,12 @@ export function Activity({
               second: "2-digit",
             })}
           </time>
-          <span
-            className={cn(
-              "min-w-0 break-words",
-              e.botId !== botId && "text-muted-foreground",
+          <span className="min-w-0 break-words">
+            {!botId && (
+              <span className="font-medium">
+                {names?.[e.botId] ?? "A deleted bot"}:{" "}
+              </span>
             )}
-          >
-            {e.botId !== botId && "Another bot: "}
             {e.text}
           </span>
         </li>

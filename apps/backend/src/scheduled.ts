@@ -2,6 +2,8 @@ import { and, lt, sql } from "drizzle-orm";
 import { createDb, type Db } from "./db";
 import { chatEvent } from "./db/schema";
 import { parseEnv, type Env } from "./config/env";
+import { sandboxFor } from "./modules/sandbox/sandbox-backend";
+import { staleRunning } from "./modules/sandbox/store";
 
 /** Live events only matter for resuming a dropped stream; history is in chat_message. */
 const EVENT_RETENTION_DAYS = 7;
@@ -28,9 +30,18 @@ export async function pruneEvents(db: Db, olderThan: Date): Promise<number> {
 /** Cron Trigger (see `triggers.crons` in wrangler.jsonc). */
 export const scheduled: ExportedHandlerScheduledHandler<Env> = async (_controller, env, ctx) => {
   const cutoff = new Date(Date.now() - EVENT_RETENTION_DAYS * 86_400_000);
+  ctx.waitUntil(pauseStaleSandboxes(env));
   ctx.waitUntil(
     pruneEvents(createDb(parseEnv(env).DATABASE_URL), cutoff).then((count) =>
       console.log(`[retention] pruned ${count} chat events older than ${EVENT_RETENTION_DAYS}d`),
     ),
   );
 };
+
+/** Safety net: a sandbox still marked running with no use for twice the idle window (its alarm was lost) is paused. */
+async function pauseStaleSandboxes(env: Env) {
+  const cfg = parseEnv(env);
+  const rows = await staleRunning(createDb(cfg.DATABASE_URL), 2 * cfg.SANDBOX_IDLE_MINUTES * 60_000);
+  await Promise.allSettled(rows.map((r) => sandboxFor(env, r.botId).pauseIfStale(r.userId)));
+  if (rows.length) console.log(`[sandbox] paused ${rows.length} stale sandbox(es)`);
+}

@@ -7,6 +7,7 @@ import type { AuthGuardEnv } from "../../../middleware/auth-guard";
 import { userLimit } from "../../../middleware/rate-limit";
 import { computerFor } from "../../computer/sandbox-backend";
 import { cleanupThreads } from "../../chat/cleanup";
+import { sandboxFor } from "../../sandbox/sandbox-backend";
 import { modelError } from "../../agent/models";
 import { domainFor } from "../../agent/domains";
 import { bot, chatThread } from "../../../db/schema";
@@ -81,6 +82,10 @@ const manage = new Hono<AuthGuardEnv>()
       .where(and(eq(chatThread.botId, id), eq(chatThread.userId, userId)));
     // Stop its runs first, so nothing writes to rows that are about to go.
     await cleanupThreads(db, env, threads.map((t) => t.id));
+    // Its code sandbox goes in E2B too (the table row would go with the bot, the paid machine would not).
+    await sandboxFor(env, id)
+      .destroy(userId)
+      .catch((e: unknown) => console.error("[bots] sandbox cleanup failed", e));
     await db.delete(bot).where(and(eq(bot.id, id), eq(bot.userId, userId)));
     // Its files on the computer. A failure here must not undo the deletion above: its runs are stopped
     // and its threads are gone (every run slice checks its thread still exists), so nothing uses it again.

@@ -1,4 +1,4 @@
-import type { ComputerState as State, ComputerStatus, WorkingBot } from "../types";
+import type { ComputerSettingsInput, ComputerState as State, ComputerStatus, WorkingBot } from "../types";
 import { MIN_WAKE_SECONDS, today } from "./constants";
 import { ComputerState } from "./state";
 
@@ -6,6 +6,16 @@ import { ComputerState } from "./state";
 export class ComputerStatusLayer extends ComputerState {
   protected get wrapMs() {
     return this.cfg.COMPUTER_WRAP_MINUTES * 60_000;
+  }
+
+  /** The user's own idle and session limits; they can only shorten the server's (COMPUTER_IDLE/SESSION_MINUTES). */
+  protected async limits(): Promise<{ idleMinutes: number; sessionMinutes: number }> {
+    const saved = await this.ctx.storage.get<Partial<ComputerSettingsInput>>("settings");
+    const cfg = this.cfg;
+    return {
+      idleMinutes: Math.min(saved?.idleMinutes ?? cfg.COMPUTER_IDLE_MINUTES, cfg.COMPUTER_IDLE_MINUTES),
+      sessionMinutes: Math.min(saved?.sessionMinutes ?? cfg.COMPUTER_SESSION_MINUTES, cfg.COMPUTER_SESSION_MINUTES),
+    };
   }
 
   protected broadcast(message: unknown) {

@@ -22,6 +22,7 @@ export type ChatErrorKind =
   | "rate_limit"
   | "quota"
   | "too_large"
+  | "busy"
   | "server"
   | "timeout"
   | "unknown";

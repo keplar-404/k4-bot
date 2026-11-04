@@ -13,6 +13,11 @@ export function closedText(cause: Closed["cause"]): string {
         "The computer shut down because today's computer time ran out. It cannot be turned on again by anyone until 00:00 UTC. Do NOT ask to turn it on. " +
         "Stop working. Reply with a short final message: what you finished, and that you could not complete the rest because the daily computer time ended."
       );
+    case "reset":
+      return (
+        "The user reset the computer while you were working: it was wiped to a brand-new machine and your files on it are gone. " +
+        "Stop working and do NOT ask to turn it on. Reply with a short final message: say the computer was reset by the user, what you had finished, and that you could not complete the rest."
+      );
     case "session":
       return (
         "The computer went to sleep while you were working (its session or the wrap-up time ended). " +

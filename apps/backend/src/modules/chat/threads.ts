@@ -12,14 +12,16 @@ export async function getOwnedThread(db: Db, threadId: string, userId: string) {
   return thread;
 }
 
-/** Messages are ordered by a per-thread counter, not by clock time. */
-export async function nextMessageSeq(db: Db, threadId: string): Promise<number> {
-  const [row] = await db
-    .select({ max: sql<number>`coalesce(max(${chatMessage.seq}), 0)` })
-    .from(chatMessage)
-    .where(eq(chatMessage.threadId, threadId));
-  return Number(row?.max ?? 0) + 1;
-}
+/**
+ * Messages are ordered by a per-thread counter, not by clock time. The counter is
+ * computed inside the INSERT statement itself, so no read-then-write gap sits
+ * between choosing a number and storing it.
+ */
+export const nextMessageSeq = (threadId: string) =>
+  sql<number>`(select coalesce(max(seq), 0) + 1 from chat_message where thread_id = ${threadId})`;
+
+/** The free router's id; every other free model id ends in ":free". */
+const FREE_ROUTER = "openrouter/free";
 
 const startOfUtcDay = () => {
   const d = new Date();
@@ -34,7 +36,14 @@ export async function tokensUsedToday(db: Db, userId: string): Promise<number> {
       tokens: sql<number>`coalesce(sum(${agentUsage.inputTokens} + ${agentUsage.outputTokens}), 0)`,
     })
     .from(agentUsage)
-    .where(and(eq(agentUsage.userId, userId), gte(agentUsage.createdAt, startOfUtcDay())));
+    .where(
+      and(
+        eq(agentUsage.userId, userId),
+        gte(agentUsage.createdAt, startOfUtcDay()),
+        // Free models do not count against the budget (models.ts isFreeModel).
+        sql`${agentUsage.model} <> ${FREE_ROUTER} and ${agentUsage.model} not like '%:free'`,
+      ),
+    );
   return Number(spend?.tokens ?? 0);
 }
 

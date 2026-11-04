@@ -5,6 +5,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { disconnectMcp, type InstalledMcp } from "@/features/integrations/api";
+import { TestConnectionButton } from "./test-connection-button";
 
 /** The connected apps, each opening its page, with Disconnect (deletes the saved token). */
 export function ConnectedList({
@@ -53,6 +54,7 @@ export function ConnectedList({
                     : "No key needed"}
                 </p>
               </button>
+              <TestConnectionButton id={i.id} name={i.name} compact />
               <Button
                 variant="ghost"
                 size="icon-sm"

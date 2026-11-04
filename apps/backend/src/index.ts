@@ -14,6 +14,9 @@ import type { Env } from "./config/env";
 export { ChatRelayDurableObject } from "./modules/chat/relay";
 export { ChatRunWorkflow } from "./modules/chat/run/workflow";
 export { UserComputerDurableObject } from "./modules/computer/user-computer";
+export { BotSandbox } from "./modules/sandbox";
+export { AsyncTaskRegistry } from "./modules/async-tasks/registry";
+export { AsyncTaskWorkflow } from "./modules/async-tasks/workflow";
 
 // The live view of the computer: token-gated, framed by the web app, and ~60 asset requests per page load.
 // Stored images are shown by the web app (another origin) in <img>: the default same-origin policy would block them.

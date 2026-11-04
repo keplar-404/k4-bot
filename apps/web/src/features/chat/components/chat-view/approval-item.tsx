@@ -9,7 +9,7 @@ import {
   ItemMedia,
   ItemTitle,
 } from "@/components/ui/item";
-import { APPROVAL_LABEL } from "./approval-label";
+import { approvalLabel } from "./approval-label";
 
 export function ApprovalItem({
   actions,
@@ -27,14 +27,7 @@ export function ApprovalItem({
       </ItemMedia>
       <ItemContent>
         <ItemTitle className="break-all">
-          {actions
-            .map(
-              (a) =>
-                APPROVAL_LABEL[a.name] ??
-                `Approve ${a.name}${a.args.file_path ? ` ${String(a.args.file_path)}` : ""}`,
-            )
-            .join(", ")}
-          ?
+          {actions.map(approvalLabel).join(", ")}?
         </ItemTitle>
       </ItemContent>
       <ItemActions>

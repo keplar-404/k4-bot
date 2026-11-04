@@ -66,7 +66,7 @@ export type Core = {
  * the error of any computer tool), so it stops and writes a final message instead of trying again.
  */
 export type Closed = {
-  cause: "user" | "quota" | "session";
+  cause: "user" | "quota" | "session" | "reset";
   at: number;
   bots: Record<string, { name: string; told: boolean }>;
 };

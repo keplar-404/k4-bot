@@ -44,10 +44,11 @@ export function createWebTools(apiKey: string, level: WebLevel) {
     description:
       "Read web pages (up to 20 URLs per call) as markdown, including pages built with JavaScript. " +
       "Extract only the pages you expect to cite. Full pages by default; pass query (+ chunks_per_source) only to pull one fact from a long page. " +
-      "If a page fails or comes back empty, retry it with extract_depth 'advanced'. Say which pages could not be read.",
+      "Uses Tavily's 'advanced' extraction by default (higher success on JavaScript-rendered pages, tables and embedded content). " +
+      "If a page still fails or comes back empty and the computer is available, open it in the computer's browser instead. Say which pages could not be read.",
     schema: z.object({
       urls: z.array(z.url()).min(1).max(20),
-      extract_depth: z.enum(["basic", "advanced"]).default("basic"),
+      extract_depth: z.enum(["basic", "advanced"]).default("advanced"),
       query: z.string().max(400).optional().describe("Return only the passages about this."),
       chunks_per_source: z.number().int().min(1).max(5).optional().describe("Passages per page when query is set."),
     }),
@@ -85,7 +86,7 @@ export function createWebTools(apiKey: string, level: WebLevel) {
       limit: z.number().int().min(1).max(30).default(20),
       select_paths: z.array(z.string().max(200)).max(20).optional(),
       exclude_paths: z.array(z.string().max(200)).max(20).optional(),
-      extract_depth: z.enum(["basic", "advanced"]).default("basic"),
+      extract_depth: z.enum(["basic", "advanced"]).default("advanced"),
     }),
   });
 

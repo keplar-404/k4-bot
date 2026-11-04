@@ -7,6 +7,8 @@ export function filesSection(canSee: boolean, hasComputer: boolean): string {
   return `
 # Files
 - Files the user attaches are listed in their message with a file id.${canSee ? " Attached images are shown to you; open other images with view_image." : ""}
+- read_document reads an attached PDF, text or office file (docx, xlsx, pptx, odt, ods, csv, md, txt, json, html, xml) page by page (scanned pages come back as pictures for you to read). Read it before answering about it, and cite page numbers.
+- read_pdf_advanced (Mistral OCR, paid) is for complex PDFs (scans, tables, math) that read_document flagged; use only when needed.
 - generate_image creates an image (it costs money: one per request unless asked for more).${
     hasComputer
       ? `

@@ -2,6 +2,7 @@ import { mintToken, wsUrl } from "@/features/chat/lib/client";
 import { backoffMs } from "@/features/chat/lib/outbox";
 import { reduceEvent, type WireEvent } from "@/features/chat/lib/stream";
 
+import { notifyFor } from "./notices";
 import type { ChatCtx } from "./types";
 export async function connectImpl(
   ctx: ChatCtx,
@@ -43,6 +44,8 @@ export async function connectImpl(
         void ctx.reload();
       } else if (frame.type === "event" && frame.event) {
         const result = reduceEvent(ctx.streamRef.current, frame.event);
+        // Only a new event (not a replay the reducer skipped) shows its notice.
+        if (result.state !== ctx.streamRef.current) notifyFor(frame.event);
         if (result.effect === "resync") {
           void ctx.reload();
           return;

@@ -23,7 +23,7 @@ export function IntegrationsDialog() {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className="flex h-[min(720px,90dvh)] w-[calc(100%-2rem)] max-w-3xl flex-col gap-4 p-5 sm:max-w-3xl">
         <DialogHeader>
-          <DialogTitle>Skills &amp; MCP servers</DialogTitle>
+          <DialogTitle>Plugins</DialogTitle>
           <DialogDescription>
             Install skills and connect apps here, then choose which ones each
             bot uses in its settings.

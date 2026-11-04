@@ -75,6 +75,9 @@ const browse = new Hono<AuthGuardEnv>()
     const row = await ownedFile(db, c.get("session").user.id, c.req.param("id"));
     if (!row) return c.json({ error: "NOT_FOUND" }, 404);
     await env.FILES!.delete(row.storageKey);
+    // What read_document cached for it (parsed pages, OCR text).
+    const cached = await env.FILES!.list({ prefix: `${row.storageKey}.parsed/` });
+    if (cached.objects.length) await env.FILES!.delete(cached.objects.map((o) => o.key));
     await db.delete(chatFile).where(eq(chatFile.id, row.id));
     return c.json({ ok: true });
   });

@@ -80,6 +80,10 @@ export class ComputerTables {
     this.sql.exec("DELETE FROM activity WHERE rowid <= (SELECT MAX(rowid) FROM activity) - ?", ACTIVITY_KEEP);
   }
 
+  clearActivity() {
+    this.sql.exec("DELETE FROM activity");
+  }
+
   recentActivity(limit = 30): ActivityEvent[] {
     return this.sql
       .exec<{ at: number; botId: string; text: string }>("SELECT at, bot_id AS botId, text FROM activity ORDER BY rowid DESC LIMIT ?", limit)

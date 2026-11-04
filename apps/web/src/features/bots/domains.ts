@@ -5,9 +5,11 @@ import type { RoleId } from "@/features/bots/roles";
 
 const BASE = process.env.NEXT_PUBLIC_AUTH_URL ?? "http://localhost:8787";
 
-/** Hard ceilings, the same as the server's (modules/agent/domains/types.ts). */
-export const MAX_SUBAGENTS = 20;
-export const MAX_PARALLEL_TOOLS = 10;
+/** Hard ceilings: one definition, shared with the server (that file only has type imports, so nothing else is bundled). */
+export {
+  MAX_PARALLEL_TOOLS,
+  MAX_SUBAGENTS,
+} from "@backend/modules/agent/domains/types";
 
 export interface DomainDefaults {
   subagents: boolean;
@@ -36,7 +38,11 @@ export function useDomains(): DomainInfo[] {
   const [domains, setDomains] = useState<DomainInfo[]>([]);
   useEffect(() => {
     cached ??= fetch(`${BASE}/api/v1/bots/domains`, { credentials: "include" })
-      .then((r) => (r.ok ? r.json() : { domains: [] }))
+      .then((r) => {
+        if (r.ok) return r.json();
+        cached = null; // a failed reply must not stick for the whole page load
+        return { domains: [] };
+      })
       .then((b) => (b as { domains?: DomainInfo[] }).domains ?? [])
       .catch(() => {
         cached = null;

@@ -1,4 +1,5 @@
 import { tokensUsedToday } from "../../../chat/threads";
+import { isFreeModel } from "../../models";
 import { Group, LEAD } from "./group";
 import { GROUP_MAX_MS, type SubagentToolsOptions } from "./options";
 import { runGroup } from "./run-group";
@@ -22,7 +23,7 @@ export async function startGroup(o: SubagentToolsOptions, max: number, goal: str
   }
   const groupEnd = Math.min(Date.now() + GROUP_MAX_MS, o.sliceDeadline - 60_000);
   if (groupEnd - Date.now() < 2 * 60_000) return "NOT DONE: too little time is left in this step to run a group. Finish what you have, or continue in your next message.";
-  if ((await tokensUsedToday(o.db, o.userId)) >= o.env.MAX_DAILY_TOKENS_PER_USER) return "NOT DONE: today's token budget is used up. Continue on your own or tell the user.";
+  if (!isFreeModel(o.modelId) && (await tokensUsedToday(o.db, o.userId)) >= o.env.MAX_DAILY_TOKENS_PER_USER) return "NOT DONE: today's token budget is used up. Continue on your own or tell the user.";
 
   const g = new Group(`g${crypto.randomUUID().slice(0, 6)}`, goal, agents.map((a) => a.name));
   g.watcher = toolCallId;

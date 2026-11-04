@@ -40,6 +40,18 @@ export type Owner = { kind: "bot"; id: string } | { kind: "user" };
 
 export type ComputerState = "off" | "starting" | "running" | "paused" | "error";
 
+/** What the user can change about their computer. Each limit can only be shorter than the server's. */
+export const computerSettingsSchema = z.object({
+  idleMinutes: z.number().int().min(1).max(240),
+  sessionMinutes: z.number().int().min(1).max(1440),
+});
+export type ComputerSettingsInput = z.infer<typeof computerSettingsSchema>;
+export interface ComputerSettings extends ComputerSettingsInput {
+  /** The server's ceilings: the page's inputs stop there. */
+  maxIdleMinutes: number;
+  maxSessionMinutes: number;
+}
+
 /** A bot that used the computer in the last few minutes, in a run that has not ended. */
 export interface WorkingBot {
   botId: string;

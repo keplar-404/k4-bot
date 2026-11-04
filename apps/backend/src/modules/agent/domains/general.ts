@@ -26,14 +26,6 @@ export const advisor: DomainSpec = {
   recommended: { skills: ["anthropics/knowledge-work-plugins/product-brainstorming", "obra/superpowers/brainstorming"], apps: ["airtable"] },
 };
 
-export const coding: DomainSpec = {
-  id: "coding",
-  instructions: () =>
-    "Your role: coding assistant. Write, review, debug and explain code. Prefer simple, working solutions; run or test code when you can instead of guessing; show only the relevant code and explain the key decisions briefly.",
-  web: "standard",
-  defaults: { ...standard, maxParallelTools: 6 },
-  recommended: { skills: ["mattpocock/skills/tdd", "obra/superpowers/systematic-debugging", "shadcn-ui/ui/shadcn"], apps: ["shadcn"] },
-};
 
 export const writing: DomainSpec = {
   id: "writing",
