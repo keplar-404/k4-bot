@@ -10,8 +10,6 @@ import { createInterface } from "node:readline";
 import { Command, MemorySaver } from "@langchain/langgraph";
 import { buildAgent } from "./agent";
 import { DEFAULT_MODEL_ID } from "./models";
-import { webAccess } from "./tools/web";
-import { memoryBudgetStore } from "./tools/web/budget";
 import type { Part } from "./parts";
 import { consumeRun, type RunStream } from "./run-stream";
 
@@ -29,12 +27,7 @@ const agent = buildAgent({
   bot: { id: crypto.randomUUID(), name: "CLI", description: null, role: "assistant", roleTitle: null, subagentsEnabled: false, maxSubagents: 5, maxParallelTools: 5 },
   modelId: process.argv[2] ?? DEFAULT_MODEL_ID,
   openrouterApiKey: process.env.OPENROUTER_API_KEY,
-  // Local runs count spend in memory, with small fixed caps.
-  web: webAccess(
-    { TAVILY_API_KEY: process.env.TAVILY_API_KEY, TAVILY_CREDITS_PER_DAY: 300, TAVILY_CREDITS_PER_USER_PER_DAY: 300, TAVILY_CREDITS_PER_RUN: 100, TAVILY_RESEARCH_PER_USER_PER_DAY: 2 },
-    memoryBudgetStore(),
-    { userId: "cli", runId: crypto.randomUUID() },
-  ),
+  web: process.env.TAVILY_API_KEY ? { apiKey: process.env.TAVILY_API_KEY } : undefined,
   checkpointer: new MemorySaver(),
 }) as unknown as { streamEvents(input: unknown, config: object): Promise<RunStream> };
 

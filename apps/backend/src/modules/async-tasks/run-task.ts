@@ -6,9 +6,7 @@ import { chatModelFor } from "../agent/chat-model";
 import { DEFAULT_MODEL_ID } from "../agent/models";
 import { createParallelToolsMiddleware } from "../agent/middleware/parallel-tools";
 import { createToolErrorsMiddleware } from "../agent/middleware/tool-errors";
-import { createDb } from "../../db";
-import { pgBudgetStore } from "../agent/tools/web/budget";
-import { createWebTools, webAccess } from "../agent/tools/web";
+import { createWebTools } from "../agent/tools/web";
 import type { AsyncTaskRegistry } from "./registry";
 
 /** Graph steps and time one background task may take. */
@@ -42,11 +40,9 @@ const inboxMiddleware = (registry: DurableObjectStub<AsyncTaskRegistry>, taskId:
  */
 export async function runTask(env: Env, p: TaskParams, registry: DurableObjectStub<AsyncTaskRegistry>) {
   const { createModel } = chatModelFor({ modelId: p.modelId ?? DEFAULT_MODEL_ID, apiKey: env.OPENROUTER_API_KEY ?? "", maxOutputTokens: env.MAX_OUTPUT_TOKENS });
-  // Its own run scope ("task:<id>"), under the same per-user and app-wide daily caps as the chat.
-  const web = webAccess(env, pgBudgetStore(createDb(env.DATABASE_URL)), { userId: p.userId, runId: `task:${p.taskId}` });
   const agent = createAgent({
     model: createModel(),
-    tools: web ? createWebTools(web) : [],
+    tools: env.TAVILY_API_KEY ? createWebTools({ apiKey: env.TAVILY_API_KEY }) : [],
     middleware: [createToolErrorsMiddleware(), createParallelToolsMiddleware(4), inboxMiddleware(registry, p.taskId), createFilesystemMiddleware({ backend: new StateBackend() })],
     systemPrompt: [
       `You are "${p.agent}", a background sub-agent working for "${p.botName}". Today is ${new Date().toISOString().slice(0, 10)}.`,

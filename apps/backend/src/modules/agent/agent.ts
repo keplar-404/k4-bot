@@ -43,8 +43,8 @@ export function buildAgent(options: BuildAgentOptions) {
           maxParallelTools: bot.maxParallelTools,
           today,
           brief: domain.subagentBrief,
-          // Sub-agents share the lead's guard (one budget per run) but never get tavily_research.
-          webTools: options.web ? createWebTools({ ...options.web, research: false }) : [],
+          // Sub-agents get the web tools but never tavily_research.
+          webTools: options.web ? createWebTools({ apiKey: options.web.apiKey }) : [],
           botApps: options.apps as BotApps | undefined,
           saveFiles: saveGroupFiles,
         })

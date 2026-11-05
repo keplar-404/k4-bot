@@ -8,7 +8,12 @@
  */
 const API = "https://api.tavily.com";
 
-export class TavilyError extends Error {}
+export class TavilyError extends Error {
+  /** The HTTP status Tavily answered with, when there was one (404: unknown research task). */
+  constructor(message: string, readonly status?: number) {
+    super(message);
+  }
+}
 
 /** POST with `body`, or GET when `body` is null (research status). */
 export async function call<T>(apiKey: string, path: string, body: Record<string, unknown> | null, timeoutMs: number): Promise<T> {
@@ -23,7 +28,7 @@ export async function call<T>(apiKey: string, path: string, body: Record<string,
     const detail = typeof data?.detail === "string" ? data.detail : data?.detail?.error;
     // 432/433 are Tavily's plan and usage limits: the model should stop and tell the user, not retry.
     const hint = response.status === 432 || response.status === 433 ? " The web search allowance is used up; tell the user." : "";
-    throw new TavilyError(`Tavily ${path.slice(1)} failed (${response.status}): ${detail ?? "no details"}.${hint}`.slice(0, 300));
+    throw new TavilyError(`Tavily ${path.slice(1)} failed (${response.status}): ${detail ?? "no details"}.${hint}`.slice(0, 300), response.status);
   }
   return data;
 }

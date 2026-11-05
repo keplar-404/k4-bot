@@ -41,6 +41,15 @@ assert.match(
   html("[docs](https://example.com)"),
   /data-streamdown="link"[^>]*>docs<\/button>/,
 );
+// A deep-research citation is a small pill showing the number, still behind the same link check.
+const cited = html("Value fell [[3]](https://example.com/a).");
+assert.match(
+  cited,
+  /data-streamdown="link"[^>]*>3<\/button>/,
+  "pill shows the number",
+);
+assert.match(cited, /class="[^"]*rounded-full[^"]*"/, "styled as a pill");
+assert.ok(!cited.includes("[3]"), "no raw brackets");
 assert.match(
   html("| a | b |\n|---|---|\n| 1 | 2 |"),
   /data-streamdown="table"/,

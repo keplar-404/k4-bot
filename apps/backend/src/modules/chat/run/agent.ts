@@ -4,9 +4,8 @@ import { buildAgent, type BuildAgentOptions } from "../../agent/agent";
 import { NeonHttpCheckpointer } from "../../agent/checkpointer/neon-http-checkpointer";
 import type { RunStream } from "../../agent/run-stream";
 import type { ComputerStub } from "../../computer/sandbox-backend";
-import { pgBudgetStore } from "../../agent/tools/web/budget";
-import { type WebAccess, webAccess } from "../../agent/tools/web";
 import { fileOptions } from "./context";
+import { pgResearchArchive } from "./research-archive";
 import type { ChatRunParams } from "./types";
 
 type Streamable = {
@@ -31,7 +30,7 @@ export function buildRunAgent(
     compact: params.compact,
     openrouterApiKey: env.OPENROUTER_API_KEY,
     freeVisionModel: env.FREE_VISION_MODEL,
-    web: withResearch(webAccess(env, pgBudgetStore(db), { userId: params.userId, runId: params.runId }), params.research),
+    web: webOptions(env, db, params, rest.bot.id),
     maxOutputTokens: env.MAX_OUTPUT_TOKENS,
     checkpointer: new NeonHttpCheckpointer(db),
     ...(stub ? { computer: { stub, runId: params.runId } } : {}),
@@ -41,5 +40,10 @@ export function buildRunAgent(
   }) as unknown as Streamable;
 }
 
-/** tavily_research is offered only in a run the user started with /deep-research. */
-const withResearch = (web: WebAccess | undefined, research?: boolean) => (web ? { ...web, research: Boolean(research) } : undefined);
+/** Tavily tools; in a /deep-research run also tavily_research with its archive (task ids + report files). */
+function webOptions(env: Env, db: Db, params: ChatRunParams, botId: string) {
+  if (!env.TAVILY_API_KEY) return undefined;
+  if (!params.research) return { apiKey: env.TAVILY_API_KEY };
+  const archive = pgResearchArchive({ db, bucket: env.FILES, userId: params.userId, threadId: params.threadId, botId, maxStorageBytes: env.MAX_STORAGE_MB_PER_USER * 1024 * 1024 });
+  return { apiKey: env.TAVILY_API_KEY, research: true, archive };
+}

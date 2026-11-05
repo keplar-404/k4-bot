@@ -47,9 +47,10 @@ apps/backend/src/modules/agent/
   extract `chunks_per_source`). Names match Tavily's own MCP tools, so the Tavily skills (`tavily-ai/skills:
   tavily-search`, `tavily-research`, in the skills catalog) work unchanged. Every bot, sub-agent and background task
   gets all four tools; `tavily_research` (Tavily's research agent, up to 250 credits) exists only in a run the user
-  started with `/deep-research` (chat/commands.ts). Every call passes `WebGuard` (web/guard.ts): it reserves the
-  documented worst-case cost against the app's day, the user's day and the run (research: a daily count instead),
-  atomically in `web_usage`, then settles to Tavily's reported `usage.credits`; identical calls in a run are free. Tool descriptions carry Tavily's best
+  started with `/deep-research` (chat/commands.ts). Research is paid for once per thread and request: the Tavily
+  request id is saved in `research_task` before polling (a retry resumes it), and the finished report is saved as a
+  markdown file (R2 + chat_file) before the model sees it, inline only up to 60,000 characters (below Deep Agents'
+  80,000-character eviction), with its file id so `read_document` can re-read it later (web/research-run.ts).  There are no Tavily-specific spend caps; the model, tool-call and token limits still apply. Tool descriptions carry Tavily's best
   practices (advanced depth, 10 results, one focused query per part, extract before citing). Reference copies of
   Tavily's skills are in `.agents/skills/tavily-*`.
 - **Parallel tools**: ToolNode runs a step's tool calls with Promise.all; the middleware queues beyond the bot's

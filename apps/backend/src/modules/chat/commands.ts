@@ -18,6 +18,7 @@ export function researchInstruction(question: string): string {
     question,
     "Pick model 'mini' for a narrow, well-scoped question and 'pro' for a broad or multi-part one.",
     "When it returns, give the user the report as it came, with its Sources list. Do not run other searches.",
+    "If the report says it continues in a file, give what you received and tell the user the full report is in the attached file.",
     "If it says NOT DONE, tell the user why in one or two sentences.",
   ].join("\n\n");
 }

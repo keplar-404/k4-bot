@@ -1,5 +1,4 @@
 import { call, clip, compact } from "./client";
-import type { Billed } from "./guard";
 
 /** POST /search, as in https://docs.tavily.com/documentation/api-reference/endpoint/search. */
 export interface SearchParams {
@@ -30,7 +29,7 @@ export interface SearchParams {
 
 type Result = { title: string; url: string; content: string; score: number; published_date?: string | null; raw_content?: string | null };
 type Image = string | { url: string; description?: string };
-type SearchResponse = { answer?: string; images?: Image[]; results: Result[]; usage?: { credits?: number } };
+type SearchResponse = { answer?: string; images?: Image[]; results: Result[] };
 
 /** Raw page text per result and overall, when the model asked for it (results are offloaded to files when long). */
 const RAW_PER_RESULT = 6_000;
@@ -38,12 +37,11 @@ const RAW_TOTAL = 40_000;
 
 const imageLine = (i: Image) => (typeof i === "string" ? `- ${i}` : `- ${i.url}${i.description ? ` — ${i.description}` : ""}`);
 
-export async function search(apiKey: string, params: SearchParams): Promise<Billed> {
+export async function search(apiKey: string, params: SearchParams): Promise<string> {
   // include_domains_mode without include_domains is a 400 at Tavily.
-  const body = compact({ ...params, include_domains_mode: params.include_domains?.length ? params.include_domains_mode : undefined, include_usage: true });
+  const body = compact({ ...params, include_domains_mode: params.include_domains?.length ? params.include_domains_mode : undefined });
   const data = await call<SearchResponse>(apiKey, "/search", body, 30_000);
-  const credits = data.usage?.credits;
-  if (!data.results?.length && !data.answer) return { text: `No results for "${params.query}". Try other words, or remove filters.`, credits };
+  if (!data.results?.length && !data.answer) return `No results for "${params.query}". Try other words, or remove filters.`;
 
   let raw = RAW_TOTAL;
   const results = data.results.map((r, i) => {
@@ -58,5 +56,5 @@ export async function search(apiKey: string, params: SearchParams): Promise<Bill
     results.join("\n\n"),
     data.images?.length ? `Images:\n${data.images.map(imageLine).join("\n")}` : "",
   ];
-  return { text: parts.filter(Boolean).join("\n\n"), credits };
+  return parts.filter(Boolean).join("\n\n");
 }
