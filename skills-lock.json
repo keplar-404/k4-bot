@@ -25,6 +25,12 @@
       "skillPath": "skills/cloudflare/SKILL.md",
       "computedHash": "16677254613c400b98dc62a6e46f21d11a38a89dfee54721afc7f213a9ac73e1"
     },
+    "composio": {
+      "source": "ComposioHQ/composio",
+      "sourceType": "github",
+      "skillPath": "skills/composio/SKILL.md",
+      "computedHash": "1f52e312ab582897f9d4011ebf4915085b3a3c4b39d4b98d8eec4e26fa1aed38"
+    },
     "create-auth": {
       "source": "better-auth/skills",
       "sourceType": "github",
@@ -234,6 +240,18 @@
       "sourceType": "github",
       "skillPath": "better-auth/organization/SKILL.md",
       "computedHash": "8c85e683dabef4532f1e8b67bbed5c453d39e0e3d5aeedd69d16b568f6e6d44f"
+    },
+    "react-flow": {
+      "source": "existential-birds/beagle",
+      "sourceType": "github",
+      "skillPath": "plugins/beagle-react/skills/react-flow/SKILL.md",
+      "computedHash": "24daea215037828ec60608bf5952cd24ed55ff5512d65fc1d636bd0c0b188c5a"
+    },
+    "reactflow-expert": {
+      "source": "curiositech/windags-skills",
+      "sourceType": "github",
+      "skillPath": "skills/reactflow-expert/SKILL.md",
+      "computedHash": "e00f4730a77fa6619f081a8490677a34b83fdf708eac6c59a9a54c7db6670508"
     },
     "shadcn": {
       "source": "shadcn/ui",

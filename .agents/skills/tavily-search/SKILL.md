@@ -1,10 +1,11 @@
 ---
 name: tavily-search
-description: |
-  Use this skill whenever a task needs the web: searching for information, checking current facts or news, finding sources, reading a URL, finding a page on a site, or collecting many pages from a site. Use it for anything past your training data or anything the user wants verified online.
-allowed-tools: Bash(tvly *)
+description: >
+  Use this skill whenever a task needs the web: searching for information,
+  checking current facts or news, finding sources, reading a URL, finding a page
+  on a site, or collecting many pages from a site. Use it for anything past your
+  training data or anything the user wants verified online.
 ---
-
 # Tavily search
 
 Use the `tavily_search`, `tavily_extract`, `tavily_map` and `tavily_crawl` tools if your tool list has them

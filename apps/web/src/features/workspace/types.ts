@@ -24,6 +24,8 @@ export interface WorkspaceApi {
   /** Whether the right side bar is shown (a panel on wide screens, a sheet on narrow ones). */
   sidebarOpen: boolean;
   setSidebarOpen: (open: boolean) => void;
+  /** Sets the side bar state without writing to storage (used for auto-init on load). */
+  setSidebarOpenState: (open: boolean) => void;
   /** The full-page code editor over this bot's sandbox (not remembered: it wakes the sandbox). */
   editorOpen: boolean;
   setEditorOpen: (open: boolean) => void;

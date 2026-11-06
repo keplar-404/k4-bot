@@ -1,6 +1,8 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
+/* React Flow styles in the base layer so Tailwind utilities can override them (see reactflow.dev theming docs). */
+@import "@xyflow/react/dist/style.css" layer(base);
 
 /* Lets Tailwind generate the utility classes Streamdown (markdown) uses. */
 @source "../../node_modules/streamdown/dist/*.js";

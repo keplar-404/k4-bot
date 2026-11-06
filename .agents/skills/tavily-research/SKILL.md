@@ -1,10 +1,14 @@
 ---
 name: tavily-research
-description: |
-  Research a topic in depth with Tavily. Use this skill when a question needs many sources gathered and weighed together: analysing a market, policy, technology or trend, comparing options across several criteria, reviewing the literature, or any request to research, investigate or analyze something in depth. A single fact or answer to find, even one with many clues, is a tavily-search task. For one CRM record use tavily-entity, for a table of matches use tavily-list, and for a recurring check use tavily-monitor.
-allowed-tools: Bash(tvly *)
+description: >
+  Research a topic in depth with Tavily. Use this skill when a question needs
+  many sources gathered and weighed together: analysing a market, policy,
+  technology or trend, comparing options across several criteria, reviewing the
+  literature, or any request to research, investigate or analyze something in
+  depth. A single fact or answer to find, even one with many clues, is a
+  tavily-search task. For one CRM record use tavily-entity, for a table of
+  matches use tavily-list, and for a recurring check use tavily-monitor.
 ---
-
 # Tavily research
 
 Use this when the answer has to be built from many sources. A single fact or

@@ -102,3 +102,28 @@ export function saveState(botId: string, s: WorkspaceState) {
     // private mode or full storage: the tabs are simply not remembered
   }
 }
+
+const SIDEBAR_KEY = "k4.sidebarOpen";
+
+/** The right side bar's saved open/closed choice in this browser (it starts open). */
+export function readSidebarOpen(): boolean {
+  try {
+    const saved = localStorage.getItem(SIDEBAR_KEY);
+    if (saved === null) {
+      localStorage.setItem(SIDEBAR_KEY, "true"); // the first visit starts open
+      return true;
+    }
+    return saved !== "false";
+  } catch {
+    return true; // private mode or full storage: it just starts open
+  }
+}
+
+/** Keeps the right side bar's open/closed choice for the next visit. */
+export function saveSidebarOpen(open: boolean) {
+  try {
+    localStorage.setItem(SIDEBAR_KEY, String(open));
+  } catch {
+    // private mode or full storage: the choice is simply not remembered
+  }
+}

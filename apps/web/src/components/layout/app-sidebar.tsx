@@ -7,6 +7,7 @@ import {
   MonitorIcon,
   PuzzleIcon,
   UserIcon,
+  WorkflowIcon,
 } from "lucide-react";
 import type * as React from "react";
 import { NavMain } from "@/components/layout/nav-main";
@@ -36,6 +37,7 @@ const navItems = [
   },
   { title: "VM machine", url: "/dashboard/vm", icon: <MonitorIcon /> },
   { title: "Files", url: "/dashboard/files", icon: <FolderOpenIcon /> },
+  { title: "Workflow", url: "/dashboard/workflow", icon: <WorkflowIcon /> },
   { title: "Sandboxes", url: "/dashboard/sandboxes", icon: <MonitorIcon /> },
   { title: "Avatar", url: "/dashboard/avatar", icon: <UserIcon /> },
 ];

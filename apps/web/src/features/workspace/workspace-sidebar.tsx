@@ -3,6 +3,7 @@
 import {
   type ReactNode,
   useEffect,
+  useRef,
   useState,
   useSyncExternalStore,
 } from "react";
@@ -21,6 +22,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useWorkspace } from "./use-workspace";
 import { WorkspacePanels } from "./workspace-panels";
+import { readSidebarOpen } from "./workspace-state";
 
 const WIDE = "(min-width: 1024px)";
 
@@ -38,8 +40,9 @@ function useWide() {
 
 /**
  * The chat and its right side bar. On wide screens the side bar is a resizable panel (drag the divider; it keeps
- * between 320px and 60% of the width, and the chat keeps at least 360px) that the header button hides and shows.
- * On narrow ones the same tabs open in a sheet from a button.
+ * between 320px and 60% of the width, and the chat keeps at least 360px) that the header button hides and shows;
+ * its open/closed choice is kept in this browser, so a reload starts it the same way. On narrow ones the same
+ * tabs open in a sheet from a button.
  */
 export function WorkspaceSidebar({
   botId,
@@ -50,10 +53,30 @@ export function WorkspaceSidebar({
 }) {
   const wide = useWide();
   const panel = usePanelRef();
-  const { sidebarOpen, setSidebarOpen } = useWorkspace();
+  const { sidebarOpen, setSidebarOpen, setSidebarOpenState } = useWorkspace();
 
-  // Shown on wide screens, hidden on narrow ones (where it is a sheet) until the header button asks for it.
-  useEffect(() => setSidebarOpen(wide), [wide, setSidebarOpen]);
+  // Ignore resizes that happen during the initial mount/layout, so a reload does not overwrite the saved choice.
+  const mountTime = useRef(Date.now());
+
+  // Wide screens start from the side bar's saved choice; narrow ones (where it is a sheet) keep it hidden until the
+  // header button asks for it, and resizing across the breakpoint shows or hides it as before. The query is read
+  // directly rather than through `wide`, because the hydrated first render always reports the server's `false`.
+  const prevWide = useRef<boolean | undefined>(undefined);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: wide only re-fires the effect; the value comes from the query
+  useEffect(() => {
+    const realWide = window.matchMedia(WIDE).matches;
+    if (prevWide.current === undefined) {
+      prevWide.current = realWide;
+      if (realWide) setSidebarOpen(readSidebarOpen());
+      else setSidebarOpenState(false); // narrow: closed on load, without clobbering the saved choice
+      return;
+    }
+    if (prevWide.current !== realWide) {
+      prevWide.current = realWide;
+      if (realWide) setSidebarOpen(readSidebarOpen());
+      else setSidebarOpenState(false);
+    }
+  }, [wide, setSidebarOpen]);
 
   // The header button drives the panel. The slide class goes on first and the resize happens two frames later, so the
   // browser sees a change to animate (the same 200ms linear slide as the app side bar). A drag never slides: a
@@ -95,12 +118,19 @@ export function WorkspaceSidebar({
           id="workspace"
           aria-label="Workspace"
           panelRef={panel}
-          defaultSize={480}
+          // A panel is born collapsed when the saved choice was closed, so a reload shows it that way at once
+          // (opening it later expands to minSize; every open after that returns to the last dragged size).
+          defaultSize={sidebarOpen ? 480 : 0}
           minSize={320}
           maxSize="60%"
           collapsible
           collapsedSize={0}
-          onResize={() => setSidebarOpen(!panel.current?.isCollapsed())}
+          onResize={() => {
+            if (Date.now() - mountTime.current < 200) return;
+            const collapsed = panel.current?.isCollapsed();
+            if (collapsed === undefined) return;
+            setSidebarOpen(!collapsed);
+          }}
           className={cn("flex flex-col overflow-hidden", slide)}
         >
           <div className="flex h-full min-w-80 flex-1 flex-col">

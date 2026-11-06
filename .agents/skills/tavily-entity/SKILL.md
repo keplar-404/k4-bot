@@ -1,10 +1,14 @@
 ---
 name: tavily-entity
-description: |
-  Fill in a company, person, or organization for a CRM from the web, using Tavily, including a CSV of rows the user already has. Identifies the right entity when others share the name, then fills the fields from authoritative sources. Use when the user wants to enrich an account, a spreadsheet, or a pasted list of known names, or says "enrich", "CRM", or "who is". For discovering matches use tavily-list. For a deep comprehensive report use tavily-research.
-allowed-tools: Bash(tvly *)
+description: >
+  Fill in a company, person, or organization for a CRM from the web, using
+  Tavily, including a CSV of rows the user already has. Identifies the right
+  entity when others share the name, then fills the fields from authoritative
+  sources. Use when the user wants to enrich an account, a spreadsheet, or a
+  pasted list of known names, or says "enrich", "CRM", or "who is". For
+  discovering matches use tavily-list. For a deep comprehensive report use
+  tavily-research.
 ---
-
 # Tavily entity
 
 Resolve one entity and return a CRM record. The name is not the identity.

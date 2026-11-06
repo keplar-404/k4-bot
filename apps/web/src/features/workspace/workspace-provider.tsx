@@ -1,6 +1,12 @@
 "use client";
 
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import type { WorkspaceApi, WorkspaceFile } from "./types";
 import { WorkspaceContext } from "./use-workspace";
 import {
@@ -9,7 +15,9 @@ import {
   INITIAL,
   newStart,
   pickTool,
+  readSidebarOpen,
   restoreState,
+  saveSidebarOpen,
   saveState,
 } from "./workspace-state";
 
@@ -23,7 +31,13 @@ export function WorkspaceProvider({
 }) {
   const [state, setState] = useState(INITIAL);
   const [editorOpen, setEditorOpen] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpenState] = useState<boolean>(() => readSidebarOpen());
+
+  /** Every open/close of the right side bar is kept in this browser, so a reload starts it the same way. */
+  const setSidebarOpen = useCallback((open: boolean) => {
+    setSidebarOpenState(open);
+    saveSidebarOpen(open);
+  }, []);
 
   useEffect(() => setState(restoreState(botId)), [botId]);
   useEffect(() => saveState(botId, state), [botId, state]);
@@ -31,7 +45,8 @@ export function WorkspaceProvider({
   const api = useMemo<WorkspaceApi>(
     () => ({
       ...state,
-      open: (file: WorkspaceFile) =>
+      open: (file: WorkspaceFile) => {
+        setSidebarOpen(true);
         setState((s) =>
           addTab(s, {
             id: file.id,
@@ -39,7 +54,8 @@ export function WorkspaceProvider({
             title: file.name,
             file: { id: file.id, name: file.name, mimeType: file.mimeType },
           }),
-        ),
+        );
+      },
       openUrl: (url: string) =>
         setState((s) =>
           addTab(s, {
@@ -56,10 +72,11 @@ export function WorkspaceProvider({
       setActive: (activeId: string) => setState((s) => ({ ...s, activeId })),
       sidebarOpen,
       setSidebarOpen,
+      setSidebarOpenState,
       editorOpen,
       setEditorOpen,
     }),
-    [state, editorOpen, sidebarOpen],
+    [state, editorOpen, sidebarOpen, setSidebarOpen, setSidebarOpenState],
   );
 
   return (
