@@ -27,4 +27,6 @@ export type PromptBarProps = {
   modelKey?: string;
   effort?: string | null;
   onSelect?: (modelKey: string, effort: string | null) => void;
+  mode?: "allow_all" | "plan" | "ask";
+  onModeChange?: (mode: "allow_all" | "plan" | "ask") => void;
 };

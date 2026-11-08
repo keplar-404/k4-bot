@@ -2,6 +2,7 @@ import { GraphRecursionError } from "@langchain/langgraph";
 import { createDb } from "../../../db";
 import type { Env } from "../../../config/env";
 import type { AgentBot } from "../../agent/agent";
+import { loadBotComposioApps } from "../../agent/composio/bot-apps";
 import { connectBotApps, type BotApps } from "../../agent/mcp";
 import { contextLengthOf } from "../../agent/model-context";
 import { DEFAULT_MODEL_ID, isFreeModel } from "../../agent/models";
@@ -10,6 +11,7 @@ import { consumeRun } from "../../agent/run-stream";
 import { collectUnfinished, GroupHub } from "../../agent/tools/subagents";
 import { loadBotSkills } from "../../integrations/skills";
 import { loadMemory, saveBotMemory, savePreferences } from "../../memory/store";
+import { isMode } from "../modes";
 import { getOwnedThread, tokensUsedToday } from "../threads";
 import { buildRunAgent } from "./agent";
 import { attachedImages, peersOf, subagentContext } from "./context";
@@ -59,7 +61,9 @@ export async function runSlice(env: Env, params: ChatRunParams, botRow: AgentBot
 
   try {
     // The bot was deleted while this run waited or slept: stop quietly (there is no chat left to tell).
-    if (!(await getOwnedThread(db, threadId, userId))) return { status: "failed" };
+    const ownedThread = await getOwnedThread(db, threadId, userId);
+    if (!ownedThread) return { status: "failed" };
+    const mode = isMode(ownedThread.mode) ? ownedThread.mode : "ask";
     // Stop was pressed between two slices: end here without calling the model.
     if (await stopRequested(env, threadId, runId).catch(() => false)) {
       await publish("run.stopped", { messageId: `${runId}:assistant` });
@@ -80,6 +84,7 @@ export async function runSlice(env: Env, params: ChatRunParams, botRow: AgentBot
     // The bot's skills (read from R2) and connected apps (MCP servers; tokens decrypted here, for this slice only).
     const skills = env.FILES ? await loadBotSkills(env.FILES, db, userId, botRow.id) : {};
     apps = await connectBotApps(env, db, userId, botRow.id);
+    const composioApps = await loadBotComposioApps(db, botRow.id);
     const progress = new Map<string, SubagentStatus[]>();
     const subagents = botRow.subagentsEnabled ? await subagentContext(env, db, params, { publish, hub, sliceDeadline, progress }) : undefined;
     // The model's real context window: sizes the automatic summary and the chat's context meter.
@@ -90,7 +95,7 @@ export async function runSlice(env: Env, params: ChatRunParams, botRow: AgentBot
       saveMemory: async (content: string) => void (await saveBotMemory(db, userId, botRow.id, content)),
       savePreferences: (content: string) => savePreferences(db, userId, content),
     };
-    const agent = buildRunAgent(env, db, params, { bot: botRow, skills, apps, subagents, peers, stub, images, contextLength, memory });
+    const agent = buildRunAgent(env, db, params, { bot: botRow, skills, apps, subagents, peers, stub, images, contextLength, memory, mode, account: { env, db, userId, apps: composioApps } });
 
     // A retried slice may carry an answer the failed one already used: only send it while the agent still waits for it.
     if (resume !== undefined && slice > 0) {

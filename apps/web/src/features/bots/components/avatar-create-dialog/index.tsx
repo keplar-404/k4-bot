@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import type { Bot, CreateBotInput } from "@/features/bots/api";
 import { ActionsSection } from "./actions-section";
+import { AppsSection } from "./apps-section";
 import { AvatarSection } from "./avatar-section";
 import { CapabilitiesSection } from "./capabilities-section";
 import { DescriptionSection } from "./description-section";
@@ -57,6 +58,7 @@ export function AvatarCreateDialog({
           <AvatarSection form={form} />
           <IdentitySection form={form} />
           <IntegrationsSection form={form} />
+          <AppsSection form={form} />
           <CapabilitiesSection form={form} />
           <DescriptionSection form={form} />
           <ActionsSection form={form} />

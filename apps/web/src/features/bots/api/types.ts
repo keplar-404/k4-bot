@@ -13,6 +13,12 @@ export type Bot = {
   /** Installed skills (user_skill ids) and connected apps (user_mcp_server ids) the bot uses. */
   skillIds?: string[];
   mcpServerIds?: string[];
+  /** Composio apps this bot may use: toolkits (and optional connected account + write flag). */
+  composioApps?: {
+    toolkit: string;
+    connectedAccountId?: string;
+    allowWrites?: boolean;
+  }[];
   /** Capabilities: sub-agent groups and parallel tool calls. */
   subagentsEnabled?: boolean;
   maxSubagents?: number;
@@ -39,6 +45,11 @@ export type CreateBotInput = {
   roleTitle?: string;
   skillIds?: string[];
   mcpServerIds?: string[];
+  composioApps?: {
+    toolkit: string;
+    connectedAccountId?: string;
+    allowWrites?: boolean;
+  }[];
   subagentsEnabled?: boolean;
   maxSubagents?: number;
   maxParallelTools?: number;

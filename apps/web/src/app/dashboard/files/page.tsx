@@ -2,6 +2,7 @@
 
 import { Loader2Icon } from "lucide-react";
 import { useState } from "react";
+import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { DeleteFileDialog } from "@/features/files/components/library/delete-file-dialog";
 import {
@@ -32,43 +33,46 @@ export default function FilesPage() {
     filter === "all" ? files : files.filter((f) => f.source === filter);
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
-      <header className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold">Files</h1>
-        <p className="max-w-prose text-sm text-muted-foreground">
-          What you attached in chats, images your bots created, and files they
-          shared from the computer. These are saved copies: they download any
-          time, even while the computer is asleep.
-        </p>
-      </header>
+    <>
+      <PageHeader title="Files" />
+      <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
+        <header className="flex flex-col gap-1">
+          <h1 className="text-2xl font-semibold">Files</h1>
+          <p className="max-w-prose text-sm text-muted-foreground">
+            What you attached in chats, images your bots created, and files they
+            shared from the computer. These are saved copies: they download any
+            time, even while the computer is asleep.
+          </p>
+        </header>
 
-      <FilterTabs filter={filter} onChange={setFilter} />
+        <FilterTabs filter={filter} onChange={setFilter} />
 
-      <LibraryGrid
-        loading={loading}
-        shown={shown}
-        filtered={filter !== "all"}
-        onDelete={setDeleting}
-      />
+        <LibraryGrid
+          loading={loading}
+          shown={shown}
+          filtered={filter !== "all"}
+          onDelete={setDeleting}
+        />
 
-      {cursor && !loading && (
-        <Button
-          variant="outline"
-          className="self-center"
-          disabled={more}
-          onClick={loadMore}
-        >
-          {more && <Loader2Icon className="animate-spin" />}
-          Load more
-        </Button>
-      )}
+        {cursor && !loading && (
+          <Button
+            variant="outline"
+            className="self-center"
+            disabled={more}
+            onClick={loadMore}
+          >
+            {more && <Loader2Icon className="animate-spin" />}
+            Load more
+          </Button>
+        )}
 
-      <DeleteFileDialog
-        file={deleting}
-        busy={busy}
-        onCancel={() => setDeleting(null)}
-        onConfirm={() => void confirmDelete()}
-      />
-    </div>
+        <DeleteFileDialog
+          file={deleting}
+          busy={busy}
+          onCancel={() => setDeleting(null)}
+          onConfirm={() => void confirmDelete()}
+        />
+      </div>
+    </>
   );
 }

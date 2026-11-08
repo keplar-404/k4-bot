@@ -63,6 +63,17 @@ export function useBotFormEffects(args: {
     state.setRoleTitle(state.bot?.roleTitle ?? "");
     state.setSkillIds(state.bot?.skillIds ?? []);
     state.setMcpServerIds(state.bot?.mcpServerIds ?? []);
+    state.setComposioToolkits(
+      state.bot?.composioApps?.map((a) => a.toolkit) ?? [],
+    );
+    state.setComposioAllowWrites(
+      Object.fromEntries(
+        (state.bot?.composioApps ?? []).map((a) => [
+          a.toolkit,
+          a.allowWrites ?? true,
+        ]),
+      ),
+    );
     state.setShape((state.bot?.shape as ShapeId) ?? state.SHAPES[0].id);
     state.setColor((state.bot?.color as ColorId) ?? "encre");
     state.setExpression("neutre");

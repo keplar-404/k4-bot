@@ -3,6 +3,8 @@ import { useEffect } from "react";
 import { ComposerShell } from "./composer-shell";
 import { EffortMenu } from "./effort-menu";
 import { Icon } from "./icons";
+import { ModeMenu } from "./mode-menu";
+import { useModeState } from "./mode-state";
 import { ModelMenu } from "./model-menu";
 import { PlusMenu } from "./plus-menu";
 import { usePromptEffects } from "./prompt-effects";
@@ -18,6 +20,8 @@ export default function PromptBar({
   modelKey,
   effort = null,
   onSelect,
+  mode,
+  onModeChange,
   attachments = [],
   onAttach,
   onRemoveAttachment,
@@ -37,8 +41,11 @@ export default function PromptBar({
   modelKey?: string;
   effort?: string | null;
   onSelect?: (modelKey: string, effort: string | null) => void;
+  mode?: "allow_all" | "plan" | "ask";
+  onModeChange?: (mode: "allow_all" | "plan" | "ask") => void;
 }) {
   const state = usePromptState();
+  const modeState = useModeState();
   const props = {
     placeholder,
     onSend,
@@ -46,6 +53,8 @@ export default function PromptBar({
     modelKey,
     effort,
     onSelect,
+    mode,
+    onModeChange,
     attachments,
     onAttach,
     onRemoveAttachment,
@@ -55,7 +64,7 @@ export default function PromptBar({
   };
   const h = usePromptHandlers(state, props);
   const h2 = usePromptHandlers2(state, props, h);
-  const merged = { ...h, ...h2 };
+  const merged = { ...h, ...h2, ...modeState, mode, onModeChange };
   usePromptEffects(state, merged);
   usePromptEffects2(state, merged);
   const takeFiles = merged.takeFiles;
@@ -97,6 +106,7 @@ export default function PromptBar({
         <PlusMenu state={state} h={merged} props={props} />
         <ModelMenu state={state} h={merged} />
         <EffortMenu state={state} h={merged} />
+        <ModeMenu state={state} modeState={modeState} h={merged} />
         <ComposerShell state={state} props={props} h={merged} />
       </div>
     </div>

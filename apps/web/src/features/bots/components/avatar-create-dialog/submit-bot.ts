@@ -12,6 +12,11 @@ export interface SubmitDeps {
   roleTitle: string;
   skillIds: string[];
   mcpServerIds: string[];
+  composioApps?: {
+    toolkit: string;
+    connectedAccountId?: string;
+    allowWrites?: boolean;
+  }[];
   caps: Capabilities;
   shape: ShapeId;
   color: ColorId;
@@ -39,6 +44,7 @@ export async function submitBot(deps: SubmitDeps): Promise<void> {
       ...(deps.role === "custom" ? { roleTitle: deps.roleTitle.trim() } : {}),
       skillIds: deps.skillIds,
       mcpServerIds: deps.mcpServerIds,
+      composioApps: deps.composioApps,
       ...deps.caps,
       shape: deps.shape,
       color: deps.color,

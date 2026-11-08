@@ -20,6 +20,7 @@ export function handleRunEvent(
           runId,
           kind: String(payload.kind ?? "info"),
           question: String(payload.question ?? "The bot needs your input."),
+          ...optionalText(payload),
         },
       };
     case "run.sleeping":
@@ -110,4 +111,14 @@ export function handleRunEvent(
     default:
       return state;
   }
+}
+
+/** The prompt's optional text fields (mode switch, secret form), only the ones the server sent. */
+const PROMPT_TEXT = ["to", "reason", "plan", "name", "label", "why"] as const;
+function optionalText(payload: Record<string, unknown>) {
+  const fields: Partial<Record<(typeof PROMPT_TEXT)[number], string>> = {};
+  for (const key of PROMPT_TEXT) {
+    if (typeof payload[key] === "string") fields[key] = payload[key];
+  }
+  return fields;
 }

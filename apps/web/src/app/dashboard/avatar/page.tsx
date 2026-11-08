@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { PageHeader } from "@/components/layout/page-header";
 import { DEFAULT_EXPRESSION } from "@/features/avatar/bloub/bot/expressions";
 import {
   DEFAULT_COLOR,
@@ -44,19 +45,22 @@ export default function AvatarPage() {
   }, [value, loaded]);
 
   return (
-    <div className="flex flex-1 flex-col gap-4 p-4 pt-0 lg:flex-row">
-      <div className="flex items-center justify-center lg:w-2/3">
-        <BloubAvatar
-          size={320}
-          shape={value.shape}
-          color={value.color}
-          expression={value.expression}
-          animated
-        />
+    <>
+      <PageHeader title="Avatar" />
+      <div className="flex flex-1 flex-col gap-4 p-4 lg:flex-row">
+        <div className="flex items-center justify-center lg:w-2/3">
+          <BloubAvatar
+            size={320}
+            shape={value.shape}
+            color={value.color}
+            expression={value.expression}
+            animated
+          />
+        </div>
+        <div className="lg:w-1/3">
+          <BloubCustomizer value={value} onChange={setValue} />
+        </div>
       </div>
-      <div className="lg:w-1/3">
-        <BloubCustomizer value={value} onChange={setValue} />
-      </div>
-    </div>
+    </>
   );
 }

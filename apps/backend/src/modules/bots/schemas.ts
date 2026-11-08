@@ -17,6 +17,17 @@ export const createBotSchema = z
   skillIds: z.array(z.string().min(1).max(64)).max(50).optional(),
   /** Connected apps (user_mcp_server ids) the bot may use. Omitted = unchanged. */
   mcpServerIds: z.array(z.string().min(1).max(64)).max(20).optional(),
+  /** Composio apps (toolkits) the bot may use. Omitted = unchanged. */
+  composioApps: z
+    .array(
+      z.object({
+        toolkit: z.string().regex(/^[a-z0-9][a-z0-9_-]{0,63}$/),
+        connectedAccountId: z.string().min(1).max(64).optional(),
+        allowWrites: z.boolean().optional(),
+      }),
+    )
+    .max(30)
+    .optional(),
   /** Capabilities. Omitted on create = the role's defaults; omitted on edit = unchanged. */
   subagentsEnabled: z.boolean().optional(),
   maxSubagents: z.number().int().min(1).max(MAX_SUBAGENTS).optional(),

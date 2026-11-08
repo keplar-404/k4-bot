@@ -17,6 +17,10 @@ export function useBotFormFields() {
   const [roleTitle, setRoleTitle] = useState("");
   const [skillIds, setSkillIds] = useState<string[]>([]);
   const [mcpServerIds, setMcpServerIds] = useState<string[]>([]);
+  const [composioToolkits, setComposioToolkits] = useState<string[]>([]);
+  const [composioAllowWrites, setComposioAllowWrites] = useState<
+    Record<string, boolean>
+  >({});
   const [shape, setShape] = useState<ShapeId>(SHAPES[0].id);
   const [color, setColor] = useState<ColorId>("encre");
   const [expression, setExpression] = useState<ExpressionId>("neutre");
@@ -33,6 +37,10 @@ export function useBotFormFields() {
     setSkillIds,
     mcpServerIds,
     setMcpServerIds,
+    composioToolkits,
+    setComposioToolkits,
+    composioAllowWrites,
+    setComposioAllowWrites,
     shape,
     setShape,
     color,

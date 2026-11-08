@@ -8,3 +8,7 @@ export * from "./relations";
 export * from "./memory";
 export * from "./sandbox";
 export * from "./research";
+export * from "./secret";
+export * from "./composio";
+export * from "./workflow";
+export * from "./bot-workflow";

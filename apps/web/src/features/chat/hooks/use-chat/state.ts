@@ -35,6 +35,7 @@ export function useChatState() {
   const [models, setModels] = useState<ModelRow[]>([]);
   const [modelId, setModelId] = useState<string | undefined>(undefined);
   const [reasoningEffort, setReasoningEffort] = useState<string | null>(null);
+  const [mode, setMode] = useState<"allow_all" | "plan" | "ask">("ask");
   const modelIdRef = useRef<string | undefined>(undefined);
   const reasoningEffortRef = useRef<string | undefined>(undefined);
   const streamRef = useRef<StreamState>(initialStreamState());
@@ -83,6 +84,8 @@ export function useChatState() {
     setModelId,
     reasoningEffort,
     setReasoningEffort,
+    mode,
+    setMode,
     modelIdRef,
     reasoningEffortRef,
     streamRef,

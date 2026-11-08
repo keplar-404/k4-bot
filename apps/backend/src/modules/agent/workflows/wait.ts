@@ -1,0 +1,22 @@
+import type { Db } from "../../../db";
+import { getRun } from "../../workflows/store/runs";
+import { asText } from "./common";
+
+const WAIT_MS = 45_000;
+const POLL_MS = 1_500;
+
+/** Waits up to WAIT_MS for a run to end, then reports how it went (or that it is still going). */
+export async function waitForRun(db: Db, userId: string, runId: string) {
+  for (let waited = 0; waited < WAIT_MS; waited += POLL_MS) {
+    await new Promise((resolve) => setTimeout(resolve, POLL_MS));
+    const run = await getRun(db, userId, runId);
+    if (!run || run.status === "queued" || run.status === "running") continue;
+
+    const lastOutputs = run.steps
+      .filter((s) => s.status === "succeeded")
+      .slice(-3)
+      .map((s) => ({ nodeId: s.nodeId, output: s.output }));
+    return asText({ runId, status: run.status, error: run.error, failedNodeId: run.failedNodeId, lastOutputs }, 8_000);
+  }
+  return asText({ runId, status: "running", note: "Still going. Check later with workflow_run_status." });
+}

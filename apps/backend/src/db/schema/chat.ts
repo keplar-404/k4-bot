@@ -24,6 +24,8 @@ export const chatThread = pgTable(
     title: text("title").notNull().default("New chat"),
     /** Tokens of the latest model call: how full the context window is (the chat's context meter). */
     contextTokens: integer("context_tokens").notNull().default(0),
+    /** Permission mode for this chat: allow_all | plan | ask. */
+    mode: text("mode").notNull().default("ask"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()

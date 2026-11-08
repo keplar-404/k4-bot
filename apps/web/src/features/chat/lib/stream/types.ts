@@ -18,6 +18,13 @@ export interface Prompt {
   runId: string;
   kind: string;
   question: string;
+  to?: string;
+  reason?: string;
+  plan?: string;
+  /** request_secret: the secret's name, what it is, and why the bot needs it. */
+  name?: string;
+  label?: string;
+  why?: string;
 }
 
 /** The context meter: tokens of the latest model call, and today's tokens against the daily budget. */

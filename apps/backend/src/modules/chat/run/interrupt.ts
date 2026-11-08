@@ -6,7 +6,7 @@ import { MAX_SLEEP_MS, type Publish, type SliceResult } from "./types";
  * goes on. Clients show a question, approval or sleep until told the run went on.
  */
 export async function pauseFor(interrupt: PendingInterrupt, publish: Publish): Promise<SliceResult> {
-  const payload = (interrupt.payload ?? {}) as { actionRequests?: unknown; kind?: string; question?: string; ms?: number; reason?: string };
+  const payload = (interrupt.payload ?? {}) as { actionRequests?: unknown; kind?: string; question?: string; ms?: number; reason?: string; to?: string; plan?: string; name?: string; label?: string; why?: string };
   if (payload.actionRequests) {
     await publish("run.waiting_approval", { actions: payload.actionRequests });
     return { status: "needs_input", kind: "approval" };
@@ -16,6 +16,15 @@ export async function pauseFor(interrupt: PendingInterrupt, publish: Publish): P
     await publish("run.sleeping", { until: Date.now() + ms, reason: payload.reason ?? "" });
     return { status: "sleep", ms };
   }
-  await publish("run.waiting_input", { kind: payload.kind ?? "info", question: payload.question ?? "The bot needs your input." });
+  await publish("run.waiting_input", {
+    kind: payload.kind ?? "info",
+    question: payload.question ?? payload.reason ?? "The bot needs your input.",
+    to: payload.to,
+    reason: payload.reason,
+    plan: payload.plan,
+    name: payload.name,
+    label: payload.label,
+    why: payload.why,
+  });
   return { status: "needs_input", kind: "answer" };
 }

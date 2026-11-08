@@ -1,7 +1,9 @@
 import type { BaseCheckpointSaver } from "@langchain/langgraph-checkpoint";
+import type { ChatMode } from "../chat/modes";
 import type { ComputerStub } from "../computer/sandbox-backend";
 import type { Env } from "../../config/env";
 import type { Db } from "../../db";
+import type { AccountOptions } from "./account-tools";
 import type { BotApps } from "./mcp";
 import type { FileToolsOptions, ViewHolder } from "./tools/files";
 import type { MemoryToolsOptions } from "./tools/memory";
@@ -34,6 +36,8 @@ export interface BuildAgentOptions {
   contextLength?: number;
   /** The user ran /compact: this run summarizes the conversation first, to free context. */
   compact?: boolean;
+  /** Permission mode for this run: allow_all | plan | ask. */
+  mode?: ChatMode;
   /** Hard cap on tokens per model reply. Without it OpenRouter reserves credit for the model maximum (64k+). */
   maxOutputTokens?: number;
   /** With the free router: the free vision model for calls that carry pictures (middleware/free-vision.ts). */
@@ -58,6 +62,10 @@ export interface BuildAgentOptions {
   skills?: Record<string, string>;
   /** Tools of the bot's connected apps (MCP servers) and the ones that need approval, from agent/mcp. */
   apps?: Pick<BotApps, "tools" | "approvals" | "names" | "unavailable" | "readOnly" | "close">;
+  /** Reads the thread's real mode (after a pause the model is told this, never the user's answer text). */
+  readMode?: () => Promise<ChatMode>;
+  /** What tools that act on the user's account need: their Composio apps, workflows and secrets (agent/account-tools). */
+  account?: AccountOptions;
   /** What a sub-agent group may use and how to account for it; required for the sub-agent tools (bots with the capability). */
   subagents?: Pick<
     SubagentToolsOptions,

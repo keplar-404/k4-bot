@@ -32,6 +32,21 @@ export function ComposerActions({
       <div
         className={`flex items-center gap-0.5 ${state.wide ? "col-start-2 row-start-2 justify-self-start" : "col-start-3 row-start-1"}`}
       >
+        <button
+          ref={(state as any).modeRef}
+          type="button"
+          aria-expanded={(state as any).modeOpen}
+          aria-label="Permission mode"
+          onClick={() => {
+            state.setPlusOpen(false);
+            state.setModelOpen(false);
+            state.setEffortOpen(false);
+            (state as any).setModeOpen((c: boolean) => !c);
+          }}
+          className={`flex h-7 shrink-0 items-center gap-1 px-1.5 text-[12px] font-medium transition-colors duration-150 rounded-[8px] ${(state as any).modeOpen ? "bg-hover text-ink" : "text-ink-3 hover:bg-hover hover:text-ink"}`}
+        >
+          {(h as any).mode ?? "ask"}
+        </button>
         {h.efforts.length > 0 && (
           <button
             ref={state.effortRef}

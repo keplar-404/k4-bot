@@ -43,9 +43,18 @@ export async function connectImpl(
       if (frame.type === "resync") {
         void ctx.reload();
       } else if (frame.type === "event" && frame.event) {
-        const result = reduceEvent(ctx.streamRef.current, frame.event);
+        const ev = frame.event;
+        const payload = (
+          ev.payload && typeof ev.payload === "object" ? ev.payload : {}
+        ) as Record<string, unknown>;
+        // Mode changes are thread-level, not part of the stream state.
+        if (ev.type === "thread.mode" && typeof payload.mode === "string") {
+          ctx.setMode(payload.mode as "allow_all" | "plan" | "ask");
+          return;
+        }
+        const result = reduceEvent(ctx.streamRef.current, ev);
         // Only a new event (not a replay the reducer skipped) shows its notice.
-        if (result.state !== ctx.streamRef.current) notifyFor(frame.event);
+        if (result.state !== ctx.streamRef.current) notifyFor(ev);
         if (result.effect === "resync") {
           void ctx.reload();
           return;

@@ -4,10 +4,10 @@ import type { ReactNode } from "react";
 import PromptBar from "@/features/chat/components/prompt-bar";
 import type { useAttachments } from "@/features/chat/hooks/use-attachments";
 import type { FileRef } from "@/features/chat/lib/protocol";
-import type { ChatUsage } from "@/features/chat/lib/stream/types";
-import { AgentQuestion } from "./agent-question";
+import type { ChatUsage, Prompt } from "@/features/chat/lib/stream/types";
 import { ApprovalItem } from "./approval-item";
 import type { toCatalog } from "./catalog";
+import { PausedInput } from "./paused-input";
 import { SleepingItem } from "./sleeping-item";
 import { UsageMeter } from "./usage-meter";
 
@@ -27,6 +27,8 @@ export function Prompts({
   onApprove,
   onReject,
   chooseModel,
+  mode,
+  onModeChange,
   usage,
 }: {
   run: string;
@@ -34,7 +36,7 @@ export function Prompts({
     runId: string;
     actions: { name: string; args: Record<string, unknown> }[];
   } | null;
-  prompt: { runId: string; kind: string; question: string } | null;
+  prompt: Prompt | null;
   sleeping: { until: number; reason: string } | null;
   beforeComposer?: ReactNode;
   attachments: ReturnType<typeof useAttachments>;
@@ -47,6 +49,8 @@ export function Prompts({
   onApprove: () => void;
   onReject: () => void;
   chooseModel: (key: string, effort: string | null) => void;
+  mode?: "allow_all" | "plan" | "ask";
+  onModeChange?: (mode: "allow_all" | "plan" | "ask") => void;
   usage: ChatUsage | null;
 }) {
   return (
@@ -60,12 +64,7 @@ export function Prompts({
       )}
 
       {run === "waiting_input" && prompt && (
-        <AgentQuestion
-          key={prompt.runId}
-          question={prompt.question}
-          kind={prompt.kind}
-          onAnswer={(text) => onAnswer(text)}
-        />
+        <PausedInput prompt={prompt} onAnswer={onAnswer} />
       )}
 
       {run === "sleeping" && sleeping && <SleepingItem sleeping={sleeping} />}
@@ -90,6 +89,8 @@ export function Prompts({
         modelKey={modelId}
         effort={reasoningEffort}
         onSelect={chooseModel}
+        mode={mode}
+        onModeChange={onModeChange}
       />
       <UsageMeter
         usage={usage}

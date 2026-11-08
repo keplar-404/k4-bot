@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback } from "react";
+import { toast } from "sonner";
 import { saveBotModel } from "@/features/bots/api";
+import { request } from "@/features/chat/lib/client/http";
 import { toInfo } from "./helpers";
 import { answerImpl, decideImpl, stopImpl } from "./resume";
 import { scheduleModelSave } from "./save-model";
@@ -46,6 +48,25 @@ export function useChatActionsMeta(
     },
     [botId, select, state],
   );
+  const changeMode = useCallback(
+    async (mode: "allow_all" | "plan" | "ask") => {
+      const tid = state.threadRef.current;
+      const prev = state.mode;
+      state.setMode(mode);
+      // No chat yet: the picked mode is sent with the first message's thread (send.ts), nothing to save now.
+      if (!tid) return;
+      try {
+        await request(`/api/v1/chat/threads/${tid}/mode`, {
+          method: "PUT",
+          body: JSON.stringify({ mode }),
+        });
+      } catch {
+        state.setMode(prev);
+        toast.error("Could not change mode.");
+      }
+    },
+    [state],
+  );
   return {
     decide,
     answer,
@@ -55,5 +76,6 @@ export function useChatActionsMeta(
     reject,
     select,
     chooseModel,
+    changeMode,
   };
 }

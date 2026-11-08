@@ -54,6 +54,7 @@ const history = new Hono<AuthGuardEnv>()
       pending,
       // The context meter as of the last model call (the live stream updates it while a run works).
       usage: { contextTokens: thread.contextTokens, todayUsed, todayLimit: env.MAX_DAILY_TOKENS_PER_USER },
+      mode: thread.mode,
     });
   });
 

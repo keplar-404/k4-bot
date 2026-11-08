@@ -13,6 +13,7 @@ export async function loadHistoryImpl(
     lastSeq,
     pending,
     usage,
+    mode,
   } = await getMessages(threadId);
   const stored = new Set(rows.map((r) => r.id));
 
@@ -28,6 +29,7 @@ export async function loadHistoryImpl(
   }));
   persistOutbox(threadId, ctx.outboxRef.current);
 
+  if (mode) ctx.setMode(mode as "allow_all" | "plan" | "ask");
   ctx.streamRef.current = applyPending(
     initialStreamState(
       [...rowsToViews(rows), ...unsent],

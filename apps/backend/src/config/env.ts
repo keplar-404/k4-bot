@@ -58,7 +58,9 @@ export const envSchema = z.object({
   SANDBOX_IDLE_MINUTES: z.coerce.number().int().positive().default(10),
   SANDBOX_TEMPLATE: z.string().default("base"),
   SANDBOX_MAX_MINUTES_PER_DAY: z.coerce.number().int().positive().default(240),
-  // --- Secrets users give us (MCP tokens): AES-256-GCM, see lib/secrets.ts ---
+  // --- Composio (per-user connected apps: Gmail, Slack, GitHub, ...) ---
+  COMPOSIO_API_KEY: z.string().optional(),
+  // --- Secrets users give us (MCP tokens, workflow secrets): AES-256-GCM, see shared/secrets.ts ---
   /** 32 random bytes, base64. Generate with: openssl rand -base64 32 */
   SECRETS_ENCRYPTION_KEY: z.string().optional(),
   /** The previous key while rotating, so values encrypted with it still decrypt. */
@@ -76,11 +78,24 @@ export type Env = z.infer<typeof envSchema> & {
   CHAT_RUN: Workflow;
   /** Background sub-agent tasks (start_background_task): one Workflow each, and one registry per chat thread. */
   ASYNC_TASK: Workflow;
+  /** Workflow runs, and the live socket each workflow's open builders listen on. */
+  WORKFLOW_RUN: Workflow;
+  WORKFLOW_LIVE: DurableObjectNamespace<import("../modules/workflows/live/relay").WorkflowRunRelay>;
   ASYNC_TASKS: DurableObjectNamespace<import("../modules/async-tasks/registry").AsyncTaskRegistry>;
   /** Per-IP limiter for every API request. */
   RL: RateLimit;
   /** Per-user limiter for mutating/expensive routes. */
   RL_WRITE: RateLimit;
+  /** Workflow draft saves (autosave), per user. */
+  RL_WF_SAVE: RateLimit;
+  /** Workflow runs started by a user (manual, test, webhook), per user or workflow. */
+  RL_WF_RUN: RateLimit;
+  /** Public webhook calls, per workflow. */
+  RL_WF_HOOK: RateLimit;
+  /** Composio actions run by bots and workflow blocks, per user. */
+  RL_APP_EXEC: RateLimit;
+  /** Workflow HTTP request blocks, per user. */
+  RL_HTTP: RateLimit;
   /** One computer per user: addressed by user id. */
   USER_COMPUTER: DurableObjectNamespace<import("../modules/computer/user-computer").UserComputerDurableObject>;
   /** One sandbox per bot: addressed by bot id. */

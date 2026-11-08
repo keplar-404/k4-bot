@@ -13,9 +13,11 @@
     "check:retry": "bun run src/modules/chat/run/retry.check.ts",
     "check:documents": "bun run src/modules/files/documents/documents.check.ts && bun run src/modules/files/documents/office/office.check.ts",
     "check:sandbox": "bun run src/modules/sandbox/policy.check.ts && bun run src/modules/sandbox/paths.check.ts",
-    "check:middleware": "bun run src/modules/agent/middleware/stack.check.ts && bun run src/modules/agent/middleware/todo-guard.check.ts",
+    "check:middleware": "bun run src/modules/agent/middleware/stack.check.ts && bun run src/modules/agent/middleware/todo-guard.check.ts && bun run src/modules/agent/modes.check.ts",
     "check:web": "bun run src/modules/chat/commands.check.ts && bun run src/modules/agent/tools/web/research.check.ts && bun run src/modules/agent/tools/web/research-format.check.ts",
-    "check": "bun run check:web && bun run check:relay-token && bun run check:guards && bun run check:secrets && bun run check:retry && bun run check:documents && bun run check:sandbox && bun run check:middleware",
+    "check:workflows": "bun run src/modules/workflows/graph/graph.check.ts && bun run src/modules/workflows/graph/publish.check.ts",
+    "check:engine": "bun run src/modules/workflows/engine/engine.check.ts && bun run src/modules/workflows/engine/http-guard.check.ts && bun run src/modules/composio/action-kind.check.ts && bun run src/modules/workflows/routes/hooks.check.ts && bun run src/modules/workflows/engine/blocks/http.check.ts",
+    "check": "bun run check:workflows && bun run check:engine && bun run check:web && bun run check:relay-token && bun run check:guards && bun run check:secrets && bun run check:retry && bun run check:documents && bun run check:sandbox && bun run check:middleware",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
@@ -23,6 +25,7 @@
     "e2b:smoke": "bun --env-file=.dev.vars run scripts/e2b/desktop-smoke.ts"
   },
   "dependencies": {
+    "@composio/core": "^0.28.0",
     "@hono/zod-validator": "^0.9.1",
     "@langchain/core": "^1.3.2",
     "@langchain/langgraph": "^1.6.0",

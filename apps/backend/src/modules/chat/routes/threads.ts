@@ -3,8 +3,12 @@ import { and, desc, eq, lt } from "drizzle-orm";
 import { getRequestContext } from "../../../shared/context";
 import { validate } from "../../../shared/validate";
 import { createThreadSchema } from "../schemas";
+import { MODES } from "../modes";
+import { setThreadMode } from "../thread-mode";
 import type { AuthGuardEnv } from "../../../middleware/auth-guard";
+import { userLimit } from "../../../middleware/rate-limit";
 import { bot, chatThread } from "../../../db/schema";
+import { z } from "zod";
 
 const threads = new Hono<AuthGuardEnv>()
   // List a user's threads, newest first, cursor-paginated by updatedAt.
@@ -49,9 +53,16 @@ const threads = new Hono<AuthGuardEnv>()
 
     const [created] = await db
       .insert(chatThread)
-      .values({ id: crypto.randomUUID(), botId: data.botId, userId, title: data.title ?? "New chat" })
+      .values({ id: crypto.randomUUID(), botId: data.botId, userId, title: data.title ?? "New chat", mode: data.mode ?? "ask" })
       .returning();
     return c.json({ thread: created }, 201);
+  })
+
+  .put("/threads/:id/mode", userLimit, validate("param", z.object({ id: z.string().min(1) })), validate("json", z.object({ mode: z.enum(MODES) })), async (c) => {
+    const { db, env } = getRequestContext(c);
+    const { id } = c.req.valid("param");
+    const updated = await setThreadMode(db, env, c.get("session").user.id, id, c.req.valid("json").mode);
+    return updated ? c.json({ thread: updated }) : c.json({ error: "NOT_FOUND" }, 404);
   });
 
 export default threads;

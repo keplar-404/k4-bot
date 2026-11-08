@@ -1,6 +1,7 @@
 "use client";
 
 import { Loader2Icon, MoonIcon, PowerIcon } from "lucide-react";
+import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -24,6 +25,7 @@ import { VmSettings } from "./vm-settings";
 export function VmPage() {
   return (
     <ComputerProvider>
+      <PageHeader title="VM machine" />
       <VmContent />
     </ComputerProvider>
   );

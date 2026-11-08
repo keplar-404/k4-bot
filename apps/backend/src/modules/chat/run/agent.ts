@@ -4,6 +4,8 @@ import { buildAgent, type BuildAgentOptions } from "../../agent/agent";
 import { NeonHttpCheckpointer } from "../../agent/checkpointer/neon-http-checkpointer";
 import type { RunStream } from "../../agent/run-stream";
 import type { ComputerStub } from "../../computer/sandbox-backend";
+import { isMode } from "../modes";
+import { getOwnedThread } from "../threads";
 import { fileOptions } from "./context";
 import { pgResearchArchive } from "./research-archive";
 import type { ChatRunParams } from "./types";
@@ -19,7 +21,7 @@ export function buildRunAgent(
   env: Env,
   db: Db,
   params: ChatRunParams,
-  parts: Pick<BuildAgentOptions, "bot" | "skills" | "apps" | "subagents" | "peers" | "contextLength" | "memory"> & { stub?: ComputerStub; images: Array<{ name: string; dataUrl: string }> },
+  parts: Pick<BuildAgentOptions, "bot" | "skills" | "apps" | "subagents" | "peers" | "contextLength" | "memory" | "mode" | "account"> & { stub?: ComputerStub; images: Array<{ name: string; dataUrl: string }> },
 ): Streamable {
   const { stub, images, ...rest } = parts;
   const isCoding = rest.bot?.role === "coding";
@@ -35,6 +37,10 @@ export function buildRunAgent(
     checkpointer: new NeonHttpCheckpointer(db),
     ...(stub ? { computer: { stub, runId: params.runId } } : {}),
     ...(isCoding ? { sandbox: { env, db, userId: params.userId } } : {}),
+    readMode: async () => {
+      const thread = await getOwnedThread(db, params.threadId, params.userId);
+      return isMode(thread?.mode) ? thread.mode : "ask";
+    },
     asyncTasks: { env, threadId: params.threadId, userId: params.userId, botName: parts.bot.name, modelId: params.modelId },
     files: fileOptions(env, db, params, images),
   }) as unknown as Streamable;

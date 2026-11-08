@@ -3,6 +3,7 @@
 import {
   BotIcon,
   FolderOpenIcon,
+  KeyRoundIcon,
   LayoutDashboardIcon,
   MonitorIcon,
   PlugIcon,
@@ -39,6 +40,7 @@ const navItems = [
   { title: "VM machine", url: "/dashboard/vm", icon: <MonitorIcon /> },
   { title: "Files", url: "/dashboard/files", icon: <FolderOpenIcon /> },
   { title: "Connect", url: "/dashboard/connect", icon: <PlugIcon /> },
+  { title: "Secrets", url: "/dashboard/secrets", icon: <KeyRoundIcon /> },
   { title: "Workflow", url: "/dashboard/workflow", icon: <WorkflowIcon /> },
   { title: "Sandboxes", url: "/dashboard/sandboxes", icon: <MonitorIcon /> },
   { title: "Avatar", url: "/dashboard/avatar", icon: <UserIcon /> },

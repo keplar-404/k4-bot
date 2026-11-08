@@ -5,21 +5,22 @@ import { validate } from "../../../shared/validate";
 import { createBotSchema, setBotModelSchema } from "../schemas";
 import type { AuthGuardEnv } from "../../../middleware/auth-guard";
 import { userLimit } from "../../../middleware/rate-limit";
-import { computerFor } from "../../computer/sandbox-backend";
-import { cleanupThreads } from "../../chat/cleanup";
-import { sandboxFor } from "../../sandbox/sandbox-backend";
 import { modelError } from "../../agent/models";
 import { domainFor } from "../../agent/domains";
-import { bot, chatThread } from "../../../db/schema";
-import { ownedBotId, setBotIntegrations } from "../queries";
+import { bot } from "../../../db/schema";
+import { composioAppsOf, composioGate, saveBotComposioApps } from "../composio-apps";
+import { deleteBotEverything } from "../delete-bot";
+import { integrationLinks, ownedBotId, setBotIntegrations } from "../queries";
 
 const manage = new Hono<AuthGuardEnv>()
   .post("/", userLimit, validate("json", createBotSchema), async (c) => {
-    const { db } = getRequestContext(c);
+    const { db, env } = getRequestContext(c);
     const userId = c.get("session").user.id;
-    const { skillIds, mcpServerIds, ...fields } = c.req.valid("json");
+    const { skillIds, mcpServerIds, composioApps, ...fields } = c.req.valid("json");
     // Capabilities the form did not send come from the role (e.g. research bots spawn sub-agents).
     const defaults = domainFor(fields.role).defaults;
+    const refused = await composioGate(c, env, userId, composioApps);
+    if (refused) return refused;
     const [created] = await db
       .insert(bot)
       .values({
@@ -32,13 +33,16 @@ const manage = new Hono<AuthGuardEnv>()
       })
       .returning();
     await setBotIntegrations(db, userId, created!.id, skillIds, mcpServerIds);
-    return c.json({ bot: { ...created, skillIds: skillIds ?? [], mcpServerIds: mcpServerIds ?? [] } }, 201);
+    await saveBotComposioApps(db, created!.id, composioApps);
+    return c.json({ bot: { ...created, skillIds: skillIds ?? [], mcpServerIds: mcpServerIds ?? [], composioApps: composioApps ?? [] } }, 201);
   })
 
   .patch("/:id", userLimit, validate("json", createBotSchema), async (c) => {
-    const { db } = getRequestContext(c);
+    const { db, env } = getRequestContext(c);
     const userId = c.get("session").user.id;
-    const { skillIds, mcpServerIds, ...fields } = c.req.valid("json");
+    const { skillIds, mcpServerIds, composioApps, ...fields } = c.req.valid("json");
+    const refused = await composioGate(c, env, userId, composioApps);
+    if (refused) return refused;
     const [updated] = await db
       .update(bot)
       .set(fields)
@@ -46,7 +50,10 @@ const manage = new Hono<AuthGuardEnv>()
       .returning();
     if (!updated) return c.json({ error: "NOT_FOUND", message: "Bot not found" }, 404);
     await setBotIntegrations(db, userId, updated.id, skillIds, mcpServerIds);
-    return c.json({ bot: updated });
+    await saveBotComposioApps(db, updated.id, composioApps);
+    // The same shape as GET: a client that caches this answer must not lose the bot's skills and apps (a re-save would clear them).
+    const [links, apps] = await Promise.all([integrationLinks(db, userId, updated.id), composioAppsOf(db, [updated.id])]);
+    return c.json({ bot: { ...updated, skillIds: links.skills.map((l) => l.id), mcpServerIds: links.apps.map((l) => l.id), composioApps: apps.get(updated.id) ?? [] } });
   })
 
   // The model picked in the prompt bar, saved so it is still selected after a refresh or on another device.
@@ -65,33 +72,12 @@ const manage = new Hono<AuthGuardEnv>()
     return c.json({ ok: true });
   })
 
-  /**
-   * Deletes the bot and everything it owns: its running work is stopped, its chats go with it (the
-   * database cascades threads, messages and events), its agent memory is removed, and its Linux account
-   * and files are removed from the user's computer (now if it is awake, otherwise on its next wake).
-   */
   .delete("/:id", userLimit, async (c) => {
     const { db, env } = getRequestContext(c);
     const userId = c.get("session").user.id;
     const id = c.req.param("id");
     if (!(await ownedBotId(db, userId, id))) return c.json({ error: "NOT_FOUND", message: "Bot not found" }, 404);
-
-    const threads = await db
-      .select({ id: chatThread.id })
-      .from(chatThread)
-      .where(and(eq(chatThread.botId, id), eq(chatThread.userId, userId)));
-    // Stop its runs first, so nothing writes to rows that are about to go.
-    await cleanupThreads(db, env, threads.map((t) => t.id));
-    // Its code sandbox goes in E2B too (the table row would go with the bot, the paid machine would not).
-    await sandboxFor(env, id)
-      .destroy(userId)
-      .catch((e: unknown) => console.error("[bots] sandbox cleanup failed", e));
-    await db.delete(bot).where(and(eq(bot.id, id), eq(bot.userId, userId)));
-    // Its files on the computer. A failure here must not undo the deletion above: its runs are stopped
-    // and its threads are gone (every run slice checks its thread still exists), so nothing uses it again.
-    await computerFor(env, userId)
-      .removeBot(id)
-      .catch((e: unknown) => console.error("[bots] computer cleanup failed", e));
+    await deleteBotEverything(db, env, userId, id);
     return c.json({ ok: true });
   });
 

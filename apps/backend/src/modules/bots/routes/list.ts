@@ -4,6 +4,7 @@ import { getRequestContext } from "../../../shared/context";
 import type { AuthGuardEnv } from "../../../middleware/auth-guard";
 import { publicDomains } from "../../agent/domains";
 import { bot } from "../../../db/schema";
+import { composioAppsOf } from "../composio-apps";
 import { botColumns, idsOf, integrationLinks } from "../queries";
 
 const list = new Hono<AuthGuardEnv>()
@@ -13,14 +14,12 @@ const list = new Hono<AuthGuardEnv>()
   .get("/", async (c) => {
     const { db } = getRequestContext(c);
     const userId = c.get("session").user.id;
-    const [rows, links] = await Promise.all([
-      db.select(botColumns).from(bot).where(eq(bot.userId, userId)).orderBy(desc(bot.createdAt)),
-      integrationLinks(db, userId),
-    ]);
+    const rows = await db.select(botColumns).from(bot).where(eq(bot.userId, userId)).orderBy(desc(bot.createdAt));
+    const [links, apps] = await Promise.all([integrationLinks(db, userId), composioAppsOf(db, rows.map((r) => r.id))]);
     // No HTTP caching: the client keeps its own TTL cache and must never
     // re-serve a stale list over an optimistic create/update/delete.
     c.header("Cache-Control", "no-store");
-    return c.json({ bots: rows.map((r) => ({ ...r, skillIds: idsOf(links.skills, r.id), mcpServerIds: idsOf(links.apps, r.id) })) });
+    return c.json({ bots: rows.map((r) => ({ ...r, skillIds: idsOf(links.skills, r.id), mcpServerIds: idsOf(links.apps, r.id), composioApps: apps.get(r.id) ?? [] })) });
   })
 
   // One bot with its skill and app links: three small queries scoped to this bot, never the whole list.
@@ -35,9 +34,9 @@ const list = new Hono<AuthGuardEnv>()
       .where(and(eq(bot.id, id), eq(bot.userId, userId)))
       .limit(1);
     if (!row) return c.json({ error: "NOT_FOUND", message: "Bot not found" }, 404);
-    const links = await integrationLinks(db, userId, id);
+    const [links, apps] = await Promise.all([integrationLinks(db, userId, id), composioAppsOf(db, [id])]);
     c.header("Cache-Control", "no-store");
-    return c.json({ bot: { ...row, skillIds: links.skills.map((s) => s.id), mcpServerIds: links.apps.map((a) => a.id) } });
+    return c.json({ bot: { ...row, skillIds: links.skills.map((s) => s.id), mcpServerIds: links.apps.map((a) => a.id), composioApps: apps.get(id) ?? [] } });
   });
 
 export default list;

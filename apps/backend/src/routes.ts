@@ -5,10 +5,14 @@ import chat from "./modules/chat/routes";
 import computer from "./modules/computer/routes";
 import files from "./modules/files/routes";
 import integrations from "./modules/integrations/routes";
+import composio from "./modules/composio/routes";
+import workflows from "./modules/workflows/routes";
 import sandbox from "./modules/sandbox/routes";
 import sandboxEditor from "./modules/sandbox/editor-routes";
 import models from "./modules/agent/routes";
 import memory from "./modules/memory/routes";
+import secrets from "./modules/secrets/routes";
+import hooks from "./modules/workflows/routes/hooks";
 
 import type { Env } from "./config/env";
 
@@ -20,10 +24,14 @@ const routes = new Hono<{ Bindings: Env }>()
   .route("/computer", computer)
   .route("/files", files)
   .route("/integrations", integrations)
+  .route("/composio", composio)
+  .route("/workflows", workflows)
   // The editor first: its token-gated socket must answer before the main routes' sign-in check.
   .route("/sandbox", sandboxEditor)
   .route("/sandbox", sandbox)
   .route("/models", models)
-  .route("/memory", memory);
+  .route("/memory", memory)
+  .route("/secrets", secrets)
+  .route("/hooks", hooks);
 
 export default routes;

@@ -1,8 +1,11 @@
 import { z } from "zod";
+import { MODES } from "./modes";
 
 export const createThreadSchema = z.object({
   botId: z.string().min(1),
   title: z.string().max(200).optional(),
+  /** The permission mode picked before the first message; omitted = ask. */
+  mode: z.enum(MODES).optional(),
 });
 
 export const sendMessageSchema = z

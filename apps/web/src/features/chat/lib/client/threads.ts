@@ -17,10 +17,13 @@ export interface MessageRow {
   createdAt: string;
 }
 
-export function createThread(botId: string): Promise<{ thread: ThreadRow }> {
+export function createThread(
+  botId: string,
+  mode?: "allow_all" | "plan" | "ask",
+): Promise<{ thread: ThreadRow }> {
   return request("/api/v1/chat/threads", {
     method: "POST",
-    body: JSON.stringify({ botId }),
+    body: JSON.stringify({ botId, mode }),
   });
 }
 
@@ -44,6 +47,7 @@ export function getMessages(
   lastSeq: number;
   pending: { type: string; payload: unknown } | null;
   usage?: { contextTokens: number; todayUsed: number; todayLimit: number };
+  mode?: string;
 }> {
   return request(`/api/v1/chat/threads/${threadId}/messages?limit=${limit}`);
 }

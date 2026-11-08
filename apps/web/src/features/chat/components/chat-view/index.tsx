@@ -44,6 +44,8 @@ export function ChatView({
     models,
     modelId,
     reasoningEffort,
+    mode,
+    setMode,
     chooseModel,
     send,
     retry,
@@ -85,12 +87,14 @@ export function ChatView({
         catalog={catalog}
         modelId={modelId}
         reasoningEffort={reasoningEffort}
+        mode={mode}
         send={send}
         onStop={() => void stop()}
         onAnswer={(text) => void answer(text)}
         onApprove={() => void approve()}
         onReject={() => void reject()}
         chooseModel={chooseModel}
+        onModeChange={(m) => void setMode(m)}
       />
     </div>
   );
