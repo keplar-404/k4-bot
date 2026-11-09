@@ -8,7 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { Block, BlockBody } from "../blocks";
+import type { BlockBody } from "../blocks";
 import { Field, SettingsSection } from "./field";
 
 type DelayBlock = Extract<BlockBody, { kind: "logic.delay" }>;

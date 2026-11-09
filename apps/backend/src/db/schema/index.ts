@@ -12,3 +12,4 @@ export * from "./secret";
 export * from "./composio";
 export * from "./workflow";
 export * from "./bot-workflow";
+export * from "./task";

@@ -24,9 +24,17 @@ export async function userSession(db: Db, composio: Composio, userId: string) {
   return session;
 }
 
+/** Pages a connection may return to: the builder and the dashboard, nothing else. */
+const RETURN_PATH = /^\/(workflows|dashboard)(\/[A-Za-z0-9_-]+)*\/?$/;
+
 /**
  * Where Composio sends the user after they authorize an app: always our own web app, never a URL from the request
- * (that would make the Connect Link an open redirect to any site).
+ * (that would make the Connect Link an open redirect to any site). `returnTo` is only a path on our site, checked
+ * against RETURN_PATH; anything else goes back to the Connect page.
  */
-export const connectCallback = (webOrigin: string, toolkit: string) =>
-  `${webOrigin.replace(/\/$/, "")}/dashboard/connect?connected=${encodeURIComponent(toolkit)}`;
+export function connectCallback(webOrigin: string, toolkit: string, returnTo?: string) {
+  const path = returnTo && RETURN_PATH.test(returnTo) ? returnTo : "/dashboard/connect";
+  const url = new URL(path, webOrigin);
+  url.searchParams.set("connected", toolkit);
+  return url.toString();
+}

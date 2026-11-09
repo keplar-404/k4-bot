@@ -27,6 +27,8 @@ function triggerInput(kind: string | undefined, input: unknown) {
   const now = new Date().toISOString();
   if (kind === "trigger.webhook") return { body: input ?? {}, headers: {}, receivedAt: now };
   if (kind === "trigger.schedule") return { scheduledAt: now };
+  // A test of an app-event workflow: the sample event the user typed stands in for the real one.
+  if (kind === "trigger.app") return { event: "test", data: isPlainObject(input) ? input : {}, eventId: "test", receivedAt: now };
   return { inputs: isPlainObject(input) ? input : {} };
 }
 

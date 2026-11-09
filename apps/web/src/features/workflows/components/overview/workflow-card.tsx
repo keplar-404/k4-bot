@@ -39,6 +39,11 @@ export function WorkflowCard({
           <p className="mt-1 text-muted-foreground text-xs">
             {triggerLabel(w.graph)}
           </p>
+          {w.status === "paused" && w.pausedReason && (
+            <p className="mt-1 text-amber-700 text-xs dark:text-amber-400">
+              {w.pausedReason}
+            </p>
+          )}
         </div>
         <WorkflowStatusBadge status={w.status} />
       </div>

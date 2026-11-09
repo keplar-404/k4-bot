@@ -90,17 +90,6 @@ export const listRuns = (id: string) =>
 export const getRun = (runId: string) => request<RunDetail>(`/runs/${runId}`);
 export const cancelRun = (runId: string) =>
   request<{ ok: true }>(`/runs/${runId}/cancel`, { method: "POST" });
-/** A short-lived token for the live socket (a WebSocket cannot carry the session to another origin). */
-export const getLiveToken = (id: string) =>
-  request<{ token: string; userId: string }>(`/${id}/live-token`, {
-    method: "POST",
-  });
-export const liveSocketUrl = (
-  id: string,
-  auth: { token: string; userId: string },
-) =>
-  `${BASE.replace(/^http/, "ws")}/api/v1/workflows/${id}/live?${new URLSearchParams(auth)}`;
-
 export const getSharedBots = (id: string) =>
   request<{ botIds: string[] }>(`/${id}/bots`);
 export const setSharedBots = (id: string, botIds: string[]) =>

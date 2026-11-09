@@ -4,6 +4,7 @@ import type { Env } from "../../../config/env";
 import { isRead } from "../../composio/action-kind";
 import { composioFor, TOOLKIT_SLUG } from "../../composio/client";
 import { getTool, listTools } from "../../composio/tools";
+import { listTriggerTypes } from "../../composio/triggers";
 import type { BotComposioApp } from "./bot-apps";
 
 const MAX_SCHEMA_CHARS = 8000;
@@ -17,7 +18,7 @@ export const actionField = z
 
 export const notEnabled = (toolkit: string) => `${toolkit} is not enabled for this bot.`;
 
-/** The two tools that only look things up: find an action of an app, and see what an action takes. */
+/** The tools that only look things up: an app's actions, what an action takes, and the events an app can start a workflow with. */
 export function createLookupTools(env: Env, enabled: Map<string, BotComposioApp>) {
   const findActions = tool(
     async ({ app, query }) => {
@@ -57,5 +58,27 @@ export function createLookupTools(env: Env, enabled: Map<string, BotComposioApp>
     },
   );
 
-  return [findActions, actionDetails] as const;
+  const findEvents = tool(
+    async ({ app }) => {
+      if (!enabled.has(app)) return notEnabled(app);
+      const events = await listTriggerTypes(composioFor(env), app);
+      const compact = events.slice(0, MAX_MATCHES).map((e) => ({
+        trigger: e.slug,
+        name: e.name,
+        description: e.description.slice(0, 200),
+        config: e.config,
+        sends: Object.keys((e.payload as { properties?: object }).properties ?? {}),
+      }));
+      const text = JSON.stringify(compact);
+      return text.length > MAX_SCHEMA_CHARS ? `${text.slice(0, MAX_SCHEMA_CHARS)}… (cut)` : text;
+    },
+    {
+      name: "app_find_events",
+      description:
+        "The events of an enabled app that can start a workflow (trigger.app): their slug, settings and the fields they send as {{trigger.data.x}}.",
+      schema: z.object({ app: appField }),
+    },
+  );
+
+  return [findActions, actionDetails, findEvents] as const;
 }

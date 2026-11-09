@@ -2,7 +2,14 @@ import { and, asc, count, ilike, inArray, or, sql, type SQL } from "drizzle-orm"
 import type { Db } from "../../db";
 import { composioToolkit } from "../../db/schema";
 
-export type CatalogQuery = { q?: string; category?: string; slugs?: string[]; offset: number; limit: number };
+export type CatalogQuery = {
+  q?: string;
+  category?: string;
+  slugs?: string[];
+  withTriggers?: boolean;
+  offset: number;
+  limit: number;
+};
 
 /** `%` and `_` typed by the user are literal characters, not wildcards. */
 const like = (q: string) => `%${q.replace(/[\\%_]/g, (m) => `\\${m}`)}%`;
@@ -18,6 +25,7 @@ function where(q: CatalogQuery): SQL | undefined {
   }
   // jsonb containment: the toolkit lists this category among its own.
   if (q.category) parts.push(sql`${composioToolkit.categories} @> ${JSON.stringify([{ slug: q.category }])}::jsonb`);
+  if (q.withTriggers) parts.push(sql`${composioToolkit.triggersCount} > 0`);
   if (q.slugs) parts.push(q.slugs.length ? inArray(composioToolkit.slug, q.slugs) : sql`false`);
   return parts.length ? and(...parts) : undefined;
 }

@@ -1,20 +1,22 @@
+import { scheduleIssue } from "../../schedules/issues";
 import { isTrigger, LIMITS, type WorkflowGraph, type WorkflowNode } from "./schema";
+import { loopIssues, loopOf } from "./loop-rules";
 import { type GraphIssue, structureIssues } from "./structure";
 
 // Save-time rules live in structure.ts; most callers import everything from here.
 export { type GraphIssue, structureIssues, topoOrder } from "./structure";
 
 const DELAY_SECONDS = { seconds: 1, minutes: 60, hours: 3600, days: 86400 } as const;
-const SCHEDULE_MINUTES = { minutes: 1, hours: 60, days: 1440, weeks: 10080 } as const;
 
 /** Everything a workflow needs before it can be turned on (or test-run): one trigger, every block wired and filled in. */
 export function publishIssues(g: WorkflowGraph): GraphIssue[] {
-  const issues = structureIssues(g);
+  const issues = [...structureIssues(g), ...loopIssues(g)];
   const trigger = g.nodes.find(isTrigger);
   if (!trigger) issues.push({ message: "Add a trigger: what starts this workflow." });
   if (g.nodes.length < 2) issues.push({ message: "Add at least one step after the trigger." });
 
   const connected = trigger ? reachableFrom(g, trigger.id) : null;
+  const loop = loopOf(g);
   let totalDelaySeconds = 0;
   for (const node of g.nodes) {
     if (connected && !connected.has(node.id)) {
@@ -22,11 +24,13 @@ export function publishIssues(g: WorkflowGraph): GraphIssue[] {
     }
     const message = blockIssue(node);
     if (message) issues.push({ nodeId: node.id, message });
-    if (node.kind === "logic.delay") totalDelaySeconds += delaySeconds(node);
+    // A delay inside a For each waits once per item.
+    const repeats = loop?.body.has(node.id) ? loop.loop.config.max : 1;
+    if (node.kind === "logic.delay") totalDelaySeconds += delaySeconds(node) * repeats;
   }
 
   if (totalDelaySeconds > LIMITS.maxDelaySeconds) {
-    issues.push({ message: "All the delays together can be at most 7 days." });
+    issues.push({ message: "All the delays together (each one inside a For each counts per item) can be at most 7 days." });
   }
   return issues;
 }
@@ -46,15 +50,22 @@ function blockIssue(node: WorkflowNode): string | null {
     }
     case "action.http":
       return node.config.url ? null : "Enter a URL.";
+    case "ai.bot":
+      if (!node.config.botId) return "Choose the bot that does this step.";
+      return node.config.prompt.trim() ? null : "Say what the bot should do.";
+    case "trigger.app":
+      return node.config.toolkit && node.config.trigger
+        ? null
+        : "Choose an app and the event that starts this workflow.";
     case "logic.if":
     case "logic.filter":
       return node.config.conditions.length > 0 ? null : "Add at least one condition.";
+    case "logic.loop":
+      return node.config.items.trim() ? null : "Choose the list to go through.";
     case "logic.delay":
       return delaySeconds(node) > LIMITS.maxDelaySeconds ? "A delay can be at most 7 days." : null;
-    case "trigger.schedule": {
-      const minutes = node.config.every * SCHEDULE_MINUTES[node.config.unit];
-      return minutes < LIMITS.minScheduleMinutes ? "A schedule runs at most every 5 minutes." : null;
-    }
+    case "trigger.schedule":
+      return scheduleIssue(node.config, LIMITS.minScheduleMinutes);
     default:
       return null;
   }

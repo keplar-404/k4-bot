@@ -51,6 +51,20 @@ export function WebhookDialog({
             Copy
           </Button>
         </div>
+        <div className="flex flex-col gap-1">
+          <span className="font-medium text-muted-foreground text-xs">
+            Try it from a terminal
+          </span>
+          <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded-md bg-muted p-2 font-mono text-[11px]">
+            {`curl -X POST '${url ?? ""}' \\
+  -H 'content-type: application/json' \\
+  -d '{"name": "Ada", "email": "ada@example.com"}'`}
+          </pre>
+          <span className="text-muted-foreground text-xs">
+            Every step can then read the body, e.g.{" "}
+            <code>{"{{trigger.body.email}}"}</code>. Only JSON, up to 256 KB.
+          </span>
+        </div>
         <DialogFooter>
           <Button onClick={onClose}>Done</Button>
         </DialogFooter>

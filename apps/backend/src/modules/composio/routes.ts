@@ -13,6 +13,7 @@ import { connectCallback, userSession } from "./session";
 import toolsRoutes from "./tools-routes";
 
 const slug = z.string().regex(TOOLKIT_SLUG);
+const authorizeBody = z.object({ toolkit: slug, returnTo: z.string().max(300).optional() });
 /**
  * Composio connected apps (Platform: one session per user, our user id is Composio's user id, connections are
  * private to that user). Tokens never reach this Worker or the browser: Composio stores them and uses them when a
@@ -34,15 +35,15 @@ const composioRoutes = new Hono<AuthGuardEnv>()
     }
   })
 
-  // Start connecting an app: a Connect Link for this user only, returning to our Connect page.
-  .post("/authorize", userLimit, validate("json", z.object({ toolkit: slug })), async (c) => {
+  // Start connecting an app: a Connect Link for this user only, returning to the page that asked (or Connect).
+  .post("/authorize", userLimit, validate("json", authorizeBody), async (c) => {
     const { db, env } = getRequestContext(c);
-    const { toolkit } = c.req.valid("json");
+    const { toolkit, returnTo } = c.req.valid("json");
     try {
       if (!(await isKnownToolkit(db, toolkit))) return c.json({ error: "NOT_FOUND", message: "Unknown app." }, 404);
       const session = await userSession(db, composioFor(env), c.get("session").user.id);
       const request = await session.authorize(toolkit, {
-        callbackUrl: connectCallback(env.WEB_ORIGIN ?? env.BETTER_AUTH_URL, toolkit),
+        callbackUrl: connectCallback(env.WEB_ORIGIN ?? env.BETTER_AUTH_URL, toolkit, returnTo),
       });
       if (!request.redirectUrl) {
         return c.json({ error: "NO_LINK", message: "This app could not start a connection." }, 502);

@@ -9,6 +9,8 @@ export type CatalogFilters = {
   q: string;
   category: string | null;
   slugs: string[] | null;
+  /** Only apps that have events (for the App event trigger). */
+  withTriggers?: boolean;
 };
 
 /**
@@ -38,6 +40,7 @@ export function useCatalog(filters: CatalogFilters) {
             q: filters.q.trim() || undefined,
             category: filters.category ?? undefined,
             slugs,
+            withTriggers: filters.withTriggers,
             offset,
             limit: PAGE,
           },
@@ -53,7 +56,7 @@ export function useCatalog(filters: CatalogFilters) {
         if (!ac.signal.aborted) setLoading(false);
       }
     },
-    [filters.q, filters.category, slugKey],
+    [filters.q, filters.category, filters.withTriggers, slugKey],
   );
 
   useEffect(() => {

@@ -1,5 +1,5 @@
-import { botHome, botUnixUser } from "../../computer/guards";
-import { SCREEN } from "../../computer/types";
+import { botHome, botUnixUser } from "../modules/computer/guards";
+import { SCREEN } from "../modules/computer/types";
 
 /* The prompt sections for files and the shared computer: only bots with storage or a computer get them. */
 

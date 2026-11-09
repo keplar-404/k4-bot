@@ -16,10 +16,12 @@ export function SchemaForm({
   schema,
   value,
   onChange,
+  emptyText = "This action takes no input.",
 }: {
   schema: JsonSchema;
   value: Args;
   onChange: (next: Args) => void;
+  emptyText?: string;
 }) {
   const props = Object.entries(schema.properties ?? {});
   const required = new Set(schema.required ?? []);
@@ -42,11 +44,7 @@ export function SchemaForm({
   const must = props.filter(([k]) => required.has(k));
   const optional = props.filter(([k]) => !required.has(k));
   if (props.length === 0)
-    return (
-      <p className="text-muted-foreground text-sm">
-        This action takes no input.
-      </p>
-    );
+    return <p className="text-muted-foreground text-sm">{emptyText}</p>;
   return (
     <div className="flex flex-col gap-4">
       {must.map(field)}

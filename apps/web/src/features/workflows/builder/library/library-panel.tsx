@@ -13,13 +13,15 @@ import {
   InputGroupInput,
 } from "@/components/ui/input-group";
 import { BUILT_IN } from "../block-catalog";
+import { usePanels } from "../panels-store";
 import { useBuilder } from "../store";
 import { LibraryApps } from "./library-apps";
 import { LibraryItem, LibrarySection } from "./library-item";
 
 /** The floating block library on the left: triggers, logic, and every app. It folds to a button. */
 export function LibraryPanel() {
-  const [open, setOpen] = useState(true);
+  const open = usePanels((s) => s.library);
+  const setOpen = (v: boolean) => usePanels.getState().toggle("library", v);
   const [query, setQuery] = useState("");
   const addBlock = useBuilder((s) => s.addBlock);
   const q = query.trim().toLowerCase();
@@ -35,6 +37,7 @@ export function LibraryPanel() {
         className="absolute top-3 left-3 z-10 shadow-sm"
         onClick={() => setOpen(true)}
         aria-label="Show blocks"
+        title="Show blocks ( [ )"
       >
         <PanelLeftOpenIcon />
       </Button>

@@ -1,68 +1,79 @@
 "use client";
 
-import { Trash2Icon, TriangleAlertIcon, XIcon } from "lucide-react";
+import {
+  MousePointerClickIcon,
+  PanelRightCloseIcon,
+  PanelRightOpenIcon,
+  Trash2Icon,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { blockKindLabel, blockTitle } from "../block-label";
-import type { Block, BlockBody } from "../blocks";
+import type { BlockBody } from "../blocks";
+import { usePanels } from "../panels-store";
 import { useBuilder } from "../store";
-import { BlockSettings } from "./block-settings";
-import { DataReferences } from "./data-references";
-import { SettingsSection } from "./field";
+import { SettingsHeader } from "./settings-header";
+import { SettingsTabs } from "./settings-tabs";
 
-/** The floating settings window on the right, for the selected block. */
+const PANEL =
+  "absolute top-3 right-3 bottom-3 z-10 flex w-[22rem] flex-col overflow-hidden rounded-xl border bg-card/95 shadow-lg backdrop-blur";
+
+/**
+ * The settings window on the right. It opens and closes with its own button (like the block library), never by
+ * selecting a block: while it is open it shows whichever block is selected.
+ */
 export function SettingsPanel() {
-  const { nodes, selectedId, select, updateBlock, removeBlock } = useBuilder();
+  const open = usePanels((s) => s.settings);
+  const setOpen = (v: boolean) => usePanels.getState().toggle("settings", v);
+  const { nodes, selectedId, updateBlock, removeBlock } = useBuilder();
   const issue = useBuilder(
     (s) => s.workflow?.issues.find((i) => i.nodeId === selectedId)?.message,
   );
   const node = nodes.find((n) => n.id === selectedId);
-  if (!node) return null;
+
+  if (!open) {
+    return (
+      <Button
+        variant="outline"
+        size="icon"
+        className="absolute top-3 right-3 z-10 shadow-sm"
+        onClick={() => setOpen(true)}
+        aria-label="Show settings"
+        title="Show settings ( ] )"
+      >
+        <PanelRightOpenIcon />
+      </Button>
+    );
+  }
+  if (!node) {
+    return (
+      <aside className={PANEL} aria-label="Block settings">
+        <div className="flex justify-end p-2">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => setOpen(false)}
+            aria-label="Hide settings"
+          >
+            <PanelRightCloseIcon />
+          </Button>
+        </div>
+        <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center text-muted-foreground text-sm">
+          <MousePointerClickIcon className="size-5" />
+          Select a block to see its settings.
+        </div>
+      </aside>
+    );
+  }
+
   const b = node.data.block;
   const update = (next: BlockBody) => updateBlock(b.id, () => next);
-
   return (
-    <aside
-      className="absolute top-3 right-3 bottom-3 z-10 flex w-[22rem] flex-col overflow-hidden rounded-xl border bg-card/95 shadow-lg backdrop-blur"
-      aria-label="Block settings"
-    >
-      <div className="flex items-start gap-2 border-b p-3">
-        <div className="min-w-0 flex-1">
-          <p className="text-muted-foreground text-xs">{blockKindLabel(b)}</p>
-          <Input
-            aria-label="Block name"
-            className="mt-1 h-8 font-medium"
-            value={b.label ?? ""}
-            placeholder={blockTitle({ ...b, label: undefined })}
-            maxLength={80}
-            onChange={(e) =>
-              update({ ...b, label: e.target.value || undefined })
-            }
-          />
-        </div>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          onClick={() => select(null)}
-          aria-label="Close settings"
-        >
-          <XIcon />
-        </Button>
-      </div>
-      <div className="flex-1 overflow-y-auto">
-        {issue && (
-          <output className="mx-4 mt-4 flex items-start gap-2 rounded-lg bg-amber-500/10 px-3 py-2 text-amber-700 text-xs dark:text-amber-300">
-            <TriangleAlertIcon className="mt-px size-3.5 shrink-0" />
-            {issue}
-          </output>
-        )}
-        <BlockSettings block={b} update={update} />
-        {!b.kind.startsWith("trigger.") && (
-          <SettingsSection title="Data from earlier steps">
-            <DataReferences id={b.id} />
-          </SettingsSection>
-        )}
-      </div>
+    <aside className={PANEL} aria-label="Block settings">
+      <SettingsHeader
+        block={b}
+        update={update}
+        onClose={() => setOpen(false)}
+      />
+      <SettingsTabs block={b} update={update} issue={issue} />
       <div className="border-t p-3">
         <Button
           variant="ghost"

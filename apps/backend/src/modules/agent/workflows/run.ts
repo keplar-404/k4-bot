@@ -4,8 +4,7 @@ import { allow } from "../../../middleware/rate-limit";
 import { RunStartError, startRun } from "../../workflows/engine/start";
 import { triggerOf } from "../../workflows/graph/triggers";
 import { workflowOfBot } from "../../workflows/store/bot-access";
-import { publishWorkflow } from "../../workflows/store/publish";
-import { setStatus } from "../../workflows/store/workflows";
+import { pauseWorkflow, publishWorkflow } from "../../workflows/store/publish";
 import { describeWorkflow, NOT_VISIBLE, type WorkflowToolContext } from "./common";
 import { waitForRun } from "./wait";
 
@@ -16,7 +15,7 @@ export function createRunTools({ env, db, userId, botId }: WorkflowToolContext) 
     async ({ workflowId }) => {
       const found = await workflowOfBot(db, userId, botId, workflowId);
       if (!found) return NOT_VISIBLE;
-      const result = await publishWorkflow(db, userId, found);
+      const result = await publishWorkflow(env, db, userId, found);
       if (!result.ok) return `Cannot turn it on: ${result.message}`;
       // The webhook token is shown to the user only, never to the model.
       const note = result.webhookToken ? "It has a webhook URL; only the user can see it, in the builder." : undefined;
@@ -34,7 +33,7 @@ export function createRunTools({ env, db, userId, botId }: WorkflowToolContext) 
     async ({ workflowId }) => {
       const found = await workflowOfBot(db, userId, botId, workflowId);
       if (!found) return NOT_VISIBLE;
-      const paused = await setStatus(db, userId, found.id, { status: "paused", nextRunAt: null });
+      const paused = await pauseWorkflow(env, db, userId, found);
       return paused ? JSON.stringify(describeWorkflow(paused)) : NOT_VISIBLE;
     },
     {

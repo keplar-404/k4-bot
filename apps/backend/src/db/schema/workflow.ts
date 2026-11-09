@@ -27,11 +27,19 @@ export const workflow = pgTable(
     nextRunAt: timestamp("next_run_at"),
     /** sha-256 of the webhook trigger's secret token (the token itself is shown once and never stored). */
     webhookTokenHash: text("webhook_token_hash"),
+    /** The Composio trigger instance (ti_…) an app-event trigger listens on, while the workflow is on. */
+    composioTriggerId: text("composio_trigger_id"),
+    /** Why the system turned it off (an app connection expired, it kept starting itself), shown until it is on again. */
+    pausedReason: text("paused_reason"),
     lastRunAt: timestamp("last_run_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
-  (t) => [index("workflow_user_idx").on(t.userId, t.updatedAt), index("workflow_due_idx").on(t.status, t.nextRunAt)],
+  (t) => [
+    index("workflow_user_idx").on(t.userId, t.updatedAt),
+    index("workflow_due_idx").on(t.status, t.nextRunAt),
+    index("workflow_composio_trigger_idx").on(t.composioTriggerId),
+  ],
 );
 
 /** One execution of a workflow, and how it ended. */
@@ -44,7 +52,7 @@ export const workflowRun = pgTable(
       .references(() => workflow.id, { onDelete: "cascade" }),
     userId: text("user_id").notNull(),
     version: integer("version").notNull(),
-    trigger: text("trigger", { enum: ["manual", "test", "schedule", "webhook", "bot"] }).notNull(),
+    trigger: text("trigger", { enum: ["manual", "test", "schedule", "webhook", "bot", "app"] }).notNull(),
     /** The bot that started this run, for the per-bot hourly cap and the run history. */
     startedByBotId: text("started_by_bot_id"),
     status: text("status", { enum: ["queued", "running", "succeeded", "failed", "cancelled"] })
@@ -88,3 +96,12 @@ export const workflowRunStep = pgTable(
   },
   (t) => [uniqueIndex("workflow_run_step_unique").on(t.runId, t.nodeId)],
 );
+
+/**
+ * Composio delivers trigger events at least once: each event id is kept for a week, so a redelivered event never
+ * starts its workflows twice.
+ */
+export const composioEvent = pgTable("composio_event", {
+  id: text("id").primaryKey(),
+  receivedAt: timestamp("received_at").defaultNow().notNull(),
+});

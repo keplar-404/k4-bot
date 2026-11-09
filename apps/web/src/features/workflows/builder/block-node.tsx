@@ -7,12 +7,10 @@ import { memo } from "react";
 import { AppLogo } from "@/features/connect/components/app-logo";
 import { logoOf } from "../describe";
 import { infoOf } from "./block-catalog";
-import { BlockHandles } from "./block-handles";
+import { BlockHandles, handle } from "./block-handles";
 import { blockKindLabel, blockTitle } from "./block-label";
 import type { FlowNode } from "./flow";
 import { useNodeOverlay } from "./node-overlay";
-
-const handle = "!size-2.5 !border-2 !border-background !bg-muted-foreground";
 
 /**
  * One block on the canvas: icon (or the app's logo), kind, title. A trigger has no input; an If block has two
@@ -38,7 +36,8 @@ function BlockNodeView({ data, selected }: NodeProps<FlowNode>) {
       {!isTrigger && (
         <Handle type="target" position={Position.Top} className={handle} />
       )}
-      {b.kind === "action.app" && b.config.toolkit ? (
+      {(b.kind === "action.app" || b.kind === "trigger.app") &&
+      b.config.toolkit ? (
         <AppLogo src={logoOf(b.config.toolkit)} name={b.config.toolkit} />
       ) : (
         <span

@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { desc, eq, isNotNull, and, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { getRequestContext } from "../../../shared/context";
 import { getOwnedThread, quotaExceeded } from "../threads";
 import { validate } from "../../../shared/validate";
@@ -7,9 +7,9 @@ import { sendMessageSchema } from "../schemas";
 import { userLimit } from "../../../middleware/rate-limit";
 import type { AuthGuardEnv } from "../../../middleware/auth-guard";
 import { DEFAULT_MODEL_ID, isFreeModel, modelError } from "../../agent/models";
-import { chatMessage, chatThread } from "../../../db/schema";
+import { chatThread } from "../../../db/schema";
 import type { ChatRunParams } from "../run/workflow";
-import { ACTIVE_RUN_STATES } from "../cleanup";
+import { threadBusy } from "../run-busy";
 import { deepResearchQuestion } from "../commands";
 
 const runs = new Hono<AuthGuardEnv>()
@@ -41,20 +41,8 @@ const runs = new Hono<AuthGuardEnv>()
 
       // One run at a time per thread: two would share one checkpoint and interleave their messages.
       const runId0 = data.retry ? null : (data.messageId ?? null);
-      const [last] = await db
-        .select({ runId: chatMessage.runId })
-        .from(chatMessage)
-        .where(and(eq(chatMessage.threadId, threadId), isNotNull(chatMessage.runId)))
-        .orderBy(desc(chatMessage.seq))
-        .limit(1);
-      // A resend of the message that started that run is the idempotent case handled below.
-      if (last?.runId && last.runId !== runId0) {
-        const status = await env.CHAT_RUN.get(last.runId)
-          .then((i) => i.status())
-          .catch(() => null);
-        if (status && ACTIVE_RUN_STATES.has(status.status)) {
-          return c.json({ error: "RUN_ACTIVE", message: "The bot is still working on your last message." }, 409);
-        }
+      if (await threadBusy(env, db, threadId, runId0)) {
+        return c.json({ error: "RUN_ACTIVE", message: "The bot is still working on your last message." }, 409);
       }
 
       // The run id is the message id, so a resend of a message the server

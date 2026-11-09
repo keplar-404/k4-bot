@@ -51,11 +51,7 @@ export const retrySchema = z.object({
   backoff: z.enum(["constant", "exponential"]).default("exponential"),
 });
 
-export const scheduleConfig = z.object({
-  every: z.number().int().min(1).max(1000),
-  unit: z.enum(["minutes", "hours", "days", "weeks"]),
-  timezone: text(64).default("UTC"),
-});
+export { scheduleConfig } from "../../schedules/config";
 
 export const appConfig = z.object({
   toolkit: z

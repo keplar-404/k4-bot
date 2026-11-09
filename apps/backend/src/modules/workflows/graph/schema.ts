@@ -10,6 +10,8 @@ import {
   scheduleConfig,
   setConfig,
 } from "./blocks";
+import { aiConfig, appTriggerConfig } from "./event-ai-blocks";
+import { approvalConfig, loopConfig } from "./flow-blocks";
 
 export { conditionSchema, LIMITS, retrySchema } from "./blocks";
 
@@ -31,12 +33,16 @@ export const nodeSchema = z.discriminatedUnion("kind", [
   z.object({ ...base, kind: z.literal("trigger.manual"), config: empty }),
   z.object({ ...base, kind: z.literal("trigger.schedule"), config: scheduleConfig }),
   z.object({ ...base, kind: z.literal("trigger.webhook"), config: empty }),
+  z.object({ ...base, kind: z.literal("trigger.app"), config: appTriggerConfig }),
   z.object({ ...base, kind: z.literal("action.app"), config: appConfig, ...outside }),
   z.object({ ...base, kind: z.literal("action.http"), config: httpConfig, ...outside }),
   z.object({ ...base, kind: z.literal("logic.if"), config: conditionsConfig }),
   z.object({ ...base, kind: z.literal("logic.filter"), config: conditionsConfig }),
   z.object({ ...base, kind: z.literal("logic.delay"), config: delayConfig }),
   z.object({ ...base, kind: z.literal("logic.set"), config: setConfig }),
+  z.object({ ...base, kind: z.literal("ai.bot"), config: aiConfig, ...outside }),
+  z.object({ ...base, kind: z.literal("logic.loop"), config: loopConfig }),
+  z.object({ ...base, kind: z.literal("logic.approval"), config: approvalConfig }),
 ]);
 
 /** A connection. From an If block, `branch` says which way ("true" / "false"). */

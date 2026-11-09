@@ -3,6 +3,7 @@ import type { ComputerStub } from "../../computer/sandbox-backend";
 import type { FileRef, SubagentStatus } from "../../agent/parts";
 import type { RunSink } from "../../agent/run-stream";
 import { formatBytes } from "../../files";
+import { COMPACT_CONFIRM } from "../../../prompts/commands";
 import { deepResearchQuestion, researchInstruction } from "../commands";
 import { describeActivity } from "./activity";
 import type { createRecorder } from "./recorder";
@@ -47,7 +48,7 @@ export function agentInput(params: ChatRunParams, attached: FileRef[], slice: nu
   if (slice > 0) return null;
   // The summarizer has already run when the model sees this (see middleware/stack.ts), so it only confirms.
   if (params.compact) {
-    const confirm = "[The user ran /compact: the conversation so far was summarized to free context.] Reply in one or two short sentences: confirm it, and say in a few words what you still remember.";
+    const confirm = COMPACT_CONFIRM;
     return { messages: [{ role: "user", content: confirm }], skillsMetadata: null };
   }
   const question = params.research ? deepResearchQuestion(params.content) : null;

@@ -14,6 +14,8 @@ const catalogQuery = z.object({
   category: slug.optional(),
   /** Only these apps (the "Connected" filter): at most 200. */
   slugs: z.string().max(4000).optional(),
+  /** Only apps with events (the App event trigger's picker). */
+  withTriggers: z.enum(["1"]).optional(),
   offset: z.coerce.number().int().min(0).max(5000).default(0),
   limit: z.coerce.number().int().min(1).max(100).default(50),
 });
@@ -29,7 +31,7 @@ const catalogRoutes = new Hono<AuthGuardEnv>()
         ?.split(",")
         .filter((s) => TOOLKIT_SLUG.test(s))
         .slice(0, 200);
-      return c.json(await searchCatalog(db, { ...q, slugs }));
+      return c.json(await searchCatalog(db, { ...q, slugs, withTriggers: q.withTriggers === "1" }));
     } catch (error) {
       return composioError(c, error, "load the app list");
     }

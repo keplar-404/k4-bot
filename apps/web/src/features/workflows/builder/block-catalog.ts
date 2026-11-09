@@ -1,14 +1,15 @@
 import {
-  ClockIcon,
   FilterIcon,
   GitBranchIcon,
   GlobeIcon,
-  HandIcon,
   HourglassIcon,
   type LucideIcon,
   PencilLineIcon,
-  WebhookIcon,
+  RepeatIcon,
+  ShieldCheckIcon,
+  SparklesIcon,
 } from "lucide-react";
+import { TRIGGER_BLOCKS } from "./block-catalog-triggers";
 import type { BlockKind } from "./blocks";
 
 export type BlockInfo = {
@@ -21,27 +22,7 @@ export type BlockInfo = {
 
 /** The built-in blocks the library offers (apps are listed from the catalog). */
 export const BUILT_IN: BlockInfo[] = [
-  {
-    kind: "trigger.manual",
-    title: "Manual",
-    hint: "Run it yourself with a button",
-    icon: HandIcon,
-    group: "Triggers",
-  },
-  {
-    kind: "trigger.schedule",
-    title: "Schedule",
-    hint: "Every few minutes, hours or days",
-    icon: ClockIcon,
-    group: "Triggers",
-  },
-  {
-    kind: "trigger.webhook",
-    title: "Webhook",
-    hint: "When another service calls a URL",
-    icon: WebhookIcon,
-    group: "Triggers",
-  },
+  ...TRIGGER_BLOCKS,
   {
     kind: "logic.if",
     title: "If / else",
@@ -68,6 +49,27 @@ export const BUILT_IN: BlockInfo[] = [
     title: "Set fields",
     hint: "Shape data for later steps",
     icon: PencilLineIcon,
+    group: "Logic",
+  },
+  {
+    kind: "logic.loop",
+    title: "For each",
+    hint: "Repeat the next steps for every item",
+    icon: RepeatIcon,
+    group: "Logic",
+  },
+  {
+    kind: "logic.approval",
+    title: "Ask me first",
+    hint: "Wait until you approve",
+    icon: ShieldCheckIcon,
+    group: "Logic",
+  },
+  {
+    kind: "ai.bot",
+    title: "Ask a bot",
+    hint: "A bot writes, sums up or decides",
+    icon: SparklesIcon,
     group: "Logic",
   },
   {

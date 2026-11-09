@@ -24,6 +24,9 @@ export { WorkflowRunRelay } from "./modules/workflows/live/relay";
 // Stored images are shown by the web app (another origin) in <img>: the default same-origin policy would block them.
 const isFileBytes = (path: string) => /^\/api\/v1\/files\/[^/]+\/content$/.test(path);
 const isStream = (path: string) => path.startsWith("/api/v1/computer/stream/");
+// Composio delivers every user's app events from a few shared IPs: a per-IP limit would drop them. The signature
+// authenticates them, and each workflow is rate limited when its run starts.
+const isComposioEvents = (path: string) => path === "/api/v1/composio/events";
 
 const app = new Hono<{ Bindings: Env }>()
   .use("*", corsMiddleware)
@@ -32,7 +35,7 @@ const app = new Hono<{ Bindings: Env }>()
   .use("*", bodyLimit({ maxSize: 1024 * 1024 }))
   // /auth/* is rate limited by Better Auth itself (database-backed rules).
   .use("/api/v1/*", (c, next) =>
-    c.req.path.startsWith("/api/v1/auth/") || isStream(c.req.path) ? next() : ipLimit(c, next),
+    c.req.path.startsWith("/api/v1/auth/") || isStream(c.req.path) || isComposioEvents(c.req.path) ? next() : ipLimit(c, next),
   )
   .route("/api/v1", routes);
 

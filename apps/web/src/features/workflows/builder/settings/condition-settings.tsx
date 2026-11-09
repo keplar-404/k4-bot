@@ -9,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { Block, BlockBody } from "../blocks";
+import type { BlockBody } from "../blocks";
 import type { Cond } from "./condition-ops";
 import { ConditionRow } from "./condition-row";
 import { SettingsSection } from "./field";

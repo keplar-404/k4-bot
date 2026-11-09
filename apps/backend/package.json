@@ -15,13 +15,14 @@
     "check:sandbox": "bun run src/modules/sandbox/policy.check.ts && bun run src/modules/sandbox/paths.check.ts",
     "check:middleware": "bun run src/modules/agent/middleware/stack.check.ts && bun run src/modules/agent/middleware/todo-guard.check.ts && bun run src/modules/agent/modes.check.ts",
     "check:web": "bun run src/modules/chat/commands.check.ts && bun run src/modules/agent/tools/web/research.check.ts && bun run src/modules/agent/tools/web/research-format.check.ts",
-    "check:workflows": "bun run src/modules/workflows/graph/graph.check.ts && bun run src/modules/workflows/graph/publish.check.ts",
-    "check:engine": "bun run src/modules/workflows/engine/engine.check.ts && bun run src/modules/workflows/engine/http-guard.check.ts && bun run src/modules/composio/action-kind.check.ts && bun run src/modules/workflows/routes/hooks.check.ts && bun run src/modules/workflows/engine/blocks/http.check.ts",
+    "check:workflows": "bun run src/modules/workflows/graph/graph.check.ts && bun run src/modules/workflows/graph/publish.check.ts && bun run src/modules/schedules/next.check.ts && bun run src/modules/workflows/engine/walk.check.ts",
+    "check:engine": "bun run src/modules/workflows/engine/engine.check.ts && bun run src/modules/workflows/engine/http-guard.check.ts && bun run src/modules/composio/action-kind.check.ts && bun run src/modules/workflows/routes/hooks.check.ts && bun run src/modules/workflows/engine/blocks/http.check.ts && bun run src/modules/composio/session.check.ts && bun run src/modules/composio/arguments.check.ts && bun run src/modules/composio/events-route.check.ts",
     "check": "bun run check:workflows && bun run check:engine && bun run check:web && bun run check:relay-token && bun run check:guards && bun run check:secrets && bun run check:retry && bun run check:documents && bun run check:sandbox && bun run check:middleware",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "agent:chat": "bun --env-file=.dev.vars run src/modules/agent/cli.ts",
+    "composio:webhook": "bun --env-file=.dev.vars run scripts/composio/set-webhook.ts",
     "e2b:smoke": "bun --env-file=.dev.vars run scripts/e2b/desktop-smoke.ts"
   },
   "dependencies": {

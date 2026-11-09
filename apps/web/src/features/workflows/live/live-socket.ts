@@ -1,6 +1,18 @@
 "use client";
 
-import { getLiveToken, type LiveEvent, liveSocketUrl } from "../api";
+import { BASE } from "@/features/files/api/library";
+import { type LiveEvent, request } from "../api";
+
+/** A short-lived token for the live socket (a WebSocket cannot carry the session to another origin). */
+export const getLiveToken = (id: string) =>
+  request<{ token: string; userId: string }>(`/${id}/live-token`, {
+    method: "POST",
+  });
+export const liveSocketUrl = (
+  id: string,
+  auth: { token: string; userId: string },
+) =>
+  `${BASE.replace(/^http/, "ws")}/api/v1/workflows/${id}/live?${new URLSearchParams(auth)}`;
 
 /** Waits between reconnect tries: 1 s, 2 s, 5 s, 10 s, then every 30 s. */
 const BACKOFF_MS = [1000, 2000, 5000, 10_000, 30_000];

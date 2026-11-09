@@ -1,4 +1,4 @@
-import type { Block, BlockBody } from "../blocks";
+import type { BlockBody } from "../blocks";
 
 type CondBlock = Extract<BlockBody, { kind: "logic.if" | "logic.filter" }>;
 export type Cond = CondBlock["config"]["conditions"][number];

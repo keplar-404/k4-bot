@@ -29,6 +29,8 @@ export type Workflow = {
   triggerKind: string | null;
   hasWebhook: boolean;
   nextRunAt: string | null;
+  /** Set when the system turned it off (an app connection expired, it kept starting itself). */
+  pausedReason: string | null;
   lastRunAt: string | null;
   createdAt: string;
   updatedAt: string;

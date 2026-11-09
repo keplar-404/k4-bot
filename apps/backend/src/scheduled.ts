@@ -1,10 +1,11 @@
 import { and, lt, sql } from "drizzle-orm";
 import { createDb, type Db } from "./db";
-import { chatEvent } from "./db/schema";
+import { chatEvent, composioEvent } from "./db/schema";
 import { parseEnv, type Env } from "./config/env";
 import { refreshCatalog } from "./modules/composio/catalog-refresh";
 import { sandboxFor } from "./modules/sandbox/sandbox-backend";
 import { staleRunning } from "./modules/sandbox/store";
+import { runDueTasks } from "./modules/tasks/due";
 import { runDueSchedules, sweepStuckRuns } from "./modules/workflows/engine/schedule";
 
 /** Live events only matter for resuming a dropped stream; history is in chat_message. */
@@ -34,8 +35,9 @@ export const scheduled: ExportedHandlerScheduledHandler<Env> = async (controller
   const cfg = parseEnv(env);
   const db = createDb(cfg.DATABASE_URL);
   if (controller.cron === "* * * * *") {
-    // Per-minute: fire due scheduled workflows.
+    // Per-minute: fire due scheduled workflows and bot tasks.
     ctx.waitUntil(runDueSchedules(cfg, db).catch((e) => console.error("[schedule] failed", e)));
+    ctx.waitUntil(runDueTasks(cfg, db).catch((e) => console.error("[tasks] failed", e)));
     return;
   }
   // Daily (0 3 * * *): retention, catalog refresh, stale sandboxes, stuck-run sweep.
@@ -48,6 +50,13 @@ export const scheduled: ExportedHandlerScheduledHandler<Env> = async (controller
     ),
   );
   ctx.waitUntil(sweepStuckRuns(db).catch((e) => console.error("[sweep] failed", e)));
+  // Composio redelivers within hours, never weeks: older event ids are no longer needed to spot duplicates.
+  ctx.waitUntil(
+    db
+      .delete(composioEvent)
+      .where(lt(composioEvent.receivedAt, cutoff))
+      .catch((e) => console.error("[composio-events] prune failed", e)),
+  );
 };
 
 /** Safety net: a sandbox still marked running with no use for twice the idle window (its alarm was lost) is paused. */

@@ -11,6 +11,7 @@ export function SchemaFieldText({
   label,
   required,
   hint,
+  meta,
   schema,
   value,
   onChange,
@@ -20,6 +21,7 @@ export function SchemaFieldText({
   label: string;
   required: boolean;
   hint: string | undefined;
+  meta?: string;
   schema: JsonSchema;
   value: unknown;
   onChange: (v: unknown) => void;
@@ -32,7 +34,7 @@ export function SchemaFieldText({
       : undefined;
   const Control = LONG.test(name) ? Textarea : Input;
   return (
-    <Field id={id} label={label} required={required} hint={hint}>
+    <Field id={id} label={label} required={required} meta={meta} hint={hint}>
       <Control
         id={id}
         value={value === undefined ? "" : String(value)}

@@ -1,5 +1,6 @@
 import type { Env } from "../../config/env";
 import { allow } from "../../middleware/rate-limit";
+import { fitArguments } from "./arguments";
 import { composioFor } from "./client";
 import { listConnections } from "./connections";
 import { getTool } from "./tools";
@@ -49,13 +50,16 @@ export async function executeAction(env: Env, args: ActionArgs): Promise<ActionR
     const version = args.version ?? tool.version;
     if (!version) return failed("This action has no version to run.");
 
+    const fitted = fitArguments(tool.input, args.arguments);
+    if ("missing" in fitted) return failed(`Fill in: ${fitted.missing.join(", ")}.`);
+
     const account = await pickAccount(env, args);
     if ("error" in account) return failed(account.error);
 
     const res = await composio.tools.execute(args.slug, {
       userId: args.userId,
       connectedAccountId: account.id,
-      arguments: args.arguments,
+      arguments: fitted.args,
       version,
     });
     if (!res.successful) {

@@ -1,20 +1,30 @@
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import { Label } from "@/components/ui/label";
 
-/** A labelled setting: name, optional "required" mark, the control, and a hint under it. */
+const SHORT_HINT = 160;
+
+/**
+ * A labelled setting: name, optional "required" mark, the control, and a hint under it. A long hint (apps explain
+ * where a value comes from, e.g. "get message IDs from Fetch emails") opens in full on "More". `meta` is a line such as
+ * "number · default 10 · e.g. me".
+ */
 export function Field({
   id,
   label,
   required,
   hint,
+  meta,
   children,
 }: {
   id: string;
   label: string;
   required?: boolean;
   hint?: string;
+  meta?: string;
   children: ReactNode;
 }) {
+  const [open, setOpen] = useState(false);
+  const long = (hint?.length ?? 0) > SHORT_HINT;
   return (
     <div className="flex flex-col gap-1.5">
       <Label htmlFor={id} className="text-xs">
@@ -27,8 +37,22 @@ export function Field({
         {required && <span className="sr-only">(required)</span>}
       </Label>
       {children}
+      {meta && <p className="text-[11px] text-muted-foreground">{meta}</p>}
       {hint && (
-        <p className="line-clamp-3 text-muted-foreground text-xs">{hint}</p>
+        <p className="text-muted-foreground text-xs">
+          {long && !open
+            ? `${hint.slice(0, SHORT_HINT).trimEnd()}… `
+            : `${hint} `}
+          {long && (
+            <button
+              type="button"
+              className="font-medium text-foreground underline-offset-2 hover:underline"
+              onClick={() => setOpen((v) => !v)}
+            >
+              {open ? "Less" : "More"}
+            </button>
+          )}
+        </p>
       )}
     </div>
   );

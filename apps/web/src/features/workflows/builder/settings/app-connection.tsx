@@ -1,6 +1,6 @@
 "use client";
 
-import { ExternalLinkIcon, RefreshCwIcon } from "lucide-react";
+import { PlugIcon, RefreshCwIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -8,8 +8,8 @@ import { authorizeApp } from "@/features/connect/api";
 import { useConnections } from "@/features/connect/use-connections";
 
 /**
- * Whether the user has connected this app. Connecting opens Composio in a new tab, so the workflow being edited
- * stays open; "Check again" reloads the status after they finish there.
+ * Whether the user has connected this app. Connecting goes to Composio in this tab and comes back to this workflow
+ * (the draft autosaves; the page warns if a save is still pending). "Check again" reloads the status.
  */
 export function AppConnection({
   toolkit,
@@ -25,7 +25,10 @@ export function AppConnection({
   const connect = async () => {
     setOpening(true);
     try {
-      window.open(await authorizeApp(toolkit), "_blank", "noopener");
+      window.location.href = await authorizeApp(
+        toolkit,
+        window.location.pathname,
+      );
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
@@ -57,7 +60,7 @@ export function AppConnection({
       </p>
       <div className="flex gap-2">
         <Button size="sm" onClick={() => void connect()} disabled={opening}>
-          <ExternalLinkIcon />
+          <PlugIcon />
           {state.kind === "broken" ? "Reconnect" : "Connect"}
         </Button>
         <Button size="sm" variant="ghost" onClick={() => void conns.reload()}>

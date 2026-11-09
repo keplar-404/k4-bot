@@ -84,6 +84,7 @@ The test login (an `@example.com` user) is in the previous session's scratchpad,
 - [ ] 03 — `WorkflowRunner` Cloudflare Workflow, step rows in DB, retry/on-error, Composio execute
 - [ ] 06a — `POST /workflows/:id/run` (manual + test), cancel, caps
 - [x] 05 — live relay + canvas overlay + runs drawer + run detail
+- 10 — edge cases and what is still open: `10-edge-cases.md`
 - [ ] 06b — schedule cron; 06c — public webhook route
 - [ ] 08 — full test pass, then cleanup of test data
 - [ ] Ask the user whether to commit/push

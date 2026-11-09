@@ -4,6 +4,7 @@ import { authGuard, type AuthGuardEnv } from "../../../middleware/auth-guard";
 import { getRequestContext } from "../../../shared/context";
 import { validate } from "../../../shared/validate";
 import { getRun, listRuns } from "../store/runs";
+import answer from "./answer";
 import crud from "./crud";
 import lifecycle from "./lifecycle";
 import { liveSocket, liveToken } from "./live";
@@ -28,6 +29,7 @@ const workflows = new Hono<AuthGuardEnv>()
     return c.json({ items });
   })
   .route("/", runs)
+  .route("/", answer)
   .route("/", share)
   .route("/", lifecycle)
   .route("/", crud);

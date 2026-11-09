@@ -17,6 +17,9 @@ export type JsonSchema = {
   properties?: Record<string, JsonSchema>;
   required?: string[];
   anyOf?: JsonSchema[];
+  deprecated?: boolean;
+  /** Composio: this input takes a file (it is uploaded to the app when the block runs). */
+  file_uploadable?: boolean;
 };
 export type ToolDetail = ToolSummary & {
   input: JsonSchema;
@@ -50,3 +53,30 @@ export const fetchTools = (toolkit: string) =>
   ).then((r) => r.items);
 export const fetchTool = (slug: string) =>
   get<ToolDetail>(`/tools/${encodeURIComponent(slug)}`);
+
+/** An event an app can start a workflow with: what it needs (`config`) and what it sends (`payload`). */
+export type TriggerType = {
+  slug: string;
+  name: string;
+  description: string;
+  /** "webhook": the app pushes it at once. "poll": checked every few minutes. */
+  delivery: string;
+  config: JsonSchema;
+  payload: JsonSchema;
+};
+
+export const fetchTriggers = (toolkit: string) =>
+  get<{ items: TriggerType[] }>(
+    `/toolkits/${encodeURIComponent(toolkit)}/triggers`,
+  ).then((r) => r.items);
+export const fetchTrigger = (slug: string) =>
+  get<TriggerType>(`/triggers/${encodeURIComponent(slug)}`);
+
+/** Composio still lists replaced settings (e.g. Gmail's old `interval`): they are not offered. */
+export function withoutDeprecated(schema: JsonSchema): JsonSchema {
+  const entries = Object.entries(schema.properties ?? {});
+  return {
+    ...schema,
+    properties: Object.fromEntries(entries.filter(([, s]) => !s.deprecated)),
+  };
+}

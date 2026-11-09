@@ -32,7 +32,7 @@ export function createComposioTools(opts: { env: Env; userId: string; apps: BotC
     return JSON.stringify(result.ok ? { data: result.data } : { error: result.error });
   }
 
-  const [findActions, actionDetails] = createLookupTools(env, enabled);
+  const [findActions, actionDetails, findEvents] = createLookupTools(env, enabled);
 
   const readAction = tool(
     async ({ app, action, arguments: input }) => {
@@ -75,7 +75,7 @@ export function createComposioTools(opts: { env: Env; userId: string; apps: BotC
     app_act: { allowedDecisions: ["approve", "reject"], description: "Let the bot use an app?" },
   };
   return {
-    tools: [findActions, actionDetails, readAction, act],
+    tools: [findActions, actionDetails, findEvents, readAction, act],
     approvals,
     appNames: [...enabled.keys()],
   };

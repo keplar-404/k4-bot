@@ -1,5 +1,6 @@
 import type { Db } from "../../../../db";
 import type { Env } from "../../../../config/env";
+import { FileGoneError, stageFiles } from "../../../composio/files";
 import { loadSecrets, SecretMissingError } from "../../../secrets/load";
 import type { WorkflowNode } from "../../graph/schema";
 import { FatalBlockError, userMessage } from "../errors";
@@ -41,7 +42,9 @@ export async function runAction(
     if (node.kind === "action.app") {
       const args = resolveDeep(node.config.arguments, scope);
       input = { ...node.config, arguments: args };
-      output = await runApp(env, run.userId, node.config, args);
+      const call = { userId: run.userId, toolkit: node.config.toolkit ?? "", tool: node.config.tool ?? "" };
+      const staged = (await stageFiles(env, db, call, args)) as Record<string, unknown>;
+      output = await runApp(env, run.userId, node.config, staged);
     } else {
       const request = resolveDeep(node.config, scope);
       input = request;
@@ -49,7 +52,11 @@ export async function runAction(
     }
     return { ok: true, input: redact(input, secrets), output: redact(limitOutput(output), secrets) };
   } catch (error) {
-    const retryable = !(error instanceof FatalBlockError || error instanceof SecretMissingError);
+    const retryable = !(
+      error instanceof FatalBlockError ||
+      error instanceof SecretMissingError ||
+      error instanceof FileGoneError
+    );
     return {
       ok: false,
       input: redact(input, secrets),

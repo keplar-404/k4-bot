@@ -20,15 +20,7 @@ const edgeInput = z.object({
 export const nodesField = z.array(nodeInput).min(1).max(50);
 export const edgesField = z.array(edgeInput).max(100);
 
-export const BLOCKS_HELP = [
-  "Blocks: trigger.manual | trigger.schedule{every,unit,timezone} | trigger.webhook,",
-  "action.app{toolkit,tool,version,arguments,connectedAccountId?},",
-  "action.http{method,url,headers,body,timeoutSeconds,expect},",
-  "logic.if | logic.filter{combine,conditions[{left,op,right}]}, logic.delay{amount,unit}, logic.set{fields[{key,value}]}.",
-  "One trigger, no loops; connections from logic.if need branch true|false.",
-].join(" ");
-export const TEMPLATES_HELP =
-  "In text fields use {{trigger.inputs.x}}, {{trigger.body.x}}, {{steps.<blockId>.output.x}} and {{secrets.NAME}}.";
+export { BLOCKS_HELP, TEMPLATES_HELP } from "../../../prompts/workflow-tools";
 
 /** Adds positions and edge ids, then lets the real schema judge it. Its message is what the model fixes. */
 export function toGraph(nodes: z.infer<typeof nodesField>, edges: z.infer<typeof edgesField>) {

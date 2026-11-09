@@ -36,10 +36,12 @@ const PLAN_ALLOWED = new Set([
   // Connected apps and workflows: reading only
   "app_find_actions",
   "app_action_details",
+  "app_find_events",
   "app_read",
   "list_my_workflows",
   "get_workflow",
   "workflow_run_status",
+  "list_scheduled_tasks",
 ]);
 
 /** `readOnlyApps`: names of connected-app (MCP) tools that only read; they stay available in Plan mode. */

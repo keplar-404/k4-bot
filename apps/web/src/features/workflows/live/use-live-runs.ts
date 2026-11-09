@@ -1,50 +1,17 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { getRun, type LiveEvent, listRuns } from "../api";
+import { listRuns } from "../api";
+import { applyLiveEvent, refreshDetail, refreshRuns } from "./live-events";
+
+export { refreshRuns } from "./live-events";
+
 import { type StepState, useRunOverlay } from "../builder/node-overlay";
 import { useBuilder } from "../builder/store";
 import { connectLive } from "./live-socket";
 import { isActive, useRunView } from "./run-view-store";
 
 const POLL_MS = 2000;
-
-/** Reloads the run list (after starting a run, and when a run starts or ends). */
-export async function refreshRuns(workflowId: string) {
-  try {
-    useRunView.getState().setRuns((await listRuns(workflowId)).items);
-  } catch {
-    // The list is a convenience: a failed reload keeps the old one.
-  }
-}
-
-/** Reloads the watched run with every step's input and output, if it is still the one being watched. */
-async function refreshDetail(runId: string) {
-  try {
-    const run = await getRun(runId);
-    if (useRunView.getState().viewedId === runId)
-      useRunView.getState().setDetail(run);
-  } catch {
-    // A blip: the next event or poll tries again.
-  }
-}
-
-function applyLiveEvent(workflowId: string, event: LiveEvent) {
-  const view = useRunView.getState();
-  if (event.type === "run.started") {
-    void refreshRuns(workflowId);
-    // Follow a new run (from another tab, the schedule, a webhook or a bot) unless another one is being watched live.
-    if (!isActive(view.detail?.status)) view.view(event.runId);
-    return;
-  }
-  if (event.runId !== view.viewedId) return;
-  if (event.type === "step") {
-    view.applyStep(event);
-    return;
-  }
-  void refreshDetail(event.runId);
-  void refreshRuns(workflowId);
-}
 
 /**
  * Shows runs on the canvas as they happen. The live socket pushes each step change; on every (re)connect the run

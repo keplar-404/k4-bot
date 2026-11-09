@@ -2,13 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { appName } from "../block-label";
-import type { Block, BlockBody } from "../blocks";
+import type { BlockBody } from "../blocks";
 import { ActionPicker } from "./action-picker";
 import { AppActionChosen } from "./app-action-section";
 import { AppConnection } from "./app-connection";
 import { AppSettingsEmpty, AppSettingsLoading } from "./app-settings-empty";
 import { SettingsSection } from "./field";
-import { RetrySettings } from "./retry-settings";
 import { SchemaForm } from "./schema-form";
 import { fetchTool, type ToolDetail } from "./tools-api";
 
@@ -86,12 +85,6 @@ export function AppSettings({
           )}
         </SettingsSection>
       )}
-      <RetrySettings
-        retry={block.retry}
-        onError={block.onError}
-        onRetry={(retry) => update({ ...block, retry })}
-        onOnError={(onError) => update({ ...block, onError })}
-      />
     </>
   );
 }

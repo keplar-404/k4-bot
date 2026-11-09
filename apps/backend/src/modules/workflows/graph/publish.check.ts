@@ -36,4 +36,33 @@ assert.ok(
 );
 assert.equal(publishIssues(twoDelays(3)).length, 0);
 
+// App events and AI steps must be filled in; a secret can never reach a bot's prompt.
+const withBlock = (node: object) =>
+  ({
+    nodes: [trigger, { position: { x: 0, y: 0 }, ...node }],
+    edges: [{ id: "e", source: "t", target: "x" }],
+  }) as never;
+const firstIssue = (g: never) => publishIssues(g)[0]?.message ?? "";
+const appEvent = (config: object) =>
+  ({
+    nodes: [
+      { id: "t", kind: "trigger.app", position: { x: 0, y: 0 }, config: { config: {}, ...config } },
+      { id: "x", kind: "logic.set", position: { x: 0, y: 0 }, config: { fields: [] } },
+    ],
+    edges: [{ id: "e", source: "t", target: "x" }],
+  }) as never;
+assert.match(firstIssue(appEvent({})), /Choose an app and the event/);
+assert.equal(publishIssues(appEvent({ toolkit: "slack", trigger: "SLACK_CHANNEL_MESSAGE_RECEIVED" })).length, 0);
+const ai = (config: object) =>
+  withBlock({
+    id: "x",
+    kind: "ai.bot",
+    onError: "stop",
+    config: { prompt: "", output: "text", useApps: false, ...config },
+  });
+assert.match(firstIssue(ai({})), /Choose the bot/);
+assert.match(firstIssue(ai({ botId: "b1" })), /Say what the bot should do/);
+assert.match(firstIssue(ai({ botId: "b1", prompt: "Use {{secrets.API_KEY}}" })), /Secrets can only/);
+assert.equal(publishIssues(ai({ botId: "b1", prompt: "Sum up {{trigger.inputs.text}}" })).length, 0);
+
 console.log("publish rules: all checks passed");

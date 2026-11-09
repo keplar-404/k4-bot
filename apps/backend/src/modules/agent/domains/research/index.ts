@@ -1,5 +1,5 @@
 import type { DomainSpec } from "../types";
-import { RESEARCH_INSTRUCTIONS, RESEARCHER_BRIEF } from "./prompts";
+import { RESEARCH_INSTRUCTIONS, RESEARCHER_BRIEF } from "../../../../prompts/research";
 
 /**
  * Deep research bot: a lead that scopes the question, researches with the full web toolset, and for broad

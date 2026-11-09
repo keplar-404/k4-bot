@@ -2,13 +2,13 @@
 
 import { Textarea } from "@/components/ui/textarea";
 import { Field } from "./field";
-import type { JsonSchema } from "./tools-api";
 
 export function SchemaFieldJson({
   id,
   label,
   required,
   hint,
+  meta,
   value,
   onChange,
 }: {
@@ -16,6 +16,7 @@ export function SchemaFieldJson({
   label: string;
   required: boolean;
   hint: string | undefined;
+  meta?: string;
   value: unknown;
   onChange: (v: unknown) => void;
 }) {
@@ -30,6 +31,7 @@ export function SchemaFieldJson({
       id={id}
       label={label}
       required={required}
+      meta={meta}
       hint={`${hint ?? ""} JSON.`.trim()}
     >
       <Textarea

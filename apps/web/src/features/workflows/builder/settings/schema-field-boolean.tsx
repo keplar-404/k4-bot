@@ -9,6 +9,7 @@ export function SchemaFieldBoolean({
   label,
   required,
   hint,
+  meta,
   schema,
   value,
   onChange,
@@ -17,13 +18,14 @@ export function SchemaFieldBoolean({
   label: string;
   required: boolean;
   hint: string | undefined;
+  meta?: string;
   schema: JsonSchema;
   value: unknown;
   onChange: (v: unknown) => void;
 }) {
   return (
     <div className="flex items-start justify-between gap-3">
-      <Field id={id} label={label} required={required} hint={hint}>
+      <Field id={id} label={label} required={required} meta={meta} hint={hint}>
         {null}
       </Field>
       <Switch

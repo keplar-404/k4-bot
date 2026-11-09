@@ -1,6 +1,6 @@
 import { triggerLabel } from "../describe";
 import { infoOf } from "./block-catalog";
-import type { Block, BlockBody } from "./blocks";
+import type { BlockBody } from "./blocks";
 
 /** "GMAIL_SEND_EMAIL" (from app "gmail") → "Send email". */
 export function actionName(tool: string, toolkit?: string): string {
@@ -18,7 +18,7 @@ export const appName = (slug: string) => {
 
 /** The small grey line above a block's title: what kind of block it is. */
 export function blockKindLabel(b: BlockBody): string {
-  if (b.kind === "action.app")
+  if (b.kind === "action.app" || b.kind === "trigger.app")
     return b.config.toolkit ? appName(b.config.toolkit) : "App";
   return infoOf(b.kind)?.title ?? b.kind;
 }
@@ -43,6 +43,7 @@ export function blockTitle(b: BlockBody): string {
     case "trigger.manual":
     case "trigger.schedule":
     case "trigger.webhook":
+    case "trigger.app":
       return triggerLabel({
         nodes: [{ ...b, position: { x: 0, y: 0 } }],
         edges: [],
@@ -57,5 +58,15 @@ export function blockTitle(b: BlockBody): string {
       return `Set ${b.config.fields.length} field${b.config.fields.length === 1 ? "" : "s"}`;
     case "action.http":
       return hostOf(b.config.url) ?? "HTTP request";
+    case "ai.bot":
+      return b.config.prompt.trim()
+        ? b.config.prompt.trim().slice(0, 40)
+        : "Ask a bot";
+    case "logic.loop":
+      return "Repeat for each item";
+    case "logic.approval":
+      return b.config.message.trim()
+        ? b.config.message.trim().slice(0, 40)
+        : "Wait for my OK";
   }
 }

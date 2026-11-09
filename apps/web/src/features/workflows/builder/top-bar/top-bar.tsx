@@ -12,7 +12,6 @@ import { MoreMenu } from "./more-menu";
 import { NameInput } from "./name-input";
 import { PowerButtons } from "./power-buttons";
 import { SaveIndicator } from "./save-indicator";
-import { WebhookDialog } from "./webhook-dialog";
 
 /** Back, name, save state on the left; what is left to do, run controls (`children`) and on / off on the right. */
 export function TopBar({
@@ -25,13 +24,14 @@ export function TopBar({
   const w = useBuilder((s) => s.workflow);
   if (!w) return null;
   const active = w.status === "active";
-  const isWebhook = w.graph.nodes.some((n) => n.kind === "trigger.webhook");
+  const _isWebhook = w.graph.nodes.some((n) => n.kind === "trigger.webhook");
 
   return (
     <header className="flex h-14 shrink-0 items-center gap-2 border-b bg-background px-3">
       <Button
         variant="ghost"
         size="icon-sm"
+        nativeButton={false}
         render={<Link href="/dashboard/workflow" />}
         aria-label="Back to workflows"
       >

@@ -23,6 +23,15 @@ type RawClient = {
   toolkits: {
     list(q: { limit?: number; cursor?: string; sort_by?: "usage" | "alphabetically" }): Promise<RawList<RawToolkit>>;
   };
+  files: {
+    createPresignedURL(body: {
+      toolkit_slug: string;
+      tool_slug: string;
+      filename: string;
+      mimetype: string;
+      md5: string;
+    }): Promise<{ key: string; new_presigned_url: string }>;
+  };
 };
 export type RawToolkit = {
   slug: string;

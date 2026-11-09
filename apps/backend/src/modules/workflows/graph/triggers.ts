@@ -1,18 +1,18 @@
+import { scheduleConfig } from "../../schedules/config";
+import { nextOccurrence } from "../../schedules/next";
 import { isTrigger, type WorkflowGraph, type WorkflowNode } from "./schema";
-
-const UNIT_MS = { minutes: 60_000, hours: 3_600_000, days: 86_400_000, weeks: 604_800_000 } as const;
 
 /** The graph's trigger block (a valid published graph has exactly one). */
 export const triggerOf = (g: WorkflowGraph): WorkflowNode | undefined => g.nodes.find(isTrigger);
 
 /**
- * When an interval schedule is next due after `from`: every N units, on a whole minute (the cron checks once a
- * minute). Null for any other trigger.
+ * When a schedule trigger is next due after `from`. Null for any other trigger, and for a "once" that has run. The
+ * config is parsed again: a graph published before schedules had modes is read straight from the database.
  */
 export function nextRunAt(trigger: WorkflowNode | undefined, from = Date.now()): Date | null {
   if (trigger?.kind !== "trigger.schedule") return null;
-  const interval = trigger.config.every * UNIT_MS[trigger.config.unit];
-  return new Date(Math.ceil((from + interval) / 60_000) * 60_000);
+  const config = scheduleConfig.safeParse(trigger.config);
+  return config.success ? nextOccurrence(config.data, from) : null;
 }
 
 const hex = (buf: ArrayBuffer) => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");

@@ -1,5 +1,6 @@
 import type { WorkflowStep } from "cloudflare:workers";
 import type { WorkflowNode } from "../graph/schema";
+import { runApproval } from "./approval";
 import { runDelay } from "./delay";
 import { type NodeDeps, type NodeResult, once } from "./durable";
 import { userMessage } from "./errors";
@@ -18,10 +19,12 @@ type StepResult =
 /**
  * Runs one block as durable Workflow steps. Everything that writes happens INSIDE a step: code outside a step runs
  * again each time the Workflow resumes. A block never throws out of here; it ends succeeded, failed or cancelled.
+ * `key` names the steps: the block id, plus `#<n>` inside a For each, so every pass is its own durable step.
  */
-export function runNode(step: WorkflowStep, deps: NodeDeps, node: WorkflowNode, ctx: RunContext) {
-  if (node.kind === "logic.delay") return runDelay(step, deps, node);
-  return runWithRetries(step, deps, node, ctx);
+export function runNode(step: WorkflowStep, deps: NodeDeps, node: WorkflowNode, ctx: RunContext, key = node.id) {
+  if (node.kind === "logic.delay") return runDelay(step, deps, node, key);
+  if (node.kind === "logic.approval") return runApproval(step, deps, node, ctx, key);
+  return runWithRetries(step, deps, node, ctx, key);
 }
 
 async function runWithRetries(
@@ -29,6 +32,7 @@ async function runWithRetries(
   deps: NodeDeps,
   node: WorkflowNode,
   ctx: RunContext,
+  key: string,
 ): Promise<NodeResult> {
   const retry = "retry" in node ? node.retry : undefined;
   const maxAttempts = retry?.maxAttempts ?? 1;
@@ -38,11 +42,12 @@ async function runWithRetries(
       delay: `${retry?.delaySeconds ?? 10} seconds` as const,
       backoff: retry?.backoff ?? "exponential",
     },
-    timeout: "2 minutes" as const,
+    // A bot that searches and reads apps needs longer than one API call.
+    timeout: node.kind === "ai.bot" ? ("5 minutes" as const) : ("2 minutes" as const),
   };
 
   try {
-    const result = await step.do(`block:${node.id}`, config, ({ attempt }) =>
+    const result = await step.do(`block:${key}`, config, ({ attempt }) =>
       tryBlock(deps, node, ctx, attempt, maxAttempts),
     );
     if (result.status !== "succeeded") return result;
@@ -55,7 +60,7 @@ async function runWithRetries(
   } catch (error) {
     // The step timed out, or Workflows stopped retrying: the block failed, not the whole engine.
     const message = userMessage(error);
-    await once(step, `fail:${node.id}`, () => deps.log.step(node, { status: "failed", error: message }));
+    await once(step, `fail:${key}`, () => deps.log.step(node, { status: "failed", error: message }));
     return { status: "failed", error: message };
   }
 }

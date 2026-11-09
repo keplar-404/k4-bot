@@ -1,3 +1,4 @@
+import { describeSchedule } from "@/features/schedules/describe";
 import type { WorkflowGraph, WorkflowStats } from "./api";
 
 type Node = WorkflowGraph["nodes"][number];
@@ -6,19 +7,29 @@ type Node = WorkflowGraph["nodes"][number];
 export function triggerLabel(graph: WorkflowGraph): string {
   const t = graph.nodes.find((n) => n.kind.startsWith("trigger."));
   if (!t) return "No trigger yet";
-  if (t.kind === "trigger.schedule") {
-    const { every, unit } = t.config;
-    const word = every === 1 ? unit.replace(/s$/, "") : unit;
-    return every === 1 ? `Every ${word}` : `Every ${every} ${word}`;
-  }
+  if (t.kind === "trigger.schedule") return describeSchedule(t.config);
   if (t.kind === "trigger.webhook") return "When a webhook is called";
+  if (t.kind === "trigger.app") {
+    const { toolkit, trigger } = t.config;
+    if (!trigger) return "When something happens in an app";
+    // "SLACK_CHANNEL_MESSAGE_RECEIVED" in slack → "Channel message received"
+    const prefix = toolkit ? `${toolkit.toUpperCase()}_` : "";
+    const words = (
+      trigger.startsWith(prefix) ? trigger.slice(prefix.length) : trigger
+    )
+      .toLowerCase()
+      .replace(/_/g, " ");
+    return `When: ${words}`;
+  }
   return "Run by hand";
 }
 
 /** The apps a workflow uses, in order, without repeats (their Composio slugs). */
 export function appsOf(graph: WorkflowGraph): string[] {
   const slugs = graph.nodes.flatMap((n: Node) =>
-    n.kind === "action.app" && n.config.toolkit ? [n.config.toolkit] : [],
+    (n.kind === "action.app" || n.kind === "trigger.app") && n.config.toolkit
+      ? [n.config.toolkit]
+      : [],
   );
   return [...new Set(slugs)];
 }

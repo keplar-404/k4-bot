@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { scheduleConfig } from "../../schedules/config";
 import { graphSchema, LIMITS, type WorkflowGraph } from "./schema";
 import { hashToken, newWebhookToken, nextRunAt } from "./triggers";
 import { publishIssues, structureIssues, topoOrder } from "./validate";
@@ -69,7 +70,7 @@ const fast = {
   id: "t",
   kind: "trigger.schedule" as const,
   position: pos,
-  config: { every: 1, unit: "minutes" as const, timezone: "UTC" },
+  config: scheduleConfig.parse({ every: 1, unit: "minutes", timezone: "UTC" }),
 };
 assert.ok(publishIssues(g([fast, app("a")], [e("t", "a")])).some((i) => /every 5 minutes/.test(i.message)));
 

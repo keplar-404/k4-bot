@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  AlarmClockIcon,
   BotIcon,
   FolderOpenIcon,
   KeyRoundIcon,
@@ -42,6 +43,7 @@ const navItems = [
   { title: "Connect", url: "/dashboard/connect", icon: <PlugIcon /> },
   { title: "Secrets", url: "/dashboard/secrets", icon: <KeyRoundIcon /> },
   { title: "Workflow", url: "/dashboard/workflow", icon: <WorkflowIcon /> },
+  { title: "Tasks", url: "/dashboard/tasks", icon: <AlarmClockIcon /> },
   { title: "Sandboxes", url: "/dashboard/sandboxes", icon: <MonitorIcon /> },
   { title: "Avatar", url: "/dashboard/avatar", icon: <UserIcon /> },
 ];

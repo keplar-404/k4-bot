@@ -4,6 +4,7 @@ import type { Env } from "../../config/env";
 import type { BotComposioApp } from "./composio/bot-apps";
 import { createComposioTools } from "./composio/tools";
 import { createSecretTool } from "./secrets/request-secret";
+import { createTaskTools } from "./tasks/tools";
 import { createWorkflowTools } from "./workflows";
 
 /** Server-side context for the tools that act on the user's account: connected apps, workflows, secrets. */
@@ -26,12 +27,15 @@ export function accountTools(options: AccountOptions, botId: string) {
   const tools = [
     ...(apps?.tools ?? []),
     ...createWorkflowTools({ env, db, userId, botId }),
+    ...createTaskTools({ db, userId, botId }),
     createSecretTool({ db, userId }),
   ];
   const approvals: Record<string, InterruptOnConfig> = {
     ...apps?.approvals,
     turn_on_workflow: askFirst("Turn on this workflow?"),
     run_workflow: askFirst("Run this workflow now?"),
+    schedule_task: askFirst("Schedule this task?"),
+    change_scheduled_task: askFirst("Change this scheduled task?"),
   };
   return { tools, approvals, appNames: apps?.appNames ?? [] };
 }

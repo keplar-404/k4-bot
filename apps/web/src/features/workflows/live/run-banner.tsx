@@ -5,17 +5,20 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { cancelRun, type RunDetail } from "../api";
 import { useBuilder } from "../builder/store";
+import { ApprovalAnswer, waitingApproval } from "./approval-answer";
 import { isActive, useRunView } from "./run-view-store";
 
 const FINISHED_STEP = ["succeeded", "failed", "skipped"];
 
 function bannerText(run: RunDetail, totalBlocks: number) {
+  if (waitingApproval(run)) return "Waiting for your OK";
   if (isActive(run.status)) {
     const done = run.steps.filter((s) => FINISHED_STEP.includes(s.status));
     return `Running · ${done.length} of ${totalBlocks} blocks`;
   }
   if (run.status === "cancelled") return "Cancelled";
-  if (run.status === "succeeded") return "Succeeded";
+  if (run.status === "succeeded")
+    return "Succeeded · select a block to see its output";
   const failedAt = run.steps.find((s) => s.nodeId === run.failedNodeId);
   // "action.http" → "http": the kind is enough to find the block on the canvas.
   const where = failedAt ? ` at ${failedAt.nodeKind.replace(/^.*\./, "")}` : "";
@@ -30,6 +33,7 @@ export function RunBanner() {
   if (!run) return null;
   const active = isActive(run.status);
   const text = bannerText(run, total);
+  const waiting = waitingApproval(run);
   return (
     <div className="absolute top-3 left-1/2 z-10 flex max-w-[min(32rem,90%)] -translate-x-1/2 items-center gap-2 rounded-full border bg-background/95 py-1 pr-1 pl-3 text-xs shadow">
       {active && (
@@ -43,6 +47,7 @@ export function RunBanner() {
       >
         {text}
       </output>
+      {waiting && <ApprovalAnswer runId={run.id} step={waiting} compact />}
       {active && (
         <Button
           size="xs"

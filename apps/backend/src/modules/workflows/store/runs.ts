@@ -12,7 +12,7 @@ export type WorkflowStats = {
   lastStatus: string | null;
 };
 
-export type RunTrigger = "manual" | "test" | "schedule" | "webhook" | "bot";
+export type RunTrigger = "manual" | "test" | "schedule" | "webhook" | "bot" | "app";
 
 type NewRun = { workflowId: string; userId: string; version: number; trigger: RunTrigger; graph: WorkflowGraph };
 

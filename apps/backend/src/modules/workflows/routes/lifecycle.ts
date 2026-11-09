@@ -5,7 +5,7 @@ import { userLimit } from "../../../middleware/rate-limit";
 import { getRequestContext } from "../../../shared/context";
 import { validate } from "../../../shared/validate";
 import { newWebhookToken, triggerOf } from "../graph/triggers";
-import { publishWorkflow } from "../store/publish";
+import { pauseWorkflow, publishWorkflow } from "../store/publish";
 import { getWorkflow, setStatus } from "../store/workflows";
 import { workflowDto } from "./dto";
 
@@ -18,21 +18,21 @@ const notFound = { error: "NOT_FOUND", message: "Workflow not found." } as const
  */
 const lifecycle = new Hono<AuthGuardEnv>()
   .post("/:id/publish", userLimit, validate("param", idParam), async (c) => {
-    const { db } = getRequestContext(c);
+    const { db, env } = getRequestContext(c);
     const userId = c.get("session").user.id;
     const w = await getWorkflow(db, userId, c.req.valid("param").id);
     if (!w) return c.json(notFound, 404);
-    const r = await publishWorkflow(db, userId, w);
+    const r = await publishWorkflow(env, db, userId, w);
     if (!r.ok) return c.json({ error: r.error, message: r.message, issues: r.issues }, r.status);
     return c.json({ ...workflowDto(r.row), webhookToken: r.webhookToken });
   })
 
   .post("/:id/pause", userLimit, validate("param", idParam), async (c) => {
-    const { db } = getRequestContext(c);
-    const row = await setStatus(db, c.get("session").user.id, c.req.valid("param").id, {
-      status: "paused",
-      nextRunAt: null,
-    });
+    const { db, env } = getRequestContext(c);
+    const userId = c.get("session").user.id;
+    const w = await getWorkflow(db, userId, c.req.valid("param").id);
+    if (!w) return c.json(notFound, 404);
+    const row = await pauseWorkflow(env, db, userId, w);
     return row ? c.json(workflowDto(row)) : c.json(notFound, 404);
   })
 

@@ -51,6 +51,7 @@ export function fetchCatalog(
     q?: string;
     category?: string;
     slugs?: string[];
+    withTriggers?: boolean;
     offset: number;
     limit: number;
   },
@@ -63,6 +64,7 @@ export function fetchCatalog(
   if (query.q) params.set("q", query.q);
   if (query.category) params.set("category", query.category);
   if (query.slugs) params.set("slugs", query.slugs.join(","));
+  if (query.withTriggers) params.set("withTriggers", "1");
   return request<{ items: CatalogApp[]; total: number }>(`/catalog?${params}`, {
     signal,
   });
@@ -74,11 +76,14 @@ export const fetchCategories = () =>
 export const fetchConnections = () =>
   request<{ items: Connection[] }>("/connections").then((r) => r.items);
 
-/** The Connect Link for this app; the browser goes there and comes back to /dashboard/connect?connected=<slug>. */
-export const authorizeApp = (toolkit: string) =>
+/**
+ * The Connect Link for this app. The browser goes there and comes back to `returnTo` (a page of this app, e.g. the
+ * workflow being edited) or to /dashboard/connect, with ?connected=<slug>.
+ */
+export const authorizeApp = (toolkit: string, returnTo?: string) =>
   request<{ redirectUrl: string }>("/authorize", {
     method: "POST",
-    body: JSON.stringify({ toolkit }),
+    body: JSON.stringify({ toolkit, returnTo }),
   }).then((r) => r.redirectUrl);
 
 export const disconnectApp = (id: string) =>

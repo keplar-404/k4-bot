@@ -3,8 +3,8 @@
 import { PlusIcon, Trash2Icon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import type { Block, BlockBody } from "../blocks";
-import { Field, SettingsSection } from "./field";
+import type { BlockBody } from "../blocks";
+import { SettingsSection } from "./field";
 
 type SetBlock = Extract<BlockBody, { kind: "logic.set" }>;
 

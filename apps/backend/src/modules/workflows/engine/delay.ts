@@ -14,17 +14,18 @@ export async function runDelay(
   step: WorkflowStep,
   { log }: NodeDeps,
   node: Extract<WorkflowNode, { kind: "logic.delay" }>,
+  key = node.id,
 ): Promise<NodeResult> {
   const ms = Math.min(node.config.amount * SECONDS[node.config.unit] * 1000, MAX_DELAY_MS);
 
-  const cancelled = await step.do(`wait:${node.id}`, async () => {
+  const cancelled = await step.do(`wait:${key}`, async () => {
     if (await log.isCancelled()) return true;
     await log.step(node, { status: "waiting", resumeAt: new Date(Date.now() + ms) });
     return false;
   });
   if (cancelled) return { status: "cancelled" };
 
-  await step.sleep(`sleep:${node.id}`, ms);
-  await once(step, `woke:${node.id}`, () => log.step(node, { status: "succeeded", output: WAITED }));
+  await step.sleep(`sleep:${key}`, ms);
+  await once(step, `woke:${key}`, () => log.step(node, { status: "succeeded", output: WAITED }));
   return { status: "succeeded", output: WAITED };
 }

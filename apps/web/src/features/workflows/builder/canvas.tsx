@@ -6,8 +6,10 @@ import {
   Controls,
   ReactFlow,
   useReactFlow,
+  useStore,
 } from "@xyflow/react";
 import { useTheme } from "next-themes";
+import type * as React from "react";
 import { type DragEvent, useEffect, useState } from "react";
 import { nodeTypes } from "./block-node";
 import type { BlockKind } from "./blocks";
@@ -32,6 +34,9 @@ export function Canvas() {
     addBlock,
   } = useBuilder();
   const { screenToFlowPosition } = useReactFlow();
+  // Handles keep a ~20px grab area on screen however far the canvas is zoomed out (block-handles.tsx).
+  const zoom = useStore((s) => s.transform[2]);
+  const handleHit = `${Math.max(20, 20 / zoom)}px`;
   const { resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -66,7 +71,8 @@ export function Canvas() {
       onDrop={onDrop}
       deleteKeyCode={["Backspace", "Delete"]}
       colorMode={mounted && resolvedTheme === "dark" ? "dark" : "light"}
-      style={flowTheme}
+      style={{ ...flowTheme, "--handle-hit": handleHit } as React.CSSProperties}
+      connectionRadius={30}
       fitView
       fitViewOptions={{ padding: 0.4, maxZoom: 1 }}
       minZoom={0.25}

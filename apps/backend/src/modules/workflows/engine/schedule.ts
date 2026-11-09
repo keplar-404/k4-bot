@@ -44,9 +44,11 @@ async function startScheduled(env: Env, db: Db, w: DueWorkflow) {
   // a second cron run that overlaps this one finds nothing to claim. (Not "equals the value we read": Postgres
   // keeps microseconds and a JS Date only milliseconds, so that comparison can miss.)
   const now = new Date();
+  const next = nextRunAt(triggerOf(graph), now.getTime());
   const claimed = await db
     .update(workflow)
-    .set({ nextRunAt: nextRunAt(triggerOf(graph), now.getTime()), lastRunAt: now })
+    // A "once" schedule has no next time: the workflow turns itself off after this run.
+    .set({ nextRunAt: next, lastRunAt: now, ...(next ? {} : { status: "paused" as const }) })
     .where(and(eq(workflow.id, w.id), eq(workflow.status, "active"), lte(workflow.nextRunAt, now)))
     .returning({ id: workflow.id });
   if (claimed.length === 0) return;

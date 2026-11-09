@@ -5,6 +5,8 @@ export type RunContext = {
   trigger: unknown;
   steps: Record<string, { output: unknown; error?: string }>;
   run: { id: string; startedAt: string };
+  /** Inside a For each: the current item. */
+  loop?: { item: unknown; index: number; count: number };
   secrets?: Record<string, string>;
 };
 
@@ -68,4 +70,20 @@ function resolveValue(value: unknown, ctx: RunContext, depth: number): unknown {
     return Object.fromEntries(entries);
   }
   return value;
+}
+
+/**
+ * For a prompt to a bot: like resolve(), but every filled-in value is wrapped in <data>…</data>, so the bot can tell
+ * the user's instructions from content that came from an app (an email or a message may try to give it orders).
+ */
+export function resolveAsData(text: string, ctx: RunContext): string {
+  const matches = [...text.matchAll(REFERENCE)];
+  if (matches.length > MAX_REFERENCES) throw new FatalBlockError("Too many references in one field.");
+  const filled = text.replace(REFERENCE, (_match, path: string) => {
+    // A value cannot close the wrapper early and smuggle text out as an instruction.
+    const value = asText(lookup(ctx, path)).replace(/<\s*\/\s*data\s*>/gi, "</ data_>");
+    return `<data>${value}</data>`;
+  });
+  if (filled.length > MAX_CHARS) throw new FatalBlockError("Too much data: the prompt is over 100 KB.");
+  return filled;
 }

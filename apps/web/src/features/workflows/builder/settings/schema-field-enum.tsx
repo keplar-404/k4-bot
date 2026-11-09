@@ -15,6 +15,7 @@ export function SchemaFieldEnum({
   label,
   required,
   hint,
+  meta,
   schema,
   value,
   onChange,
@@ -23,12 +24,13 @@ export function SchemaFieldEnum({
   label: string;
   required: boolean;
   hint: string | undefined;
+  meta?: string;
   schema: JsonSchema;
   value: unknown;
   onChange: (v: unknown) => void;
 }) {
   return (
-    <Field id={id} label={label} required={required} hint={hint}>
+    <Field id={id} label={label} required={required} meta={meta} hint={hint}>
       <Select
         value={value === undefined ? "" : String(value)}
         onValueChange={(v) => onChange(v === "" ? undefined : v)}

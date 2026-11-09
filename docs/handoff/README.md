@@ -52,7 +52,7 @@ Verified by `tsc` (backend and web), `bun run check` (includes modes, engine, ht
 | Secrets vault | DONE: `/api/v1/secrets`, `/dashboard/secrets`, `request_secret` secure form in chat |
 | Migration | `drizzle/0016_small_old_lace.sql` (idempotent). **Run `bun run db:migrate` before starting the backend**: `chat_thread.mode` is read by every chat |
 
-Deliberate simplifications (not in the old specs): manual-trigger inputs are free-form (`{{trigger.inputs.x}}`), no declared-inputs editor; `run_workflow` always asks in Ask mode (no per-share switch); no workflow preview card in chat (the tool returns the `/workflows/<id>` link); "Ask a bot" block (unconfirmed) and Composio app-event triggers are not built.
+Deliberate simplifications (not in the old specs): manual-trigger inputs are free-form (`{{trigger.inputs.x}}`), no declared-inputs editor; `run_workflow` always asks in Ask mode (no per-share switch); no workflow preview card in chat (the tool returns the `/workflows/<id>` link); see `workflows/10-edge-cases.md` §8 for what is still open.
 
 ## 4. Order of work
 
@@ -110,3 +110,17 @@ Run against `wrangler dev` with the real Neon database and OpenRouter (Claude Ha
   `modes.check.ts`); the cron claim compared timestamps exactly and could miss a due workflow; the web build failed on
   `/workflows/[id]` (`useParams` outside Suspense with Cache Components).
 - Local dev needs `SECRETS_ENCRYPTION_KEY` (now in `.env.example`); without it saving a secret answers 503.
+
+### 2026-11-08 (later): app events, AI step, guided fields
+
+- **App events** (`trigger.app`): any Composio trigger type starts a workflow (Slack message, new Gmail matching a search,
+  new GitHub issue…). Turning on creates the Composio trigger instance on the user's own account; pausing or deleting
+  stops it. Events arrive signed at `POST /api/v1/composio/events` (needs `COMPOSIO_WEBHOOK_SECRET`; set the project's
+  delivery URL once with `bun run composio:webhook https://<api host>`). Migration `0017`.
+- **AI step** (`ai.bot`, "Ask a bot"): one of the user's bots writes or decides, with its memory, web search and read-only
+  app access; app data is marked as data in its prompt. 100 per user per day.
+- **Engine:** inputs are converted to the types each action declares, and missing required inputs are named before the call.
+- **Builder:** every field shows its full description, type, default and an example; "Data from earlier steps" lists each
+  earlier block's fields; the selected block shows its last run's input and output; returning from connecting an app
+  comes back to the builder.
+- Edge cases and what is still open: `workflows/10-edge-cases.md`.

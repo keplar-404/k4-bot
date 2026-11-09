@@ -63,6 +63,8 @@ export const envSchema = z.object({
   // --- Secrets users give us (MCP tokens, workflow secrets): AES-256-GCM, see shared/secrets.ts ---
   /** 32 random bytes, base64. Generate with: openssl rand -base64 32 */
   SECRETS_ENCRYPTION_KEY: z.string().optional(),
+  /** Verifies app events Composio delivers (the project's webhook subscription secret). Without it they are refused. */
+  COMPOSIO_WEBHOOK_SECRET: z.string().min(16).optional(),
   /** The previous key while rotating, so values encrypted with it still decrypt. */
   SECRETS_ENCRYPTION_KEY_PREVIOUS: z.string().optional(),
   /** Agent steps per Workflow step. A run longer than this continues in the next slice. */

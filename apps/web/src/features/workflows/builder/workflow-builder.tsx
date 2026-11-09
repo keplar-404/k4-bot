@@ -4,6 +4,7 @@ import { ReactFlowProvider } from "@xyflow/react";
 import { Loader2Icon } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { getWorkflow } from "../api";
 import { RunBanner } from "../live/run-banner";
@@ -11,12 +12,15 @@ import { RunsDrawer } from "../live/runs-drawer";
 import { useLiveRuns } from "../live/use-live-runs";
 import { Canvas } from "./canvas";
 import { LibraryPanel } from "./library/library-panel";
+import { PausedNotice } from "./paused-notice";
 import { SettingsPanel } from "./settings/settings-panel";
 import { useBuilder } from "./store";
 import { RunButton } from "./top-bar/run-button";
 import { ShareBotsDialog } from "./top-bar/share-bots-dialog";
+import { ShortcutsDialog } from "./top-bar/shortcuts-dialog";
 import { TopBar } from "./top-bar/top-bar";
 import { useAutosave } from "./use-autosave";
+import { ShortcutKeys } from "./use-shortcuts";
 
 /**
  * The full-screen workflow builder: top bar, the canvas, the block library floating on the left and the selected
@@ -35,11 +39,25 @@ export function WorkflowBuilder({ id }: { id: string }) {
     getWorkflow(id).then(load, (e: Error) => setError(e.message));
   }, [id, load]);
 
+  // Back from connecting an app (Composio returns here with ?connected=<app>): say so, then drop the parameter.
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const app = url.searchParams.get("connected");
+    if (!app) return;
+    toast.success(`${app} connected`);
+    url.searchParams.delete("connected");
+    window.history.replaceState(null, "", url);
+  }, []);
+
   if (error) {
     return (
       <div className="flex h-svh flex-col items-center justify-center gap-3 p-6 text-center">
         <p className="font-medium">{error}</p>
-        <Button variant="outline" render={<Link href="/dashboard/workflow" />}>
+        <Button
+          variant="outline"
+          nativeButton={false}
+          render={<Link href="/dashboard/workflow" />}
+        >
           Back to workflows
         </Button>
       </div>
@@ -57,13 +75,16 @@ export function WorkflowBuilder({ id }: { id: string }) {
     <ReactFlowProvider>
       <div className="flex h-svh flex-col bg-background">
         <TopBar save={save}>
+          <ShortcutsDialog />
           <ShareBotsDialog />
           <Button size="sm" variant="outline" onClick={() => setRunsOpen(true)}>
             Runs
           </Button>
           <RunButton save={save} />
         </TopBar>
+        <PausedNotice />
         <main className="relative min-h-0 flex-1">
+          <ShortcutKeys />
           <Canvas />
           <LibraryPanel />
           <SettingsPanel />
