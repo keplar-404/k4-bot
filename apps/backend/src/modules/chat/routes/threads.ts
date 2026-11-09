@@ -1,5 +1,6 @@
 import { Hono } from "hono";
-import { and, desc, eq, lt } from "drizzle-orm";
+import { and, desc, eq, isNull, lt } from "drizzle-orm";
+import { getOwnedGroup, groupMembers, leadOf } from "../../groups/store";
 import { getRequestContext } from "../../../shared/context";
 import { validate } from "../../../shared/validate";
 import { createThreadSchema } from "../schemas";
@@ -15,6 +16,7 @@ const threads = new Hono<AuthGuardEnv>()
   .get("/threads", async (c) => {
     const { db } = getRequestContext(c);
     const botId = c.req.query("botId");
+    const groupId = c.req.query("groupId");
     const limit = Math.min(Number(c.req.query("limit") ?? "20") || 20, 50);
     const cursor = c.req.query("cursor");
 
@@ -24,7 +26,8 @@ const threads = new Hono<AuthGuardEnv>()
       .where(
         and(
           eq(chatThread.userId, c.get("session").user.id),
-          botId ? eq(chatThread.botId, botId) : undefined,
+          // A bot's own chats leave out the group chats it leads.
+          groupId ? eq(chatThread.groupId, groupId) : botId ? and(eq(chatThread.botId, botId), isNull(chatThread.groupId)) : undefined,
           cursor ? lt(chatThread.updatedAt, new Date(cursor)) : undefined,
         ),
       )
@@ -44,16 +47,23 @@ const threads = new Hono<AuthGuardEnv>()
     const userId = c.get("session").user.id;
     const data = c.req.valid("json");
 
+    let botId = data.botId;
+    if (data.groupId) {
+      const group = await getOwnedGroup(db, userId, data.groupId);
+      const lead = group ? leadOf(group, await groupMembers(db, group.id)) : null;
+      if (!lead) return c.json({ error: "NOT_FOUND", message: "Group not found" }, 404);
+      botId = lead.id;
+    }
     const [owned] = await db
       .select({ id: bot.id })
       .from(bot)
-      .where(and(eq(bot.id, data.botId), eq(bot.userId, userId)))
+      .where(and(eq(bot.id, botId!), eq(bot.userId, userId)))
       .limit(1);
     if (!owned) return c.json({ error: "NOT_FOUND", message: "Bot not found" }, 404);
 
     const [created] = await db
       .insert(chatThread)
-      .values({ id: crypto.randomUUID(), botId: data.botId, userId, title: data.title ?? "New chat", mode: data.mode ?? "ask" })
+      .values({ id: crypto.randomUUID(), botId: owned.id, groupId: data.groupId ?? null, userId, title: data.title ?? "New chat", mode: data.mode ?? "ask" })
       .returning();
     return c.json({ thread: created }, 201);
   })

@@ -12,6 +12,7 @@ import { SchemaFieldsList } from "./schema-fields-list";
 import { SchemaForm } from "./schema-form";
 import { fetchTrigger, type TriggerType, withoutDeprecated } from "./tools-api";
 import { TriggerAppPicker } from "./trigger-app-picker";
+import { useNoAuth } from "./use-no-auth";
 
 type AppTriggerBlock = Extract<BlockBody, { kind: "trigger.app" }>;
 
@@ -24,6 +25,7 @@ export function AppTriggerSettings({
   update: (b: AppTriggerBlock) => void;
 }) {
   const { toolkit, trigger } = block.config;
+  const noAuth = useNoAuth(toolkit ?? "");
   const [type, setType] = useState<TriggerType | null>(null);
   const [error, setError] = useState<string | null>(null);
   const setConfig = (config: AppTriggerBlock["config"]) =>
@@ -54,9 +56,11 @@ export function AppTriggerSettings({
           onChange={() => setConfig({ config: {} })}
         />
       </SettingsSection>
-      <SettingsSection title="Account">
-        <AppConnection toolkit={toolkit} appName={name} />
-      </SettingsSection>
+      {!noAuth && (
+        <SettingsSection title="Account">
+          <AppConnection toolkit={toolkit} appName={name} />
+        </SettingsSection>
+      )}
       <SettingsSection title="Runs when">
         {!trigger ? (
           <EventPicker

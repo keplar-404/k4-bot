@@ -1,5 +1,13 @@
 import { toast } from "sonner";
+import { request } from "@/features/chat/lib/client/http";
 import type { WireEvent } from "@/features/chat/lib/stream";
+
+/** Undo of an automatic memory update; the server refuses it if the memory changed since. */
+const undoMemory = (eventId: string) =>
+  request(`/api/v1/memory/events/${eventId}/undo`, { method: "POST" }).then(
+    () => toast.success("Memory change undone."),
+    (e: Error) => toast.error(e.message),
+  );
 
 /** Toasts for chat events that are news on their own, beside what the transcript shows. */
 export function notifyFor(event: WireEvent) {
@@ -23,5 +31,26 @@ export function notifyFor(event: WireEvent) {
         ? "Ask the bot for its result, or it will tell you on its next reply."
         : undefined,
     });
+  }
+  if (event.type === "group.notice" && typeof p.text === "string") {
+    toast.info(p.text, { id: "group-notice" });
+  }
+  if (event.type === "memory.updated" && typeof p.eventId === "string") {
+    // The bot learned something lasting from this turn and saved it on its own: say so, and let the user take it back.
+    const eventId = p.eventId;
+    toast.success(
+      p.scope === "preferences"
+        ? "Your preferences were updated"
+        : p.scope === "group"
+          ? "The group notes were updated"
+          : "The bot updated its memory",
+      {
+        id: `memory-${eventId}`,
+        description:
+          "From what you said in this chat. See it in the bot's Memory.",
+        action: { label: "Undo", onClick: () => void undoMemory(eventId) },
+        duration: 10_000,
+      },
+    );
   }
 }

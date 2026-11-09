@@ -49,7 +49,11 @@ export function blockTitle(b: BlockBody): string {
         edges: [],
       });
     case "logic.delay":
+      if (b.config.mode === "until") return "Wait until a date";
+      if (b.config.mode === "next") return `Wait until ${b.config.at}`;
       return `Wait ${b.config.amount} ${b.config.amount === 1 ? b.config.unit.replace(/s$/, "") : b.config.unit}`;
+    case "action.code":
+      return "Run code";
     case "logic.if":
       return "Check a condition";
     case "logic.filter":
@@ -62,6 +66,18 @@ export function blockTitle(b: BlockBody): string {
       return b.config.prompt.trim()
         ? b.config.prompt.trim().slice(0, 40)
         : "Ask a bot";
+    case "ai.decide":
+      return (
+        b.config.questions[0]?.instructions.trim().slice(0, 40) || "Decide"
+      );
+    case "logic.format":
+      return `Format: ${b.config.operation.replaceAll("_", " ")}`;
+    case "logic.merge":
+      return `Merge: ${b.config.mode.replaceAll("_", " ")}`;
+    case "logic.list":
+      return `List: ${b.config.operation.replaceAll("_", " ")}${b.config.field ? ` ${b.config.field}` : ""}`;
+    case "logic.switch":
+      return `${b.config.rules.length} paths${b.config.otherwise ? " + otherwise" : ""}`;
     case "logic.loop":
       return "Repeat for each item";
     case "logic.approval":

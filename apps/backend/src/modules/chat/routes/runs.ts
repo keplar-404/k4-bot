@@ -11,6 +11,9 @@ import { chatThread } from "../../../db/schema";
 import type { ChatRunParams } from "../run/workflow";
 import { threadBusy } from "../run-busy";
 import { deepResearchQuestion } from "../commands";
+import { addressed } from "../../groups/mentions";
+import { getOwnedGroup, groupMembers, leadOf } from "../../groups/store";
+import type { Db } from "../../../db";
 
 const runs = new Hono<AuthGuardEnv>()
   // Start a run. Returns 202 immediately; the answer streams over the socket.
@@ -24,9 +27,11 @@ const runs = new Hono<AuthGuardEnv>()
       const threadId = c.req.param("id");
       const data = c.req.valid("json");
 
-      if (!(await getOwnedThread(db, threadId, userId))) {
-        return c.json({ error: "NOT_FOUND" }, 404);
-      }
+      const thread = await getOwnedThread(db, threadId, userId);
+      if (!thread) return c.json({ error: "NOT_FOUND" }, 404);
+      // A group chat: the bots named with @bot:name answer in order; otherwise the lead does.
+      const turns = thread.groupId ? await groupTurns(db, userId, thread.groupId, data.content) : null;
+      if (thread.groupId && !turns) return c.json({ error: "NOT_FOUND", message: "This group has no bots." }, 404);
 
       // /deep-research needs a question: an empty one would spend a research task on nothing.
       const question = deepResearchQuestion(data.content);
@@ -64,6 +69,7 @@ const runs = new Hono<AuthGuardEnv>()
             reasoningEffort: data.reasoningEffort,
             compact: data.compact,
             research: question !== null || undefined,
+            ...(turns ? { botId: turns[0]!.id, queue: turns.slice(1).map((m) => ({ botId: m.id, task: data.content, from: "User" })) } : {}),
           } satisfies ChatRunParams,
         });
       } catch (error) {
@@ -83,5 +89,13 @@ const runs = new Hono<AuthGuardEnv>()
       return c.json({ runId, userMessageId }, 202);
     },
   );
+
+/** The group members a message addresses, in order (the lead when it names nobody); null for an empty group. */
+async function groupTurns(db: Db, userId: string, groupId: string, content: string) {
+  const group = await getOwnedGroup(db, userId, groupId);
+  const members = group ? await groupMembers(db, group.id) : [];
+  const lead = group ? leadOf(group, members) : null;
+  return lead ? addressed(content, members, lead) : null;
+}
 
 export default runs;

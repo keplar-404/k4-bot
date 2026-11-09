@@ -50,7 +50,14 @@ const stream = new Hono<AuthGuardEnv>()
       headers: upstreamHeaders(target.token, (name) => c.req.header(name)),
       body: ["GET", "HEAD"].includes(c.req.method) ? undefined : c.req.raw.body,
     }).catch(() => null);
-    if (!upstream) return c.text("The computer did not answer.", 502);
+    if (!upstream || upstream.status === 502 || upstream.status === 503) {
+      // The computer may have just gone to sleep: forget its address, and say "asleep" rather than a gateway error.
+      targets.delete(key);
+      const now = await computerFor(env, userId).viewerTarget(mode as Mode);
+      return "error" in now && now.error === "asleep"
+        ? c.text("asleep", 409)
+        : c.text("The computer did not answer.", 502);
+    }
     // Keeps the 101, the socket and the negotiated subprotocol (noVNC asks for "binary").
     if (isSocket) return new Response(null, upstream);
 

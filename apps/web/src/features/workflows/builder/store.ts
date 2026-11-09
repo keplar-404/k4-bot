@@ -18,6 +18,11 @@ type State = {
   nodes: FlowNode[];
   edges: FlowEdge[];
   selectedId: string | null;
+  /** Pinned sample outputs by block id: test runs use them instead of running those blocks. Saved with the draft. */
+  pins: Record<string, unknown>;
+  setPin: (id: string, output: unknown | undefined) => void;
+  /** The server has the latest draft (set by the autosave). */
+  saved: boolean;
   /** Bumped by every change that must be saved (not by selection or measuring). */
   version: number;
   load: (w: Workflow) => void;
@@ -46,9 +51,25 @@ export const useBuilder = create<State>((set, get) => ({
   nodes: [],
   edges: [],
   selectedId: null,
+  pins: {},
+  saved: true,
   version: 0,
   load: (w) =>
-    set({ workflow: w, ...graphToFlow(w.graph), selectedId: null, version: 0 }),
+    set({
+      workflow: w,
+      ...graphToFlow(w.graph),
+      pins: w.graph.pins ?? {},
+      selectedId: null,
+      version: 0,
+    }),
+  setPin: (id, output) =>
+    set((s) => {
+      const { [id]: _old, ...rest } = s.pins;
+      return {
+        pins: output === undefined ? rest : { ...rest, [id]: output },
+        version: s.version + 1,
+      };
+    }),
   setWorkflow: (w) => set({ workflow: w }),
   onNodesChange: (changes) =>
     set((s) => ({
@@ -74,6 +95,9 @@ export const useBuilder = create<State>((set, get) => ({
     set((s) => ({
       nodes: s.nodes.filter((n) => n.id !== id),
       edges: s.edges.filter((e) => e.source !== id && e.target !== id),
+      pins: Object.fromEntries(
+        Object.entries(s.pins).filter(([k]) => k !== id),
+      ),
       selectedId: s.selectedId === id ? null : s.selectedId,
       version: s.version + 1,
     })),

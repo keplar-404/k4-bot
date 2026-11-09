@@ -17,6 +17,7 @@ export function featureTools(options: BuildAgentOptions) {
       ...(options.apps?.tools ?? []),
       ...(options.memory ? createMemoryTools(options.memory) : []),
       ...(asyncTasks ? createAsyncTaskTools(asyncTasks) : []),
+      ...(options.extraTools ?? []),
     ],
   };
 }

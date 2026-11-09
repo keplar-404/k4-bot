@@ -5,7 +5,7 @@ import { LoopItemFields } from "./loop-item-fields";
 import { UpstreamBlock } from "./upstream-block";
 
 /** Blocks that run before `id` (everything that leads to it), nearest first. */
-function upstream(
+export function upstream(
   id: string,
   edges: Array<{ source: string; target: string }>,
 ): string[] {

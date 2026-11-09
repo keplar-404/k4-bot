@@ -1,4 +1,5 @@
-import { boolean, integer, pgTable, text, timestamp, index } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import { boolean, integer, pgTable, text, timestamp, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { user } from "./auth";
 
 export const bot = pgTable(
@@ -14,6 +15,8 @@ export const bot = pgTable(
     role: text("role").notNull().default("assistant"),
     /** The user's own role title when role is "custom". */
     roleTitle: text("role_title"),
+    /** "normal" or "admin" (manages the user's other bots and groups; one per user). */
+    kind: text("kind").notNull().default("normal"),
     /** May spawn groups of sub-agents (spawn_subagents). New bots take their role's default (modules/agent/domains). */
     subagentsEnabled: boolean("subagents_enabled").notNull().default(false),
     /** Largest sub-agent group, 1-20. */
@@ -33,7 +36,10 @@ export const bot = pgTable(
       .$onUpdate(() => /* @__PURE__ */ new Date())
       .notNull(),
   },
-  (table) => [index("bot_userId_idx").on(table.userId)],
+  (table) => [
+    index("bot_userId_idx").on(table.userId),
+    uniqueIndex("bot_one_admin_per_user").on(table.userId).where(sql`${table.kind} = 'admin'`),
+  ],
 );
 
 export type Bot = typeof bot.$inferSelect;

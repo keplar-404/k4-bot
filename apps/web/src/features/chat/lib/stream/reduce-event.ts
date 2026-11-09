@@ -5,7 +5,7 @@ import {
   handleToolProgress,
   handleToolStart,
 } from "./reduce-tool";
-import type { ChatUsage, StreamEffect, StreamState, WireEvent } from "./types";
+import { assistantId, type ChatUsage, type StreamEffect, type StreamState, type WireEvent } from "./types";
 
 function payloadOf(event: WireEvent): Record<string, unknown> {
   return event.payload && typeof event.payload === "object"
@@ -55,6 +55,7 @@ export function reduceEvent(
       // The model call failed and was never saved, but its text already streamed in. The run goes on from its
       // last saved step, so the chat reloads what was saved (dropping that text) and keeps streaming from here.
       return { state: { ...next, run: "running" }, effect: "resync" };
+    case "run.started":
     case "run.resumed":
     case "run.waiting_input":
     case "run.sleeping":
@@ -69,5 +70,13 @@ export function reduceEvent(
       break;
   }
 
+  // Group chats: every event of a bot's turn names that bot; its message is labelled with it from the first event.
+  if (typeof payload.botId === "string") next = tagAuthor(next, runId, payload.botId);
   return { state: next, effect: "none" };
+}
+
+function tagAuthor(state: StreamState, runId: string, botId: string): StreamState {
+  const id = assistantId(runId);
+  if (!state.messages.some((m) => m.id === id && m.botId !== botId)) return state;
+  return { ...state, messages: state.messages.map((m) => (m.id === id ? { ...m, botId } : m)) };
 }

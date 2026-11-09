@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useComputerContext } from "@/features/computer/components/computer-provider";
 import { useFullscreen } from "@/features/computer/hooks/use-fullscreen";
 import { cn } from "@/lib/utils";
@@ -29,6 +30,8 @@ export function ComputerPanel({
   const { status, inControl } = computer;
   const live = status?.state === "running";
   const { open, setOpen, closeRef } = useFullscreen(live || inControl);
+  // Below the lg breakpoint the Activity column starts hidden: the screen needs the width.
+  const [sideOpen, setSideOpen] = useState(false);
 
   if (!status) {
     return <LoadingSkeleton className={className} />;
@@ -61,12 +64,17 @@ export function ComputerPanel({
             doing={doing}
             closeRef={closeRef}
             onClose={() => setOpen(false)}
+            sideOpen={sideOpen}
+            onToggleSide={() => setSideOpen((v) => !v)}
           />
         )}
         <div
           className={cn(
             open
-              ? "grid min-h-0 flex-1 gap-3 md:grid-cols-[1fr_16rem]"
+              ? cn(
+                  "grid min-h-0 flex-1 gap-3 lg:grid-cols-[1fr_16rem]",
+                  sideOpen && "grid-cols-[1fr_14rem]",
+                )
               : "contents",
           )}
         >
@@ -76,7 +84,9 @@ export function ComputerPanel({
             doing={doing}
             onOpen={() => setOpen(true)}
           />
-          {open && <SideColumn computer={computer} botId={botId} />}
+          {open && (
+            <SideColumn computer={computer} botId={botId} shown={sideOpen} />
+          )}
         </div>
         {live && !open && (
           <PreviewActions computer={computer} onOpen={() => setOpen(true)} />

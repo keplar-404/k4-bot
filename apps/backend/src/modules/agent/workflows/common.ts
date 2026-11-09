@@ -7,6 +7,9 @@ import type { WorkflowRow } from "../../workflows/store/workflows";
 export type WorkflowToolContext = { env: Env; db: Db; userId: string; botId: string };
 
 export const NOT_VISIBLE = "No such workflow is shared with this bot.";
+/** Shared workflows can be read and run; only the bot that made one (or the user) may change or switch it. */
+export const NOT_YOURS =
+  "This workflow was shared with you, not made by you: you can read and run it, but only the user can change it, turn it on or off, or delete it.";
 
 /** A workflow as the model sees it: ids, status, what still blocks turning it on, and (optionally) its blocks. */
 export function describeWorkflow(w: WorkflowRow, withGraph = false) {
@@ -17,6 +20,11 @@ export function describeWorkflow(w: WorkflowRow, withGraph = false) {
     status: w.status,
     trigger: w.triggerKind ?? w.graph.nodes.find(isTrigger)?.kind ?? null,
     issues: publishIssues(w.graph).slice(0, 8),
+    // What run_workflow's `inputs` should hold (a manual trigger's form).
+    inputs: (() => {
+      const t = w.graph.nodes.find(isTrigger);
+      return t?.kind === "trigger.manual" ? t.config.fields.map((f) => ({ key: f.key, type: f.type, required: f.required, about: f.label || f.help || undefined })) : undefined;
+    })(),
     url: `/workflows/${w.id}`,
   };
   if (!withGraph) return summary;

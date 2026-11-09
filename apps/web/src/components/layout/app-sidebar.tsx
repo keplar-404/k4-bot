@@ -9,6 +9,7 @@ import {
   MonitorIcon,
   PlugIcon,
   PuzzleIcon,
+  ShieldCheckIcon,
   UserIcon,
   WorkflowIcon,
 } from "lucide-react";
@@ -27,6 +28,7 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from "@/components/ui/sidebar";
+import { NavGroups } from "@/features/groups/nav-groups";
 import { openIntegrations } from "@/features/integrations/api";
 import { IntegrationsDialog } from "@/features/integrations/components/integrations-dialog";
 
@@ -44,6 +46,11 @@ const navItems = [
   { title: "Secrets", url: "/dashboard/secrets", icon: <KeyRoundIcon /> },
   { title: "Workflow", url: "/dashboard/workflow", icon: <WorkflowIcon /> },
   { title: "Tasks", url: "/dashboard/tasks", icon: <AlarmClockIcon /> },
+  {
+    title: "Approvals",
+    url: "/dashboard/approvals",
+    icon: <ShieldCheckIcon />,
+  },
   { title: "Sandboxes", url: "/dashboard/sandboxes", icon: <MonitorIcon /> },
   { title: "Avatar", url: "/dashboard/avatar", icon: <UserIcon /> },
 ];
@@ -66,6 +73,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarContent>
         <NavMain items={navItems} />
         <NavProjects />
+        <NavGroups />
       </SidebarContent>
       <SidebarFooter>
         <ThemeToggleButton />

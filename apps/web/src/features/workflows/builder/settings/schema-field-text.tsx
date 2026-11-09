@@ -1,10 +1,18 @@
 "use client";
 
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { TemplateInput } from "../template/template-input";
 import { Field } from "./field";
+import { placeholderFor } from "./placeholder";
 import type { JsonSchema } from "./tools-api";
 
+/** Inputs that usually hold longer text get several lines. */
+const LONG =
+  /body|content|message|text|description|html|markdown|query|prompt/i;
+
+/**
+ * A text (or number) input of an app action. It can mix typed text with data from earlier steps (pills); the grey
+ * text is what an empty field does (its default), else a fitting example.
+ */
 export function SchemaFieldText({
   id,
   name,
@@ -26,28 +34,15 @@ export function SchemaFieldText({
   value: unknown;
   onChange: (v: unknown) => void;
 }) {
-  const LONG =
-    /body|content|message|text|description|html|markdown|query|prompt/i;
-  const example = (s: JsonSchema) =>
-    s.examples?.[0] !== undefined && typeof s.examples[0] !== "object"
-      ? String(s.examples[0])
-      : undefined;
-  const Control = LONG.test(name) ? Textarea : Input;
   return (
     <Field id={id} label={label} required={required} meta={meta} hint={hint}>
-      <Control
+      <TemplateInput
         id={id}
+        aria-label={label}
+        multiline={LONG.test(name)}
         value={value === undefined ? "" : String(value)}
-        // The grey text is what the field does when left empty, so it shows the default; an example only fills in
-        // when there is none (an example such as "10" next to a default of 1 would promise a value that is not used).
-        placeholder={
-          schema.default !== undefined && schema.default !== ""
-            ? String(schema.default)
-            : example(schema)
-        }
-        onChange={(e) =>
-          onChange(e.target.value === "" ? undefined : e.target.value)
-        }
+        placeholder={placeholderFor(schema)}
+        onChange={(v) => onChange(v === "" ? undefined : v)}
       />
     </Field>
   );

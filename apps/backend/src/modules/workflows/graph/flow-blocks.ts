@@ -23,4 +23,6 @@ export const loopConfig = z.object({
 export const approvalConfig = z.object({
   message: template(2000).default(""),
   timeoutHours: z.number().int().min(1).max(168).default(24),
+  /** With no answer in time: fail the block (the run fails), or treat it as declined (the run goes on, that path stops). */
+  onTimeout: z.enum(["fail", "decline"]).default("fail"),
 });

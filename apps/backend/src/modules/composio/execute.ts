@@ -1,6 +1,8 @@
 import type { Env } from "../../config/env";
 import { allow } from "../../middleware/rate-limit";
+import { createDb } from "../../db";
 import { fitArguments } from "./arguments";
+import { isNoAuthToolkit } from "./catalog-query";
 import { composioFor } from "./client";
 import { listConnections } from "./connections";
 import { getTool } from "./tools";
@@ -58,7 +60,7 @@ export async function executeAction(env: Env, args: ActionArgs): Promise<ActionR
 
     const res = await composio.tools.execute(args.slug, {
       userId: args.userId,
-      connectedAccountId: account.id,
+      ...(account.id ? { connectedAccountId: account.id } : {}),
       arguments: fitted.args,
       version,
     });
@@ -77,7 +79,7 @@ export async function executeAction(env: Env, args: ActionArgs): Promise<ActionR
 }
 
 /** The user's own ACTIVE account for the app: the one named, or the only one there is. */
-async function pickAccount(env: Env, args: ActionArgs): Promise<{ id: string } | { error: string }> {
+async function pickAccount(env: Env, args: ActionArgs): Promise<{ id?: string } | { error: string }> {
   const connections = await listConnections(composioFor(env), args.userId);
   const mine = connections.filter((c) => c.toolkit === args.toolkit && c.status === "ACTIVE");
 
@@ -87,6 +89,8 @@ async function pickAccount(env: Env, args: ActionArgs): Promise<{ id: string } |
     return { error: `That ${args.toolkit} account is not connected. Reconnect it on the Connect page.` };
   }
   if (mine.length === 1) return mine[0]!;
+  // An app that needs no login (nothing to connect) runs without an account.
+  if (mine.length === 0 && (await isNoAuthToolkit(createDb(env.DATABASE_URL), args.toolkit))) return {};
   if (mine.length === 0) return { error: `Connect ${args.toolkit} on the Connect page first.` };
   return { error: `Choose which ${args.toolkit} account to use.` };
 }

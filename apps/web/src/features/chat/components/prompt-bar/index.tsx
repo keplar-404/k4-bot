@@ -1,8 +1,8 @@
 "use client";
-import { useEffect } from "react";
 import { ComposerShell } from "./composer-shell";
+import { parseToken, type Source } from "./data";
 import { EffortMenu } from "./effort-menu";
-import { Icon } from "./icons";
+import { useMentionSources } from "./mention-sources";
 import { useModeEffects } from "./mode-effects";
 import { ModeMenu } from "./mode-menu";
 import { useModeState } from "./mode-state";
@@ -29,7 +29,10 @@ export default function PromptBar({
   busy = false,
   responding = false,
   onStop,
+  mentionExtras,
 }: {
+  /** Shown first in the "@" menu (a group chat's bots, inserted as @bot:name). */
+  mentionExtras?: Source[];
   placeholder?: string;
   onSend?: (text: string) => void;
   onAttach?: (files: File[]) => void;
@@ -46,6 +49,24 @@ export default function PromptBar({
   onModeChange?: (mode: "allow_all" | "plan" | "ask") => void;
 }) {
   const state = usePromptState();
+  const atToken = parseToken(state.draft);
+  const query = state.plusOpen
+    ? ""
+    : atToken?.kind === "at"
+      ? atToken.query
+      : "";
+  const loaded = useMentionSources(
+    state.plusOpen || atToken?.kind === "at",
+    query,
+  );
+  const sources = [
+    ...(mentionExtras ?? []).filter(
+      (s) =>
+        !query ||
+        `${s.name} ${s.desc}`.toLowerCase().includes(query.toLowerCase()),
+    ),
+    ...loaded,
+  ];
   const modeState = useModeState();
   const props = {
     placeholder,
@@ -62,6 +83,7 @@ export default function PromptBar({
     busy,
     responding,
     onStop,
+    sources,
   };
   const h = usePromptHandlers(state, props);
   const h2 = usePromptHandlers2(state, props, h);

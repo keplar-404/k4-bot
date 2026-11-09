@@ -1,9 +1,9 @@
 import type { Sandbox } from "@e2b/desktop";
-import { purgeAccounts, writeDirectory } from "./accounts";
+import { purgeAccounts, wipeAppProfiles, writeDirectory } from "./accounts";
 import { ComputerSleep } from "./sleep";
 import { startVnc } from "./vnc";
 
-/** Upkeep of the VM itself: the feature switch, the screen servers, deleted bots' accounts and /home/BOTS.md. */
+/** Upkeep of the VM itself: the feature switch, the screen servers, deleted bots' accounts, disconnected apps' logins and /home/BOTS.md. */
 export class ComputerMachine extends ComputerSleep {
   protected assertEnabled() {
     const cfg = this.cfg;
@@ -19,6 +19,7 @@ export class ComputerMachine extends ComputerSleep {
 
   protected async purgeRemovedBots(sbx: Sandbox) {
     const purged = await purgeAccounts(sbx, this.tables, this.botUsers);
+    await wipeAppProfiles(sbx, this.tables);
     if (purged > 0 || this.directoryDirty) await this.writeDirectory(sbx);
   }
 

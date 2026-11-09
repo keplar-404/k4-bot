@@ -106,3 +106,19 @@ export const takeControl = () =>
   post<{ ok: boolean; message?: string }>("/control/take");
 export const keepControl = () => post<{ held: boolean }>("/control/keep");
 export const releaseControl = () => post<{ ok: boolean }>("/control/release");
+
+/** One bot's Linux account on the computer; `exists`/`kb` are null while the computer sleeps (it is not woken). */
+export type ComputerAccount = {
+  botId: string;
+  botName: string;
+  user: string;
+  home: string;
+  exists: boolean | null;
+  kb: number | null;
+};
+export const listAccounts = () =>
+  request<{
+    running: boolean;
+    items: ComputerAccount[];
+    orphans: Array<{ user: string; kb: number }>;
+  }>("/accounts");

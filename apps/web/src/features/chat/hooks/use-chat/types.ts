@@ -5,7 +5,6 @@ import type {
   ChatErrorInfo,
   ChatMessageView,
   FileRef,
-  RunState,
 } from "@/features/chat/lib/protocol";
 import type { StreamState } from "@/features/chat/lib/stream";
 import type { useChatState } from "./state";
@@ -16,6 +15,8 @@ export type ThreadSummary = { id: string };
 
 export type ChatCtx = ChatState & {
   botId: string;
+  /** Set in a group chat: the thread is the group's, and `botId` is its lead. */
+  groupId?: string;
   FATAL: Set<string>;
   toInfo: (err: unknown) => ChatErrorInfo;
   networkError: () => ChatErrorInfo;
@@ -23,7 +24,10 @@ export type ChatCtx = ChatState & {
     messages?: ChatMessageView[],
     cursor?: number,
   ) => StreamState;
-  listThreads: (botId: string) => Promise<{ threads: ThreadSummary[] }>;
+  listThreads: (
+    botId: string,
+    groupId?: string,
+  ) => Promise<{ threads: ThreadSummary[] }>;
   listModels: () => Promise<{ models: ModelRow[]; defaultModel: string }>;
   fetchBot: (botId: string) => Promise<{ ok: boolean; bot?: Bot }>;
   readOutbox: (threadId: string) => OutboxItem[];

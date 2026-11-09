@@ -1,5 +1,5 @@
-import { createShader, playSweep } from "glimm";
-import { COMMANDS, parseToken, SOURCES } from "./data";
+import { playSweep } from "glimm";
+import { COMMANDS, parseToken } from "./data";
 import { makeShader as makeShaderImpl } from "./make-shader";
 import type { PromptState } from "./prompt-state";
 import type { ModelOption, PromptBarProps } from "./types";
@@ -20,11 +20,9 @@ export function usePromptHandlers(state: PromptState, props: PromptBarProps) {
   const query = state.plusOpen ? "" : (token?.query ?? "");
   const rows: { key: string; name: string; desc: string }[] =
     menu === "at"
-      ? SOURCES.filter(
-          (s) =>
-            (props.onAttach || !s.attach) &&
-            s.name.toLowerCase().includes(query),
-        ).map((s) => ({ key: s.key, name: s.name, desc: s.desc }))
+      ? (props.sources ?? [])
+          .filter((s) => props.onAttach || !s.attach)
+          .map((s) => ({ key: s.key, name: s.name, desc: s.desc }))
       : menu === "slash"
         ? COMMANDS.filter((c) => c.name.slice(1).startsWith(query)).map(
             (c) => ({ key: c.key, name: c.name, desc: c.desc }),

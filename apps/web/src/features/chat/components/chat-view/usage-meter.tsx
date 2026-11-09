@@ -18,10 +18,13 @@ const compact = (n: number) =>
 export function UsageMeter({
   usage,
   contextLength,
+  free,
 }: {
   usage: ChatUsage | null;
   /** The selected model's context window: the next message is sent to it. */
   contextLength: number | undefined;
+  /** The selected model is free: its tokens never count toward today's budget, so say that next to the counter. */
+  free: boolean;
 }) {
   const used = usage?.contextTokens ?? 0;
   const pct = contextLength
@@ -72,7 +75,8 @@ export function UsageMeter({
         )}
       </div>
       {usage && (
-        <span title="Tokens your bots used today; resets at 00:00 UTC">
+        <span title="Tokens your bots used today on paid models; free models are not counted. Resets at 00:00 UTC">
+          {free && "Free model, not counted · "}
           Today {compact(usage.todayUsed)} / {compact(usage.todayLimit)} ·{" "}
           {compact(Math.max(0, usage.todayLimit - usage.todayUsed))} left
         </span>

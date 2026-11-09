@@ -1,5 +1,5 @@
 import type { SubagentStatus } from "@backend/modules/agent/parts";
-import type { ChatMessageView, MessagePart, RunState } from "../protocol";
+import type { ChatMessageView, RunState } from "../protocol";
 
 export interface WireEvent {
   seq: number;
@@ -25,6 +25,8 @@ export interface Prompt {
   name?: string;
   label?: string;
   why?: string;
+  /** request_app_connections: the apps the bot needs connected. */
+  apps?: Array<{ toolkit: string; name: string; logo: string | null }>;
 }
 
 /** The context meter: tokens of the latest model call, and today's tokens against the daily budget. */

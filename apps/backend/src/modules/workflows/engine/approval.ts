@@ -37,6 +37,11 @@ export async function runApproval(
     });
     answer = event.payload;
   } catch {
+    if (node.config.onTimeout === "decline") {
+      const output = { message: asked, approved: false, timedOut: true, answeredAt: null };
+      await once(step, `unanswered:${key}`, () => log.step(node, { status: "succeeded", output, error: null }));
+      return { status: "succeeded", output, passed: false };
+    }
     const error = `No answer within ${node.config.timeoutHours} hours.`;
     await once(step, `unanswered:${key}`, () => log.step(node, { status: "failed", error }));
     return { status: "failed", error };

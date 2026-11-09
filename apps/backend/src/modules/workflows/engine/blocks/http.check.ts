@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { FatalBlockError } from "../errors";
-import { runHttp } from "./http";
+import { runHttp } from "./http-pages";
 
 type Config = Parameters<typeof runHttp>[3];
 
@@ -12,6 +12,9 @@ const env = {
 const base: Config = {
   method: "GET",
   url: "https://example.org/a",
+  query: [],
+  auth: { type: "none", token: "", username: "", headerName: "X-API-Key" },
+  pagination: { mode: "none", param: "page", start: 1, itemsPath: "", nextPath: "", maxPages: 5 },
   headers: [],
   body: { type: "none", value: "" },
   timeoutSeconds: 5,
@@ -75,5 +78,37 @@ const withCookie = { ...base, headers: [{ name: "Cookie", value: "a=b" }] };
 await expectFailure(runHttp(env, "u", "r", withCookie), true, /cannot be set/);
 const brokenJson: Config = { ...base, method: "POST", body: { type: "json", value: "{oops" } };
 await expectFailure(runHttp(env, "u", "r", brokenJson), true, /not valid JSON/);
+
+// Query parameters are encoded onto the URL; sign-in presets set their header.
+let seen: Headers | undefined;
+serve((_url, init) => {
+  seen = new Headers(init?.headers);
+  return new Response("{}");
+});
+requested.length = 0;
+await runHttp(env, "u", "r", { ...base, query: [{ name: "q", value: "a b&c" }], auth: { ...base.auth, type: "bearer", token: "tok" } });
+assert.equal(requested[0], "https://example.org/a?q=a+b%26c");
+assert.equal(seen?.get("authorization"), "Bearer tok");
+await runHttp(env, "u", "r", { ...base, auth: { ...base.auth, type: "basic", username: "ann", token: "pw" } });
+assert.equal(seen?.get("authorization"), `Basic ${btoa("ann:pw")}`);
+await runHttp(env, "u", "r", { ...base, auth: { ...base.auth, type: "api_key", headerName: "X-Key", token: "k" } });
+assert.equal(seen?.get("x-key"), "k");
+await expectFailure(runHttp(env, "u", "r", { ...base, auth: { ...base.auth, type: "bearer" } }), true, /token is empty/);
+
+// Pagination: page numbers until an empty page; a cursor; a next URL. Items are collected.
+const pg = (o: Partial<Config["pagination"]>) => ({ ...base, pagination: { ...base.pagination, ...o } });
+serve((url) => {
+  const page = Number(new URL(url).searchParams.get("p") ?? 0);
+  return Response.json({ rows: page < 3 ? [page] : [] });
+});
+const paged = (await runHttp(env, "u", "r", pg({ mode: "page", param: "p", start: 1, itemsPath: "rows" }))) as { items: unknown[]; pages: number };
+assert.deepEqual([paged.items, paged.pages], [[1, 2], 3]);
+serve((url) => {
+  const c = new URL(url).searchParams.get("c");
+  return Response.json(c ? { data: ["b"], next: null } : { data: ["a"], next: "x" });
+});
+assert.deepEqual(((await runHttp(env, "u", "r", pg({ mode: "cursor", param: "c", itemsPath: "data", nextPath: "next" }))) as { items: unknown[] }).items, ["a", "b"]);
+serve((url) => Response.json(url.endsWith("/a") ? { list: [1], links: { next: "/b" } } : { list: [2], links: {} }));
+assert.deepEqual(((await runHttp(env, "u", "r", pg({ mode: "next_url", itemsPath: "list", nextPath: "links.next", maxPages: 2 }))) as { items: unknown[] }).items, [1, 2]);
 
 console.log("http block: all checks passed");

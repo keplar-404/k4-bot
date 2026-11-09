@@ -10,7 +10,19 @@ export async function waitForRun(db: Db, userId: string, runId: string) {
   for (let waited = 0; waited < WAIT_MS; waited += POLL_MS) {
     await new Promise((resolve) => setTimeout(resolve, POLL_MS));
     const run = await getRun(db, userId, runId);
-    if (!run || run.status === "queued" || run.status === "running") continue;
+    if (!run || run.status === "queued") continue;
+    // An "Ask me first" block is waiting: only the user can answer it, so say where instead of waiting in silence.
+    const asking = run.steps.find((s) => s.nodeKind === "logic.approval" && s.status === "waiting");
+    if (asking) {
+      const message = (asking.output as { message?: string } | null)?.message ?? "";
+      return asText({
+        runId,
+        status: "waiting_for_approval",
+        question: message,
+        note: "The run is paused until the user approves. Tell them to approve or decline it on the Approvals page (/dashboard/approvals) or in the workflow builder; then check workflow_run_status.",
+      });
+    }
+    if (run.status === "running") continue;
 
     const lastOutputs = run.steps
       .filter((s) => s.status === "succeeded")

@@ -1,4 +1,6 @@
+import { LOOP_DONE } from "./loop-rules";
 import { isTrigger, LIMITS, type WorkflowGraph } from "./schema";
+import { OTHERWISE } from "./switch-block";
 
 /** A problem with the graph, pinned to a block when it is about one (the builder highlights it). */
 export type GraphIssue = { nodeId?: string; message: string };
@@ -49,9 +51,8 @@ export function structureIssues(g: WorkflowGraph): GraphIssue[] {
     if (kinds.get(e.target)?.startsWith("trigger.")) {
       issues.push({ nodeId: e.target, message: "A trigger starts the workflow: nothing can lead into it." });
     }
-    if ((kinds.get(e.source) === "logic.if") !== Boolean(e.branch)) {
-      issues.push({ nodeId: e.source, message: "Only an If block has true / false paths." });
-    }
+    const branchIssue = branchProblem(g, e);
+    if (branchIssue) issues.push({ nodeId: e.source, message: branchIssue });
     const key = `${e.source}>${e.target}>${e.branch ?? ""}`;
     if (seen.has(key)) issues.push({ nodeId: e.source, message: "The same connection exists twice." });
     seen.add(key);
@@ -64,4 +65,20 @@ export function structureIssues(g: WorkflowGraph): GraphIssue[] {
     });
   }
   return issues;
+}
+
+/** Which outputs a block has: If → true/false, Switch → its rules and "otherwise", For each → each item and "done", others → one. */
+function branchProblem(g: WorkflowGraph, e: WorkflowGraph["edges"][number]): string | null {
+  const source = g.nodes.find((n) => n.id === e.source);
+  if (source?.kind === "logic.if") {
+    return e.branch === "true" || e.branch === "false" ? null : "Connect an If block from its true or false output.";
+  }
+  if (source?.kind === "logic.switch") {
+    const outputs = new Set([...source.config.rules.map((r) => r.id), ...(source.config.otherwise ? [OTHERWISE] : [])]);
+    return e.branch && outputs.has(e.branch) ? null : "This connection leaves from a Switch output that no longer exists.";
+  }
+  if (source?.kind === "logic.loop") {
+    return !e.branch || e.branch === LOOP_DONE ? null : "Connect a For each from its each-item or done output.";
+  }
+  return e.branch ? "Only If, Switch and For each blocks have several outputs." : null;
 }

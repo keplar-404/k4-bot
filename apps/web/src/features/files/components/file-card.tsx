@@ -52,7 +52,7 @@ export function FileCard({
     <Item
       variant="outline"
       size="sm"
-      className={compact ? "w-56 bg-background/60" : "w-full max-w-sm"}
+      className={compact ? "w-56 bg-background/60" : "w-full"}
     >
       <ItemMedia variant="icon">
         {broken ? <ImageOffIcon /> : <FileKindIcon file={file} />}

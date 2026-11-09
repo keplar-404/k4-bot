@@ -1,0 +1,93 @@
+"use client";
+
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import type { BlockBody } from "../blocks";
+import { TemplateInput } from "../template/template-input";
+import { Field, SettingsSection } from "./field";
+import { SecretPicker } from "./webhook/secret-picker";
+
+type Auth = Extract<BlockBody, { kind: "action.http" }>["config"]["auth"];
+
+const TYPES: Record<Auth["type"], string> = {
+  none: "None",
+  bearer: "Bearer token",
+  basic: "Username and password (Basic)",
+  api_key: "API key in a header",
+};
+const SECRET_REF = /^\{\{\s*secrets\.([A-Za-z0-9_]+)\s*\}\}$/;
+
+/** How the HTTP block signs in: a preset that takes its token from the Secrets vault (never typed in the block). */
+export function HttpAuth({
+  auth,
+  onChange,
+}: {
+  auth: Auth;
+  onChange: (auth: Auth) => void;
+}) {
+  const set = (patch: Partial<Auth>) => onChange({ ...auth, ...patch });
+  const secret = SECRET_REF.exec(auth.token)?.[1];
+  return (
+    <SettingsSection title="Sign in">
+      <Field id="http-auth" label="Type">
+        <Select
+          value={auth.type}
+          onValueChange={(v) => v && set({ type: v as Auth["type"] })}
+        >
+          <SelectTrigger id="http-auth" className="w-full">
+            <SelectValue>{TYPES[auth.type]}</SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {Object.entries(TYPES).map(([type, label]) => (
+              <SelectItem key={type} value={type}>
+                {label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </Field>
+      {auth.type === "basic" && (
+        <Field id="http-user" label="Username">
+          <TemplateInput
+            id="http-user"
+            value={auth.username}
+            onChange={(username) => set({ username })}
+          />
+        </Field>
+      )}
+      {auth.type === "api_key" && (
+        <Field
+          id="http-key-header"
+          label="Header name"
+          hint="The header the service reads the key from."
+        >
+          <Input
+            id="http-key-header"
+            value={auth.headerName}
+            maxLength={64}
+            onChange={(e) =>
+              set({ headerName: e.target.value.replace(/[^A-Za-z0-9-]/g, "") })
+            }
+          />
+        </Field>
+      )}
+      {auth.type !== "none" && (
+        <SecretPicker
+          value={secret}
+          onChange={(name) => set({ token: `{{secrets.${name}}}` })}
+          hint={
+            auth.type === "basic"
+              ? "The password, from the Secrets page."
+              : "The token or key, from the Secrets page. It is never shown or stored in the run."
+          }
+        />
+      )}
+    </SettingsSection>
+  );
+}

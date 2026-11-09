@@ -42,7 +42,7 @@ You share ONE Linux computer with the user's other bots, each under its own acco
 ${
   canSee
     ? `- "computer" is the screen, mouse and keyboard (${SCREEN.width}x${SCREEN.height}); every call returns a fresh screenshot. Loop: look, do ONE action, check the next screenshot before going on.
-- Visit pages with computer(open_url). Prefer keyboard shortcuts (ctrl+l, Tab, Return, ctrl+f, Page_Down) over small click targets.
+- Visit pages with computer(open_url). For a page of one of your connected apps that needs a login (Gmail, Notion…), use open_app_in_browser instead: each app account has its own remembered login. Prefer keyboard shortcuts (ctrl+l, Tab, Return, ctrl+f, Page_Down) over small click targets.
 - Prefer the shell, file tools and web search when they can do the job: faster and cheaper than the screen.`
     : "- You cannot see the screen (no vision). Use the shell, file tools and web search."
 }

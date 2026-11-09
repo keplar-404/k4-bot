@@ -1,6 +1,10 @@
 import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from "cloudflare:workers";
 import { createDb } from "../../../db";
 import { parseEnv, type Env } from "../../../config/env";
+import { startNextTurn } from "../../groups/chain";
+import { groupTurn } from "../../groups/brief";
+import { getOwnedGroup } from "../../groups/store";
+import { autoUpdateMemory } from "../../memory/auto/update";
 import { publishEvent } from "./relay";
 import { loadBot, saveUserMessage } from "./setup";
 import { runSlice } from "./slice";
@@ -32,6 +36,7 @@ export class ChatRunWorkflow extends WorkflowEntrypoint<Env, ChatRunParams> {
       await step.do("report-failure", async () => {
         await publishEvent(env, params.threadId, "run.failed", {
           runId: params.runId,
+          ...(params.botId ? { botId: params.botId } : {}),
           error: error instanceof Error ? error.message : "The run did not finish.",
         });
       });
@@ -42,6 +47,14 @@ export class ChatRunWorkflow extends WorkflowEntrypoint<Env, ChatRunParams> {
   private async execute(env: Env, params: ChatRunParams, step: WorkflowStep) {
     const botRow = await step.do("load-context", () => loadBot(createDb(env.DATABASE_URL), params));
     const attached = await step.do("save-user-message", () => saveUserMessage(createDb(env.DATABASE_URL), params, botRow.id));
+    // Group chats: the members, and what this member is told (the chat since its last turn, then its task).
+    const group = params.botId
+      ? await step.do("group-context", async () => {
+          const turn = await groupTurn(createDb(env.DATABASE_URL), params, botRow.id);
+          return turn ? { groupId: turn.group.id, members: turn.members, content: turn.content } : null;
+        })
+      : null;
+    const runParams = group && !params.compact && !params.research ? { ...params, content: group.content } : params;
 
     let resume: unknown;
     // Model failures in a row; any slice that gets through resets it.
@@ -51,7 +64,7 @@ export class ChatRunWorkflow extends WorkflowEntrypoint<Env, ChatRunParams> {
         `slice-${slice}`,
         // No automatic retry: re-running a half-streamed slice would publish its events twice.
         { retries: { limit: 0, delay: 1 }, timeout: "25 minutes" },
-        () => runSlice(env, params, botRow, attached, slice, resume),
+        () => runSlice(env, runParams, botRow, attached, slice, resume, group ?? undefined),
       );
       if (result.status === "retry") {
         // `resume` is kept: an answer or approval the failed slice was carrying is delivered by the retry.
@@ -79,7 +92,32 @@ export class ChatRunWorkflow extends WorkflowEntrypoint<Env, ChatRunParams> {
       retries = 0;
       resume = undefined;
 
-      if (result.status === "done" || result.status === "failed") return;
+      if (result.status === "done") {
+        // Learn from the turn after it is answered: never delays the reply, and its own step, so a crash here
+        // cannot touch the answer. Scheduled-task prompts are not the user speaking, so they teach nothing.
+        if (group) {
+          await step.do("next-turn", () => startNextTurn(env, createDb(env.DATABASE_URL), params, { id: botRow.id, name: botRow.name, groupId: group.groupId }));
+        }
+        if (!params.content.startsWith("⏰") && !params.chained) {
+          await step.do("auto-memory", { retries: { limit: 0, delay: 1 }, timeout: "2 minutes" }, async () => {
+            const db = createDb(env.DATABASE_URL);
+            const owned = group ? await getOwnedGroup(db, params.userId, group.groupId) : null;
+            const updates = await autoUpdateMemory(env, db, {
+              group: owned ? { id: owned.id, name: owned.name, memory: owned.memory } : undefined,
+              userId: params.userId,
+              botId: botRow.id,
+              threadId: params.threadId,
+              runId: params.runId,
+              modelId: params.modelId,
+              userText: params.content,
+            });
+            for (const u of updates) await publishEvent(env, params.threadId, "memory.updated", u);
+            return updates.length;
+          });
+        }
+        return;
+      }
+      if (result.status === "failed") return;
       if (result.status === "sleep") {
         await step.sleep(`sleep-${slice}`, Math.min(result.ms, MAX_SLEEP_MS));
         resume = "Resumed after waiting.";

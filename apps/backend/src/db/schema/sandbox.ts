@@ -23,3 +23,22 @@ export const botSandbox = pgTable(
 );
 
 export type BotSandboxRow = typeof botSandbox.$inferSelect;
+
+/**
+ * Sandbox time used outside a bot's own sandbox (a workflow's Code block). Counts toward the same daily sandbox
+ * budget (SANDBOX_MAX_MINUTES_PER_DAY). Kept with the user, like usage rows: deleting a workflow gives no time back.
+ */
+export const sandboxUsage = pgTable(
+  "sandbox_usage",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    /** YYYY-MM-DD (UTC), the same day key as bot_sandbox.usage_day. */
+    day: text("day").notNull(),
+    seconds: integer("seconds").notNull(),
+    /** What used it: "workflow:<runId>". */
+    source: text("source").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [index("sandbox_usage_user_day_idx").on(t.userId, t.day)],
+);

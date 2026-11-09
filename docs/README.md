@@ -37,6 +37,7 @@ workflows hand steps to bots.
 | [Scheduled tasks](features/scheduled-tasks.md) | Grok-style tasks: a bot does something at set times |
 | [Secrets](features/secrets.md) | The encrypted vault for API keys that workflows use |
 | [Files](features/files.md) | Uploads, generated images, document reading |
+| [Decide block](features/decision-block.md) | TypeSafe Jev typed decisions in workflows |
 
 ## Repository at a glance
 

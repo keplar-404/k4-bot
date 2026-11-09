@@ -57,6 +57,19 @@ export class UserComputerDurableObject extends ComputerPanel {
     return run;
   }
 
+  /**
+   * The user asked (Connect page) to sign in to an app account on a bot's computer: that bot's browser opens the page
+   * in the account's own profile, and the user takes control to log in. Validated like any bot action.
+   */
+  async openAppLogin(botId: string, url: string, app: { toolkit: string; accountId: string }): Promise<ActionResult> {
+    if (this.state !== "running") return { ok: false, text: "The computer is not on." };
+    const parsed = computerActionSchema.safeParse({ action: "open_url", url, app });
+    if (!parsed.success) return { ok: false, text: "That address or account is not valid." };
+    const run = this.gui.then(() => this.perform(botId, parsed.data));
+    this.gui = run.catch(() => undefined);
+    return run;
+  }
+
   private async perform(botId: string, action: ComputerAction): Promise<ActionResult> {
     try {
       return await this.withSandbox(botId, async (sbx) => {

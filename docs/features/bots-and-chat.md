@@ -13,6 +13,39 @@ A bot belongs to one user. Its settings (`bot` table, edited on `/dashboard/avat
 | Parallel tools | How many tool calls may run at once (1–10) |
 | Skills, MCP servers, apps | Which installed skills, connected MCP servers and Composio apps this bot may use (per app: which account, and whether it may write) |
 
+## Groups
+
+A group (`bot_group`, sidebar → Groups) is a shared chat of two or more of the user's bots; the sidebar shows it with
+its bots' avatars stacked.
+
+- **Who answers:** a message that names bots with `@bot:name` (offered first in the "@" menu of a group chat) goes to
+  those bots, one after another; otherwise the group's **lead** answers.
+- **Each turn** is its own chat run for that bot (`ChatRunParams.botId`), with its own agent state
+  (checkpoint `"<thread>:<bot>"`). The bot is given the group, its members, the group notes and everything said since
+  its last turn. The next queued bot's run starts when one finishes (`groups/chain.ts`), and its message exists from
+  that moment, so the chat stays busy until the last bot is done.
+- **Hand-offs:** `message_bot({bot, text, fileIds?})` queues another member to answer after this turn (files are
+  passed by id). At most 8 hand-offs per user message.
+- **Group notes:** `update_group_memory` (and the group's settings dialog) hold what every member should know.
+- **In the chat** each answer shows its bot's avatar and name; its work steps stay folded, titled with the bot's name.
+- Deleting the group deletes its chat (runs stopped first). Deleting a bot hands the group chats it led to another
+  member.
+
+## The admin bot
+
+One per user (`bot.kind = "admin"`, sidebar → "Add an admin bot"). It manages the user's own bots only:
+
+| Tool | Does |
+|---|---|
+| `admin_list_bots`, `admin_list_groups` | Bots (and whether each is working now), groups and members |
+| `admin_create_bot`, `admin_update_bot`, `admin_set_bot_memory` | Create, rename / describe, replace a bot's memory |
+| `admin_delete_bot` | Deletes a bot with its chats and computer files; refused while it works; **always** asks |
+| `admin_create_group`, `admin_update_group`, `admin_delete_group` | Manage groups |
+| `admin_message_bot` | Sends a bot a message in its own chat |
+| `admin_run_as_bot` | Runs a command on the computer **as that bot's Linux user** (create, change, delete its files; no root, no other accounts); refused while that bot works; **always** asks |
+
+It can also see and manage every workflow of the user. Everything it changes is recorded in `admin_audit`.
+
 ## The chat run
 
 Sending a message (`POST /api/v1/chat/threads/:id/messages`) never runs the agent inside the request:
@@ -70,6 +103,22 @@ Approvals are LangChain human-in-the-loop interrupts; the run waits durably unti
 | `user_preferences` | All of the user's bots (name, language, tone, formats) | `update_user_preferences` |
 
 Both are in every system prompt and editable by the user.
+
+**Automatic updates:** after each finished turn, a separate durable step asks the bot's model whether the user's own
+message stated something lasting, and whether it belongs to this bot or to the global preferences. A proposed update
+is saved only if it passes checks (no secret-like text, size caps, does not drop most of the existing memory); facts
+from tool results, web pages or files are never used. The chat shows "Memory updated" with **Undo** (restores the
+previous text if nothing changed it since). Code: `modules/memory/auto/`, prompt `src/prompts/auto-memory.ts`.
+
+## The chat screen
+
+- Answers show the bot's avatar beside them; the work steps fold into one row; files appear after the turn finishes,
+  in a 1–3 column grid.
+- A **To-dos** panel above the prompt bar shows the bot's current plan (`write_todos`, built into every bot by Deep
+  Agents) with in-progress and pending counts; it slides open and closed.
+- **"@"** lists real things: attach files, your connected apps (with logos; unconnected ones have a Connect link),
+  your workflows and recent files. **"/"** lists `/deep-research` and `/compact`. Picked mentions are highlighted.
+- The microphone uses the browser's speech recognition (Chrome, Edge, Safari).
 
 ## Quotas
 

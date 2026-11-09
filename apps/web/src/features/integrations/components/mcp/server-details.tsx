@@ -4,7 +4,6 @@ import {
   ArrowLeftIcon,
   CheckIcon,
   ExternalLinkIcon,
-  KeyRoundIcon,
   Loader2Icon,
   PlusIcon,
 } from "lucide-react";
@@ -12,6 +11,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   type CatalogMcp,
   connectMcp,
@@ -90,11 +90,26 @@ export function ServerDetails({
           )
         )}
       </header>
-      <p className="text-sm">{server.description}</p>
-      <ServerCapabilities server={server} />
-      {server.fields.length > 0 && (
-        <TokenSection server={server} installed={installed} />
-      )}
+      <Tabs defaultValue="overview" className="gap-4">
+        <TabsList variant="line">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="tools">What it can do</TabsTrigger>
+          {server.fields.length > 0 && (
+            <TabsTrigger value="access">Access token</TabsTrigger>
+          )}
+        </TabsList>
+        <TabsContent value="overview">
+          <p className="text-sm">{server.description}</p>
+        </TabsContent>
+        <TabsContent value="tools">
+          <ServerCapabilities server={server} />
+        </TabsContent>
+        {server.fields.length > 0 && (
+          <TabsContent value="access">
+            <TokenSection server={server} installed={installed} />
+          </TabsContent>
+        )}
+      </Tabs>
     </div>
   );
 }

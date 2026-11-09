@@ -35,13 +35,17 @@ export function useAutosave() {
         edges,
         version: v,
         setWorkflow,
+        pins,
       } = useBuilder.getState();
       if (!workflow) return;
       saving.current = true;
       setState("saving");
       try {
         const next = await saveWorkflow(workflow.id, {
-          graph: flowToGraph(nodes, edges),
+          graph: {
+            ...flowToGraph(nodes, edges),
+            ...(Object.keys(pins).length ? { pins } : {}),
+          },
           expectedUpdatedAt: workflow.updatedAt,
         });
         setWorkflow(next);
@@ -69,5 +73,7 @@ export function useAutosave() {
     return () => window.removeEventListener("beforeunload", warn);
   }, []);
 
+  // Other parts of the builder ("Test this step") need to know the server has the latest draft.
+  useEffect(() => useBuilder.setState({ saved: state === "saved" }), [state]);
   return { state, message };
 }

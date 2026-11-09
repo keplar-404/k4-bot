@@ -10,4 +10,5 @@ export const toCatalog = (models: ModelRow[]) =>
     reasoning: m.reasoning,
     reasoningEfforts: m.reasoningEfforts,
     contextLength: m.contextLength,
+    free: m.free || m.id.endsWith(":free"),
   }));

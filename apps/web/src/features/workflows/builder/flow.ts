@@ -47,9 +47,7 @@ export function flowToGraph(
       id: e.id,
       source: e.source,
       target: e.target,
-      ...(e.sourceHandle === "true" || e.sourceHandle === "false"
-        ? { branch: e.sourceHandle }
-        : {}),
+      ...(e.sourceHandle ? { branch: e.sourceHandle } : {}),
     })),
   };
 }

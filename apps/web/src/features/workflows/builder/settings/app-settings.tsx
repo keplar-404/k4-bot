@@ -10,6 +10,7 @@ import { AppSettingsEmpty, AppSettingsLoading } from "./app-settings-empty";
 import { SettingsSection } from "./field";
 import { SchemaForm } from "./schema-form";
 import { fetchTool, type ToolDetail } from "./tools-api";
+import { useNoAuth } from "./use-no-auth";
 
 type AppBlock = Extract<BlockBody, { kind: "action.app" }>;
 
@@ -22,6 +23,7 @@ export function AppSettings({
   update: (b: AppBlock) => void;
 }) {
   const { toolkit, tool } = block.config;
+  const noAuth = useNoAuth(toolkit ?? "");
   const [detail, setDetail] = useState<ToolDetail | null>(null);
   const [picking, setPicking] = useState(!tool);
   const [error, setError] = useState<string | null>(null);
@@ -37,9 +39,11 @@ export function AppSettings({
   const name = appName(toolkit);
   return (
     <>
-      <SettingsSection title="Account">
-        <AppConnection toolkit={toolkit} appName={name} />
-      </SettingsSection>
+      {!noAuth && (
+        <SettingsSection title="Account">
+          <AppConnection toolkit={toolkit} appName={name} />
+        </SettingsSection>
+      )}
       <SettingsSection title="Action">
         {picking || !tool ? (
           <ActionPicker

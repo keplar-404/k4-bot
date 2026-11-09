@@ -1,10 +1,15 @@
 "use client";
 
-import { PanelRightCloseIcon } from "lucide-react";
+import {
+  Maximize2Icon,
+  Minimize2Icon,
+  PanelRightCloseIcon,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { blockKindLabel, blockTitle } from "../block-label";
 import type { BlockBody } from "../blocks";
+import { usePanels } from "../panels-store";
 
 /** The panel's top: the block's kind, its editable name, and the button that hides the panel. */
 export function SettingsHeader({
@@ -31,6 +36,7 @@ export function SettingsHeader({
           }
         />
       </div>
+      <WideToggle />
       <Button
         variant="ghost"
         size="icon-sm"
@@ -41,5 +47,26 @@ export function SettingsHeader({
         <PanelRightCloseIcon />
       </Button>
     </div>
+  );
+}
+
+/** On a wide screen: widen the window to input, settings and output side by side, or back. */
+function WideToggle() {
+  const wide = usePanels((s) => s.wide);
+  return (
+    <Button
+      variant="ghost"
+      size="icon-sm"
+      className="hidden xl:inline-flex"
+      onClick={() => usePanels.getState().toggle("wide")}
+      aria-label={
+        wide
+          ? "Narrow the settings"
+          : "Widen the settings: input, settings and output side by side"
+      }
+      aria-pressed={wide}
+    >
+      {wide ? <Minimize2Icon /> : <Maximize2Icon />}
+    </Button>
   );
 }

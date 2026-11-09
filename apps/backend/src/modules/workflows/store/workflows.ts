@@ -11,7 +11,7 @@ export type WorkflowRow = typeof workflow.$inferSelect;
 
 /** The trigger block a new workflow starts with, so the canvas is never empty. */
 export const STARTER_GRAPH: WorkflowGraph = {
-  nodes: [{ id: "trigger", kind: "trigger.manual", position: { x: 0, y: 0 }, config: {} }],
+  nodes: [{ id: "trigger", kind: "trigger.manual", position: { x: 0, y: 0 }, config: { fields: [] } }],
   edges: [],
 };
 

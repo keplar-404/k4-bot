@@ -1,8 +1,15 @@
 "use client";
 
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type { BlockBody } from "../blocks";
+import { TemplateInput } from "../template/template-input";
 import { Field, SettingsSection } from "./field";
 
 type ApprovalBlock = Extract<BlockBody, { kind: "logic.approval" }>;
@@ -22,15 +29,14 @@ export function ApprovalSettings({
       <Field
         id="approval-message"
         label="What to ask"
-        hint="Shown when the run reaches this block. Paste data to check, e.g. “Send this reply? {{steps.ai_1.output.text}}”."
+        hint="Shown when the run reaches this block. Add data to check with +, or drag it from the Data tab."
       >
-        <Textarea
+        <TemplateInput
           id="approval-message"
-          rows={4}
-          maxLength={2000}
+          multiline
           value={block.config.message}
           placeholder="Continue this run?"
-          onChange={(e) => set({ message: e.target.value })}
+          onChange={(message) => set({ message })}
         />
       </Field>
       <Field
@@ -54,8 +60,27 @@ export function ApprovalSettings({
           }
         />
       </Field>
+      <Field id="approval-timeout-action" label="If nobody answers in time">
+        <Select
+          value={block.config.onTimeout ?? "fail"}
+          onValueChange={(v) => set({ onTimeout: v as "fail" | "decline" })}
+        >
+          <SelectTrigger id="approval-timeout-action" className="w-full">
+            <SelectValue>
+              {block.config.onTimeout === "decline"
+                ? "Treat it as declined"
+                : "Fail this block"}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="fail">Fail this block</SelectItem>
+            <SelectItem value="decline">Treat it as declined</SelectItem>
+          </SelectContent>
+        </Select>
+      </Field>
       <p className="text-muted-foreground text-xs">
-        Approve or decline in the run banner or this block&apos;s Last run tab.
+        Answer on the Approvals page, in the run banner, or in this block&apos;s
+        Last run tab. When a bot started the run, it tells you in its chat.
         Declined stops the steps after it; the run itself still succeeds. A
         waiting run costs nothing.
       </p>

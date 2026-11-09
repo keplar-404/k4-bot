@@ -1,5 +1,6 @@
 "use client";
 
+import { fits } from "./placeholder";
 import { SchemaFieldArray } from "./schema-field-array";
 import { SchemaFieldBoolean } from "./schema-field-boolean";
 import { SchemaFieldEnum } from "./schema-field-enum";
@@ -25,7 +26,7 @@ function metaLine(schema: JsonSchema): string {
   ) {
     parts.push(`default ${plain(schema.default)}`);
   }
-  const example = schema.examples?.find((e) => e !== "" && e !== null);
+  const example = schema.examples?.find((e) => fits(schema, e));
   if (example !== undefined) parts.push(`e.g. ${plain(example).slice(0, 60)}`);
   return parts.join(" · ");
 }

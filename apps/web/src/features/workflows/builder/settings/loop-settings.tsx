@@ -2,6 +2,7 @@
 
 import { Input } from "@/components/ui/input";
 import type { BlockBody } from "../blocks";
+import { TemplateInput } from "../template/template-input";
 import { Field, SettingsSection } from "./field";
 
 type LoopBlock = Extract<BlockBody, { kind: "logic.loop" }>;
@@ -22,15 +23,13 @@ export function LoopSettings({
         id="loop-items"
         label="The list"
         required
-        hint="Copy a list field from the Data tab, e.g. {{steps.sheets_1.output.data.rows}}. Every block connected after this one runs once per item, one item after another."
+        hint="Pick a list with + (or drag one from the Data tab), e.g. the rows of a sheet. Every block connected after this one runs once per item, one item after another."
       >
-        <Input
+        <TemplateInput
           id="loop-items"
-          className="font-mono text-xs"
           value={block.config.items}
-          placeholder="{{steps.….output.items}}"
-          maxLength={4000}
-          onChange={(e) => set({ items: e.target.value })}
+          placeholder="Pick a list with +"
+          onChange={(items) => set({ items })}
         />
       </Field>
       <Field
@@ -59,6 +58,12 @@ export function LoopSettings({
         <code>{"{{loop.item.email}}"}</code>), <code>{"{{loop.index}}"}</code>{" "}
         (0, 1, 2…) and <code>{"{{loop.count}}"}</code>. One For each per
         workflow.
+      </p>
+      <p className="text-muted-foreground text-xs">
+        Blocks connected to its <strong>done</strong> output run once, after
+        every item. They can read{" "}
+        <code>{`{{steps.${block.id}.output.results}}`}</code>: each item&apos;s
+        result (the last repeated block that ran for it).
       </p>
     </SettingsSection>
   );

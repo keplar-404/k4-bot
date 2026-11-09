@@ -5,7 +5,7 @@ import { hashToken, newWebhookToken, nextRunAt } from "./triggers";
 import { publishIssues, structureIssues, topoOrder } from "./validate";
 
 const pos = { x: 0, y: 0 };
-const trigger = { id: "t", kind: "trigger.manual" as const, position: pos, config: {} };
+const trigger = { id: "t", kind: "trigger.manual" as const, position: pos, config: { fields: [] } };
 const app = (id: string, done = true) => ({
   id,
   kind: "action.app" as const,
@@ -48,15 +48,15 @@ const iff = {
   id: "if",
   kind: "logic.if" as const,
   position: pos,
-  config: { combine: "all" as const, conditions: [{ left: "{{trigger.x}}", op: "exists" as const }] },
+  config: { combine: "all" as const, conditions: [{ left: "{{trigger.x}}", op: "exists" as const }], groups: [] },
 };
 assert.deepEqual(structureIssues(g([trigger, iff, app("a")], [e("t", "if"), e("if", "a", "true")])), []);
 assert.ok(
   structureIssues(g([trigger, iff, app("a")], [e("t", "if"), e("if", "a")])).some((i) =>
-    /true \/ false/.test(i.message),
+    /true or false output/.test(i.message),
   ),
 );
-assert.ok(structureIssues(g([trigger, app("a")], [e("t", "a", "true")])).some((i) => /true \/ false/.test(i.message)));
+assert.ok(structureIssues(g([trigger, app("a")], [e("t", "a", "true")])).some((i) => /several outputs/.test(i.message)));
 
 // Publish needs a trigger, every block wired and filled in.
 assert.ok(publishIssues(g([app("a")], [])).some((i) => /Add a trigger/.test(i.message)));

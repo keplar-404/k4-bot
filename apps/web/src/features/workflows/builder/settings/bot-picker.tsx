@@ -28,7 +28,9 @@ export function BotPicker({
     >
       <Select value={botId ?? ""} onValueChange={(v) => onPick(v || undefined)}>
         <SelectTrigger id="ai-bot" className="w-full">
-          <SelectValue placeholder="Choose a bot" />
+          <SelectValue placeholder="Choose a bot">
+            {bots.find((b) => b.id === botId)?.name}
+          </SelectValue>
         </SelectTrigger>
         <SelectContent>
           {bots.map((b) => (

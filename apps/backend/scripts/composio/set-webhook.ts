@@ -7,8 +7,9 @@
  * printed secret as the Worker secret COMPOSIO_WEBHOOK_SECRET (`wrangler secret put COMPOSIO_WEBHOOK_SECRET`); the
  * API refuses events without it. Running it again updates the URL and keeps one subscription per project.
  *
- * Local development: Composio cannot reach localhost. Forward events with the Composio CLI instead:
- *   composio dev triggers listen --forward http://127.0.0.1:8787/api/v1/composio/events
+ * Local development: Composio cannot reach localhost. Expose the API with a tunnel (for example
+ * `cloudflared tunnel --url http://localhost:8787`) and run this with the tunnel's https URL. The subscription is per
+ * Composio project, so use a separate project for local work.
  */
 import { Composio } from "@composio/core";
 

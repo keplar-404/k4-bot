@@ -52,6 +52,9 @@ const control = new Hono<AuthGuardEnv>()
     }
     if (!result.reset) return c.json({ error: "BOTS_WORKING", message: "Bots are using the computer.", working: result.working }, 409);
     await stopBotRuns(db, env, userId, result.stopped.map((b) => b.botId), "Stopped: you reset the computer while this bot was working.");
+    // Build the replacement right away (in an alarm, so this request does not wait on E2B): the user gets a new
+    // computer, not just an empty slot that is filled on the next wake.
+    await stub.provision();
     return c.json(await stub.status());
   })
 

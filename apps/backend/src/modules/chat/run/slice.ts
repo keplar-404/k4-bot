@@ -2,19 +2,16 @@ import { GraphRecursionError } from "@langchain/langgraph";
 import { createDb } from "../../../db";
 import type { Env } from "../../../config/env";
 import type { AgentBot } from "../../agent/agent";
-import { loadBotComposioApps } from "../../agent/composio/bot-apps";
-import { connectBotApps, type BotApps } from "../../agent/mcp";
-import { contextLengthOf } from "../../agent/model-context";
+import type { BotApps } from "../../agent/mcp";
 import { DEFAULT_MODEL_ID, isFreeModel } from "../../agent/models";
 import type { FileRef, SubagentStatus } from "../../agent/parts";
 import { consumeRun } from "../../agent/run-stream";
 import { collectUnfinished, GroupHub } from "../../agent/tools/subagents";
-import { loadBotSkills } from "../../integrations/skills";
-import { loadMemory, saveBotMemory, savePreferences } from "../../memory/store";
 import { isMode } from "../modes";
+import type { GroupMember } from "../../groups/store";
 import { getOwnedThread, tokensUsedToday } from "../threads";
-import { buildRunAgent } from "./agent";
-import { attachedImages, peersOf, subagentContext } from "./context";
+import type { buildRunAgent } from "./agent";
+import { prepareAgent } from "./prepare";
 import { pauseFor } from "./interrupt";
 import { createRecorder } from "./recorder";
 import { createUsageReporter } from "./usage-events";
@@ -24,10 +21,21 @@ import { classifyProviderError, isTransient } from "./provider-error";
 import { type ChatRunParams, type Publish, SLICE_WALL_MS, type SliceResult } from "./types";
 
 /** One durable slice: drives the agent up to RUN_SLICE_STEPS graph steps, then reports how the run goes on. */
-export async function runSlice(env: Env, params: ChatRunParams, botRow: AgentBot, attached: FileRef[], slice: number, resume: unknown): Promise<SliceResult> {
+export async function runSlice(
+  env: Env,
+  params: ChatRunParams,
+  botRow: AgentBot,
+  attached: FileRef[],
+  slice: number,
+  resume: unknown,
+  group?: { groupId: string; members: GroupMember[] },
+): Promise<SliceResult> {
   const { runId, threadId, userId } = params;
+  // Each member of a group chat keeps its own agent state; the chat itself is shared through the turn's input.
+  const checkpointId = params.botId ? `${threadId}:${params.botId}` : threadId;
   const db = createDb(env.DATABASE_URL);
-  const publish: Publish = (type, payload) => publishEvent(env, threadId, type, { runId, ...payload });
+  // Group turns say which bot is working, so the chat can name every event's message from the first token.
+  const publish: Publish = (type, payload) => publishEvent(env, threadId, type, { runId, ...(params.botId ? { botId: params.botId } : {}), ...payload });
   const rec = createRecorder(db, params, publish);
   const stub = env.COMPUTER_ENABLED && env.E2B_API_KEY ? env.USER_COMPUTER.get(env.USER_COMPUTER.idFromName(userId)) : undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -53,12 +61,11 @@ export async function runSlice(env: Env, params: ChatRunParams, botRow: AgentBot
     const last = rec.acc.parts.at(-1);
     if (agent && last?.type === "text") {
       // The aborted model call never reached the checkpoint: add its partial answer so the conversation stays whole.
-      await agent.updateState({ configurable: { thread_id: threadId } }, { messages: [{ role: "assistant", content: last.text }] }).catch(() => undefined);
+      await agent.updateState({ configurable: { thread_id: checkpointId } }, { messages: [{ role: "assistant", content: last.text }] }).catch(() => undefined);
     }
     await publish("run.stopped", { messageId: `${runId}:assistant` });
     return { status: "done" };
   }
-
   try {
     // The bot was deleted while this run waited or slept: stop quietly (there is no chat left to tell).
     const ownedThread = await getOwnedThread(db, threadId, userId);
@@ -79,33 +86,19 @@ export async function runSlice(env: Env, params: ChatRunParams, botRow: AgentBot
       return { status: "failed" };
     }
 
-    const peers = stub ? await peersOf(db, userId, botRow.id) : [];
-    const images = await attachedImages(env, db, params, attached);
-    // The bot's skills (read from R2) and connected apps (MCP servers; tokens decrypted here, for this slice only).
-    const skills = env.FILES ? await loadBotSkills(env.FILES, db, userId, botRow.id) : {};
-    apps = await connectBotApps(env, db, userId, botRow.id);
-    const composioApps = await loadBotComposioApps(db, botRow.id);
     const progress = new Map<string, SubagentStatus[]>();
-    const subagents = botRow.subagentsEnabled ? await subagentContext(env, db, params, { publish, hub, sliceDeadline, progress }) : undefined;
-    // The model's real context window: sizes the automatic summary and the chat's context meter.
-    const contextLength = await contextLengthOf(params.modelId ?? DEFAULT_MODEL_ID);
-    // Long-term memory: this bot's own notes and the user's global preferences, read for the prompt, saved by its tools.
-    const memory = {
-      ...(await loadMemory(db, userId, botRow.id)),
-      saveMemory: async (content: string) => void (await saveBotMemory(db, userId, botRow.id, content)),
-      savePreferences: (content: string) => savePreferences(db, userId, content),
-    };
-    const agent = buildRunAgent(env, db, params, { bot: botRow, skills, apps, subagents, peers, stub, images, contextLength, memory, mode, account: { env, db, userId, apps: composioApps } });
-
+    const prepared = await prepareAgent(env, db, { params, bot: botRow, attached, mode, stub, group }, { publish, hub, sliceDeadline, progress });
+    const { agent, contextLength } = prepared;
+    apps = prepared.apps;
     // A retried slice may carry an answer the failed one already used: only send it while the agent still waits for it.
     if (resume !== undefined && slice > 0) {
-      const state = await agent.getState({ configurable: { thread_id: threadId } });
+      const state = await agent.getState({ configurable: { thread_id: checkpointId } });
       if (!state.tasks?.some((t) => t.interrupts?.length)) resume = undefined;
     }
     if (resume !== undefined) await publish("run.resumed", {});
     const onUsage = createUsageReporter({ db, threadId, publish, contextLength, todayBase, counted: !free, todayLimit: env.MAX_DAILY_TOKENS_PER_USER });
     const sink = createSink(rec, publish, stub, botRow.id, progress, onUsage);
-    const config = { version: "v3", configurable: { thread_id: threadId }, recursionLimit: env.RUN_SLICE_STEPS, durability: "sync" };
+    const config = { version: "v3", configurable: { thread_id: checkpointId }, recursionLimit: env.RUN_SLICE_STEPS, durability: "sync" };
     const stream = await agent.streamEvents(agentInput(params, attached, slice, resume), config);
     timer = setTimeout(() => stream.abort?.(), sliceDeadline - Date.now());
     poll = setInterval(async () => {

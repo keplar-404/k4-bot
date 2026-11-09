@@ -13,24 +13,32 @@ export interface MessageRow {
   role: string;
   parts: MessagePart[];
   runId: string | null;
+  authorBotId?: string | null;
   seq: number;
   createdAt: string;
 }
 
+/** A group chat (`groupId`) belongs to the group; the server picks its lead as the thread's bot. */
 export function createThread(
   botId: string,
   mode?: "allow_all" | "plan" | "ask",
+  groupId?: string,
 ): Promise<{ thread: ThreadRow }> {
   return request("/api/v1/chat/threads", {
     method: "POST",
-    body: JSON.stringify({ botId, mode }),
+    body: JSON.stringify(groupId ? { groupId, mode } : { botId, mode }),
   });
 }
 
-export function listThreads(botId: string): Promise<{ threads: ThreadRow[] }> {
-  return request(
-    `/api/v1/chat/threads?botId=${encodeURIComponent(botId)}&limit=1`,
-  );
+/** The latest chat of a bot (its own, not its group chats), or of a group. */
+export function listThreads(
+  botId: string,
+  groupId?: string,
+): Promise<{ threads: ThreadRow[] }> {
+  const by = groupId
+    ? `groupId=${encodeURIComponent(groupId)}`
+    : `botId=${encodeURIComponent(botId)}`;
+  return request(`/api/v1/chat/threads?${by}&limit=1`);
 }
 
 /**

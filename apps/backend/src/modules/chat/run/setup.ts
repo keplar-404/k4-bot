@@ -1,14 +1,26 @@
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import type { Db } from "../../../db";
-import { bot, chatFile, chatMessage, chatThread } from "../../../db/schema";
+import { bot, botGroupMember, chatFile, chatMessage, chatThread } from "../../../db/schema";
 import type { AgentBot } from "../../agent/agent";
 import type { FileRef } from "../../agent/parts";
 import { toRef } from "../../files";
 import { nextMessageSeq } from "../threads";
 import type { ChatRunParams } from "./types";
 
-/** The thread's bot as the agent needs it. Throws when the thread is not the user's. */
+/**
+ * The bot answering, as the agent needs it: the thread's bot, or in a group chat the member this run is for (it must
+ * still be a member). Throws when the thread is not the user's.
+ */
 export async function loadBot(db: Db, params: ChatRunParams): Promise<AgentBot> {
+  if (params.botId) {
+    const [member] = await db
+      .select({ id: botGroupMember.botId })
+      .from(chatThread)
+      .innerJoin(botGroupMember, eq(botGroupMember.groupId, chatThread.groupId))
+      .where(and(eq(chatThread.id, params.threadId), eq(chatThread.userId, params.userId), eq(botGroupMember.botId, params.botId)))
+      .limit(1);
+    if (!member) throw new Error(`Bot ${params.botId} is not in this group chat`);
+  }
   const [row] = await db
     .select({
       id: bot.id,
@@ -19,9 +31,10 @@ export async function loadBot(db: Db, params: ChatRunParams): Promise<AgentBot> 
       subagentsEnabled: bot.subagentsEnabled,
       maxSubagents: bot.maxSubagents,
       maxParallelTools: bot.maxParallelTools,
+      kind: bot.kind,
     })
     .from(chatThread)
-    .innerJoin(bot, eq(bot.id, chatThread.botId))
+    .innerJoin(bot, eq(bot.id, params.botId ?? chatThread.botId))
     .where(and(eq(chatThread.id, params.threadId), eq(chatThread.userId, params.userId)))
     .limit(1);
   if (!row) throw new Error(`Thread ${params.threadId} not found for user`);
@@ -40,6 +53,8 @@ export async function saveUserMessage(db: Db, params: ChatRunParams, botId: stri
       .set({ threadId: params.threadId, botId })
       .where(and(eq(chatFile.userId, params.userId), inArray(chatFile.id, files.map((f) => f.id)), isNull(chatFile.threadId)));
   }
+  // A group turn started by another bot has no new user message.
+  if (params.chained) return files;
   await db
     .insert(chatMessage)
     .values({

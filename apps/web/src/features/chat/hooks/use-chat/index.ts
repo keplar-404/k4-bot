@@ -4,10 +4,7 @@ import { useRef } from "react";
 import { fetchBot } from "@/features/bots/api";
 import { listModels, listThreads } from "@/features/chat/lib/client";
 import { backoffMs, canRetry } from "@/features/chat/lib/outbox";
-import {
-  type ChatMessageView,
-  networkError,
-} from "@/features/chat/lib/protocol";
+import { networkError } from "@/features/chat/lib/protocol";
 import { initialStreamState } from "@/features/chat/lib/stream";
 import { useChatActions } from "./actions";
 import { FATAL, toInfo } from "./helpers";
@@ -27,7 +24,7 @@ export type Connection =
   | "reconnecting"
   | "offline";
 
-export function useChat(botId: string) {
+export function useChat(botId: string, groupId?: string) {
   const state = useChatState();
   const ctxRef = useRef<ChatCtx | null>(null);
 
@@ -36,6 +33,7 @@ export function useChat(botId: string) {
   ctxRef.current = {
     ctxRef,
     botId,
+    groupId,
     ...state,
     ...actions,
     FATAL,
@@ -53,7 +51,7 @@ export function useChat(botId: string) {
     persistOutbox: actions.persistOutboxCb,
   };
 
-  useHydration(ctxRef, botId);
+  useHydration(ctxRef, botId, groupId);
   useOnline(ctxRef);
   useModels(ctxRef, botId);
   useSaveCleanup(state.saveTimerRef, state.pendingSaveRef);

@@ -3,11 +3,17 @@ import {
   GitBranchIcon,
   GlobeIcon,
   HourglassIcon,
+  ListIcon,
   type LucideIcon,
+  MergeIcon,
   PencilLineIcon,
   RepeatIcon,
+  ScaleIcon,
   ShieldCheckIcon,
   SparklesIcon,
+  SplitIcon,
+  WandIcon,
+  CodeIcon,
 } from "lucide-react";
 import { TRIGGER_BLOCKS } from "./block-catalog-triggers";
 import type { BlockKind } from "./blocks";
@@ -31,6 +37,13 @@ export const BUILT_IN: BlockInfo[] = [
     group: "Logic",
   },
   {
+    kind: "logic.switch",
+    title: "Switch",
+    hint: "Take one of several paths by rules",
+    icon: SplitIcon,
+    group: "Logic",
+  },
+  {
     kind: "logic.filter",
     title: "Filter",
     hint: "Continue only when it matches",
@@ -42,6 +55,27 @@ export const BUILT_IN: BlockInfo[] = [
     title: "Delay",
     hint: "Wait before the next step",
     icon: HourglassIcon,
+    group: "Logic",
+  },
+  {
+    kind: "logic.format",
+    title: "Formatter",
+    hint: "Change text, numbers, dates or lists",
+    icon: WandIcon,
+    group: "Logic",
+  },
+  {
+    kind: "logic.merge",
+    title: "Merge",
+    hint: "Bring paths or values together",
+    icon: MergeIcon,
+    group: "Logic",
+  },
+  {
+    kind: "logic.list",
+    title: "List tools",
+    hint: "Split out, pick, sum, sort or group a list",
+    icon: ListIcon,
     group: "Logic",
   },
   {
@@ -66,6 +100,13 @@ export const BUILT_IN: BlockInfo[] = [
     group: "Logic",
   },
   {
+    kind: "ai.decide",
+    title: "Decide (Jev)",
+    hint: "Yes/no, pick one, or score: typed answers",
+    icon: ScaleIcon,
+    group: "Logic",
+  },
+  {
     kind: "ai.bot",
     title: "Ask a bot",
     hint: "A bot writes, sums up or decides",
@@ -77,6 +118,13 @@ export const BUILT_IN: BlockInfo[] = [
     title: "HTTP request",
     hint: "Call any API or website",
     icon: GlobeIcon,
+    group: "Logic",
+  },
+  {
+    kind: "action.code",
+    title: "Code",
+    hint: "Run JavaScript in a sandbox",
+    icon: CodeIcon,
     group: "Logic",
   },
 ];

@@ -14,6 +14,22 @@ export interface ChatRunParams {
   compact?: boolean;
   /** The user ran /deep-research: this run hands the question to Tavily's research agent. */
   research?: boolean;
+  /** Group chats: the member answering in this run (otherwise the thread's bot). */
+  botId?: string;
+  /** Group chats: who answers after this run, in order (mentioned bots, then work handed on). */
+  queue?: GroupTurn[];
+  /** Group chats: bot-to-bot hand-offs so far for this user message (a loop guard). */
+  hops?: number;
+  /** Group chats: this run was started by another bot, not by a new user message (nothing to save or learn). */
+  chained?: boolean;
+}
+
+/** One queued group turn: which bot, and what it was asked by whom (a mention of the user's message has no task). */
+export interface GroupTurn {
+  botId: string;
+  task?: string;
+  from?: string;
+  fileIds?: string[];
 }
 
 /** What the user (or the clock) must supply before the run can go on, or how it ended. */

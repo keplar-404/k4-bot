@@ -1,5 +1,8 @@
+import { isTimeZone } from "../../schedules/zone";
+import { NEEDS_FIELD } from "./list-blocks";
 import { scheduleIssue } from "../../schedules/issues";
 import { isTrigger, LIMITS, type WorkflowGraph, type WorkflowNode } from "./schema";
+import { decideIssue } from "./decide-issues";
 import { loopIssues, loopOf } from "./loop-rules";
 import { type GraphIssue, structureIssues } from "./structure";
 
@@ -59,10 +62,40 @@ function blockIssue(node: WorkflowNode): string | null {
         : "Choose an app and the event that starts this workflow.";
     case "logic.if":
     case "logic.filter":
-      return node.config.conditions.length > 0 ? null : "Add at least one condition.";
+      return node.config.conditions.length > 0 || node.config.groups.some((g) => g.conditions.length > 0) ? null : "Add at least one condition.";
+    case "ai.decide":
+      return decideIssue(node.config);
+    case "trigger.webhook":
+      return node.config.auth !== "none" && !node.config.secretName
+        ? "Choose the secret callers must send (or sign with)."
+        : null;
+    case "logic.format":
+      return node.config.input.trim() ? null : "Choose the value to format.";
+    case "trigger.manual": {
+      // A graph saved before forms existed has no fields list until it is parsed with the defaults.
+      const keys = (node.config.fields ?? []).map((f) => f.key);
+      return new Set(keys).size === keys.length ? null : "Two form fields have the same name.";
+    }
+    case "action.code":
+      return node.config.code.trim() ? null : "Write the code to run.";
+    case "logic.merge":
+      if (node.config.inputs.filter((i) => i.trim()).length < 2) return "Choose at least two values to merge.";
+      return node.config.mode === "by_key" && !node.config.key.trim() ? "Name the field both lists share (the key)." : null;
+    case "logic.list":
+      if (!node.config.input.trim()) return "Choose the list.";
+      return NEEDS_FIELD.has(node.config.operation) && !node.config.field.trim() ? "Name the field of each item to use." : null;
+    case "logic.switch":
+      if (node.config.rules.length === 0) return "Add at least one rule.";
+      if (new Set(node.config.rules.map((r) => r.id)).size !== node.config.rules.length) return "Two rules have the same name.";
+      return node.config.rules.some((r) => r.conditions.length === 0) ? "Every rule needs at least one condition." : null;
     case "logic.loop":
       return node.config.items.trim() ? null : "Choose the list to go through.";
     case "logic.delay":
+      if (node.config.mode === "until") return node.config.until.trim() ? null : "Choose the date and time to wait until.";
+      if (node.config.mode === "next") {
+        if (node.config.days.length === 0) return "Pick at least one day.";
+        return isTimeZone(node.config.timezone) ? null : "Choose a valid time zone.";
+      }
       return delaySeconds(node) > LIMITS.maxDelaySeconds ? "A delay can be at most 7 days." : null;
     case "trigger.schedule":
       return scheduleIssue(node.config, LIMITS.minScheduleMinutes);
@@ -71,7 +104,9 @@ function blockIssue(node: WorkflowNode): string | null {
   }
 }
 
+/** A fixed delay's length; one that waits for a date counts as nothing here (the run checks its 7 days). */
 function delaySeconds(node: Extract<WorkflowNode, { kind: "logic.delay" }>) {
+  if (node.config.mode !== "for") return 0;
   return node.config.amount * DELAY_SECONDS[node.config.unit];
 }
 

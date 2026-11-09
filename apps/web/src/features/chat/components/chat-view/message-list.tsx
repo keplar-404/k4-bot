@@ -4,14 +4,19 @@ import { Loader2Icon } from "lucide-react";
 import { MessageScrollerContent } from "@/components/ui/message-scroller";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { ChatMessageView } from "@/features/chat/lib/protocol";
-import { MessageItem } from "./message-item";
+import { type MessageAuthor, MessageItem } from "./message-item";
 
 export function MessageList({
   messages,
   isLoading,
   thinking,
   onRetry,
+  authorOf,
+  group = false,
 }: {
+  /** Who wrote an assistant message (in a group chat, each message's own bot). */
+  authorOf: (m: ChatMessageView) => MessageAuthor | undefined;
+  group?: boolean;
   messages: ChatMessageView[];
   isLoading: boolean;
   thinking: boolean;
@@ -37,7 +42,13 @@ export function MessageList({
         </output>
       )}
       {messages.map((m) => (
-        <MessageItem key={m.id} m={m} onRetry={onRetry} />
+        <MessageItem
+          key={m.id}
+          m={m}
+          author={authorOf(m)}
+          group={group}
+          onRetry={onRetry}
+        />
       ))}
       {thinking && (
         <span className="flex items-center gap-1 px-1 pb-2 text-xs text-muted-foreground">

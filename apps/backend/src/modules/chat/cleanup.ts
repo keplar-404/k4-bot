@@ -1,7 +1,7 @@
-import { and, eq, gte, inArray, isNotNull } from "drizzle-orm";
+import { and, eq, gte, inArray, isNotNull, like } from "drizzle-orm";
 import { NeonHttpCheckpointer } from "../agent/checkpointer/neon-http-checkpointer";
 import type { Db } from "../../db";
-import { chatMessage, chatThread } from "../../db/schema";
+import { chatMessage, chatThread, checkpoint, checkpointBlobs, checkpointWrites } from "../../db/schema";
 import { publishEvent } from "./run/relay";
 import type { Env } from "../../config/env";
 
@@ -36,6 +36,8 @@ export async function cleanupThreads(db: Db, env: Env, threadIds: string[]): Pro
   );
   const checkpointer = new NeonHttpCheckpointer(db);
   await Promise.all(threadIds.map((id) => checkpointer.deleteThread(id)));
+  // Group chats keep one agent state per member, under "<thread>:<bot>".
+  await Promise.all(threadIds.map((id) => deleteMemberCheckpoints(db, id)));
   await Promise.allSettled(threadIds.map((id) => env.CHAT_RELAY.get(env.CHAT_RELAY.idFromName(id)).purge()));
   // Their background tasks' records (running task workflows end on their own within 15 minutes).
   await Promise.allSettled(threadIds.map((id) => env.ASYNC_TASKS.get(env.ASYNC_TASKS.idFromName(id)).purge()));
@@ -70,4 +72,13 @@ export async function stopBotRuns(db: Db, env: Env, userId: string, botIds: stri
       await publishEvent(env, threadId, "run.failed", { runId, error: reason, notice: true });
     }),
   );
+}
+
+async function deleteMemberCheckpoints(db: Db, threadId: string) {
+  const prefix = `${threadId}:%`;
+  await db.batch([
+    db.delete(checkpointWrites).where(like(checkpointWrites.threadId, prefix)),
+    db.delete(checkpointBlobs).where(like(checkpointBlobs.threadId, prefix)),
+    db.delete(checkpoint).where(like(checkpoint.threadId, prefix)),
+  ]);
 }

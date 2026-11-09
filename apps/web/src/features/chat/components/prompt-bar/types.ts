@@ -13,7 +13,11 @@ export type ModelOption = {
   reasoningEfforts: string[];
 };
 
+import type { Source } from "./data";
+
 export type PromptBarProps = {
+  /** What "@" offers (loaded by the prompt bar itself). */
+  sources?: Source[];
   placeholder?: string;
   onSend?: (text: string) => void;
   onAttach?: (files: File[]) => void;

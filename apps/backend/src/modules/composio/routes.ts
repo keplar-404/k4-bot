@@ -4,9 +4,10 @@ import { authGuard, type AuthGuardEnv } from "../../middleware/auth-guard";
 import { userLimit } from "../../middleware/rate-limit";
 import { getRequestContext } from "../../shared/context";
 import { validate } from "../../shared/validate";
-import { isKnownToolkit } from "./catalog-query";
+import { isKnownToolkit, isNoAuthToolkit } from "./catalog-query";
 import catalogRoutes from "./catalog-routes";
 import { composioFor, TOOLKIT_SLUG } from "./client";
+import { computerFor } from "../computer/sandbox-backend";
 import { listConnections, ownConnection } from "./connections";
 import { composioError } from "./errors";
 import { connectCallback, userSession } from "./session";
@@ -41,6 +42,9 @@ const composioRoutes = new Hono<AuthGuardEnv>()
     const { toolkit, returnTo } = c.req.valid("json");
     try {
       if (!(await isKnownToolkit(db, toolkit))) return c.json({ error: "NOT_FOUND", message: "Unknown app." }, 404);
+      if (await isNoAuthToolkit(db, toolkit)) {
+        return c.json({ error: "NO_LOGIN_NEEDED", message: "This app needs no login: there is nothing to connect." }, 400);
+      }
       const session = await userSession(db, composioFor(env), c.get("session").user.id);
       const request = await session.authorize(toolkit, {
         callbackUrl: connectCallback(env.WEB_ORIGIN ?? env.BETTER_AUTH_URL, toolkit, returnTo),
@@ -64,6 +68,8 @@ const composioRoutes = new Hono<AuthGuardEnv>()
         return c.json({ error: "NOT_FOUND", message: "Connection not found." }, 404);
       }
       await composio.connectedAccounts.delete(id);
+      // The bots' browser logins for this account go too (now, or when the computer next wakes).
+      await computerFor(env, c.get("session").user.id).forgetAppAccount(id).catch((e) => console.error("[composio] forget logins", e));
       return c.json({ ok: true });
     } catch (error) {
       return composioError(c, error, "disconnect this app");

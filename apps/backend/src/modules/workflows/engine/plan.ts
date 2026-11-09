@@ -1,3 +1,4 @@
+import { LOOP_DONE } from "../graph/loop-rules";
 import type { WorkflowEdge, WorkflowGraph } from "../graph/schema";
 
 /** How a finished block ended, as far as the blocks after it care. */
@@ -7,6 +8,8 @@ export type Outcome = {
   ifResult?: boolean;
   /** A Filter block's answer: false stops the path after it. */
   passed?: boolean;
+  /** A Switch block's answer: the output (rule id or "otherwise") whose connections are taken. */
+  route?: string;
 };
 
 /**
@@ -22,6 +25,9 @@ export function shouldRun(graph: WorkflowGraph, outcomes: Record<string, Outcome
 
 function isTaken(edge: WorkflowEdge, source: Outcome | undefined) {
   if (source?.status !== "succeeded") return false;
+  if (source.route !== undefined) return edge.branch === source.route;
+  // A For each's "done" output: taken once its items are all done (the walk runs those blocks last).
+  if (edge.branch === LOOP_DONE) return true;
   if (edge.branch) return source.ifResult === (edge.branch === "true");
   return source.passed !== false;
 }

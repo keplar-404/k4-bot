@@ -1,24 +1,15 @@
 "use client";
 
-import { CopyIcon } from "lucide-react";
+import { CopyIcon, GripVerticalIcon } from "lucide-react";
 import { toast } from "sonner";
+import { fieldsOf, REF_DRAG_TYPE } from "../template/block-fields";
 import type { JsonSchema } from "./tools-api";
 
-/** A JSON Schema type in plain words. */
-export function typeWords(schema: JsonSchema): string {
-  const type = Array.isArray(schema.type)
-    ? schema.type.find((t) => t !== "null")
-    : schema.type;
-  if (type === "integer" || type === "number") return "number";
-  if (type === "boolean") return "yes / no";
-  if (type === "array") return "list";
-  if (type === "object") return "object";
-  return "text";
-}
+export { typeWords } from "../template/block-fields";
 
 /**
- * The fields some data has (an event's payload, an action's output), each as the reference that reads it. Clicking
- * copies the reference to paste into a later block's field.
+ * The fields some data has (an event's payload, an action's output). Drag one onto a field of a later block to use
+ * it there, or click to copy its reference.
  */
 export function SchemaFieldsList({
   schema,
@@ -27,7 +18,7 @@ export function SchemaFieldsList({
   schema: JsonSchema;
   prefix: string;
 }) {
-  const fields = Object.entries(schema.properties ?? {});
+  const fields = fieldsOf(schema, prefix);
   if (fields.length === 0)
     return (
       <p className="text-muted-foreground text-xs">
@@ -37,23 +28,37 @@ export function SchemaFieldsList({
     );
   return (
     <ul className="flex flex-col gap-1">
-      {fields.map(([key, field]) => {
-        const ref = `{{${prefix}.${key}}}`;
+      {fields.map((field) => {
+        const ref = `{{${field.path}}}`;
         return (
-          <li key={key}>
+          <li key={field.path}>
             <button
               type="button"
-              className="flex w-full items-start gap-2 rounded-md border px-2 py-1.5 text-left hover:bg-muted"
+              draggable
+              onDragStart={(e) => {
+                e.dataTransfer.setData(REF_DRAG_TYPE, field.path);
+                // Plain text too, so dropping into any other input still gives the reference.
+                e.dataTransfer.setData("text/plain", ref);
+                e.dataTransfer.effectAllowed = "copy";
+              }}
+              className="flex w-full cursor-grab items-start gap-1.5 rounded-md border px-2 py-1.5 text-left hover:bg-muted active:cursor-grabbing"
+              title="Drag onto a field, or click to copy"
               onClick={() => {
                 void navigator.clipboard.writeText(ref);
                 toast.success(`Copied ${ref}`);
               }}
             >
+              <GripVerticalIcon
+                className="mt-0.5 size-3.5 shrink-0 text-muted-foreground"
+                aria-hidden
+              />
               <span className="min-w-0 flex-1">
                 <span className="flex items-baseline justify-between gap-2">
-                  <code className="truncate text-xs">{ref}</code>
+                  <span className="truncate font-medium text-xs">
+                    {field.name}
+                  </span>
                   <span className="shrink-0 text-[11px] text-muted-foreground">
-                    {typeWords(field)}
+                    {field.type}
                   </span>
                 </span>
                 {field.description && (

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useIntegrations } from "@/features/integrations/api";
 import { ConnectedList } from "./mcp/connected-list";
 import { ServerCatalog } from "./mcp/server-catalog";
@@ -31,10 +32,24 @@ export function McpTab() {
       />
     );
 
+  // Connected servers and the catalog are separate tabs: one long scroll mixed what you have with what you could add.
   return (
-    <div className="flex flex-col gap-6">
-      <ConnectedList installed={mcp.installed} onOpen={setSelected} />
-      <ServerCatalog catalog={mcp.catalog} onOpen={setSelected} />
-    </div>
+    <Tabs
+      defaultValue={mcp.installed.length > 0 ? "connected" : "browse"}
+      className="gap-4"
+    >
+      <TabsList variant="line">
+        <TabsTrigger value="connected">
+          Connected ({mcp.installed.length})
+        </TabsTrigger>
+        <TabsTrigger value="browse">Browse ({mcp.catalog.length})</TabsTrigger>
+      </TabsList>
+      <TabsContent value="connected">
+        <ConnectedList installed={mcp.installed} onOpen={setSelected} />
+      </TabsContent>
+      <TabsContent value="browse">
+        <ServerCatalog catalog={mcp.catalog} onOpen={setSelected} />
+      </TabsContent>
+    </Tabs>
   );
 }

@@ -71,7 +71,7 @@ function BlockNodeView({ data, selected }: NodeProps<FlowNode>) {
           {retries}×
         </span>
       )}
-      <BlockHandles isIf={b.kind === "logic.if"} />
+      <BlockHandles block={b} />
     </div>
   );
 }

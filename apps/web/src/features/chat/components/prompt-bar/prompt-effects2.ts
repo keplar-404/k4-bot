@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect } from "react";
-import { DICTATION, RAINBOW } from "./data";
+import { startDictation } from "./dictation";
 import type { PromptHandlers } from "./prompt-handlers";
 import type { PromptHandlers2 } from "./prompt-handlers2";
 import type { PromptState } from "./prompt-state";
@@ -35,18 +35,21 @@ export function usePromptEffects2(
       state.shaderRef.current = null;
     };
   }, []);
-  // dictation
-  // biome-ignore lint/correctness/useExhaustiveDependencies: effect copied from original prompt-bar; dependency list preserved intentionally
+  // dictation: the mic button listens once and appends what was said
+  // biome-ignore lint/correctness/useExhaustiveDependencies: setters and refs are stable; only the listening flag matters
   useEffect(() => {
     if (!state.listening) return;
-    const t = setTimeout(() => {
-      state.setDraft((current: string) =>
-        current ? `${current.trimEnd()} ${DICTATION}` : DICTATION,
-      );
-      state.setListening(false);
-      state.inputRef.current?.focus();
-    }, 2200);
-    return () => clearTimeout(t);
+    const stop = startDictation(
+      (text) =>
+        state.setDraft((current: string) =>
+          current ? `${current.trimEnd()} ${text}` : text,
+        ),
+      () => {
+        state.setListening(false);
+        state.inputRef.current?.focus();
+      },
+    );
+    return () => stop?.();
   }, [state.listening]);
   // auto-resize textarea
   // biome-ignore lint/correctness/useExhaustiveDependencies: effect copied from original prompt-bar; dependency list preserved intentionally

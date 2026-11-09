@@ -1,5 +1,4 @@
 import { AttachmentChips } from "./attachment-chips";
-import { Icon } from "./icons";
 import type { PromptHandlers } from "./prompt-handlers";
 import type { PromptHandlers2 } from "./prompt-handlers2";
 import type { PromptState } from "./prompt-state";

@@ -19,6 +19,7 @@ import { Activity } from "@/features/computer/components/panel/activity";
 import { StateBadge } from "@/features/computer/components/panel/state-badge";
 import { Usage } from "@/features/computer/components/panel/usage";
 import { ResetComputer } from "./reset-computer";
+import { VmAccounts } from "./vm-accounts";
 import { VmSettings } from "./vm-settings";
 
 /** The computer page: its state, the user's settings, every bot's activity, and the reset. */
@@ -101,6 +102,8 @@ function VmContent() {
       </Card>
 
       <VmSettings />
+
+      <VmAccounts running={running} />
 
       <Card>
         <CardHeader>

@@ -29,6 +29,8 @@ export type Bot = {
   /** The model picked for this bot in the prompt bar; null = the catalog default. */
   modelId?: string | null;
   reasoningEffort?: string | null;
+  /** "admin": the bot that manages the user's other bots and groups. */
+  kind?: string;
 };
 
 export type BotsResult =

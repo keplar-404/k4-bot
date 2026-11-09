@@ -1,6 +1,6 @@
 import { and, lt, sql } from "drizzle-orm";
 import { createDb, type Db } from "./db";
-import { chatEvent, composioEvent } from "./db/schema";
+import { adminAudit, chatEvent, composioEvent, memoryEvent, webhookRequest } from "./db/schema";
 import { parseEnv, type Env } from "./config/env";
 import { refreshCatalog } from "./modules/composio/catalog-refresh";
 import { sandboxFor } from "./modules/sandbox/sandbox-backend";
@@ -50,6 +50,26 @@ export const scheduled: ExportedHandlerScheduledHandler<Env> = async (controller
     ),
   );
   ctx.waitUntil(sweepStuckRuns(db).catch((e) => console.error("[sweep] failed", e)));
+  ctx.waitUntil(
+    db
+      .delete(webhookRequest)
+      .where(lt(webhookRequest.at, cutoff))
+      .catch((e) => console.error("[webhook-requests] prune failed", e)),
+  );
+  // Undo is offered right after an automatic memory update: a month of history is plenty.
+  ctx.waitUntil(
+    db
+      .delete(memoryEvent)
+      .where(lt(memoryEvent.createdAt, new Date(Date.now() - 30 * 86_400_000)))
+      .catch((e) => console.error("[memory-events] prune failed", e)),
+  );
+  // The admin bot's log: three months is enough to review what it did.
+  ctx.waitUntil(
+    db
+      .delete(adminAudit)
+      .where(lt(adminAudit.createdAt, new Date(Date.now() - 90 * 86_400_000)))
+      .catch((e) => console.error("[admin-audit] prune failed", e)),
+  );
   // Composio redelivers within hours, never weeks: older event ids are no longer needed to spot duplicates.
   ctx.waitUntil(
     db

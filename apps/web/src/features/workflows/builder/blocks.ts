@@ -16,6 +16,7 @@ const short: Record<BlockKind, string> = {
   "trigger.app": "event",
   "action.app": "app",
   "action.http": "http",
+  "action.code": "code",
   "logic.if": "if",
   "logic.filter": "filter",
   "logic.delay": "delay",
@@ -23,6 +24,11 @@ const short: Record<BlockKind, string> = {
   "ai.bot": "ai",
   "logic.loop": "each",
   "logic.approval": "ask",
+  "ai.decide": "decide",
+  "logic.switch": "switch",
+  "logic.format": "format",
+  "logic.merge": "merge",
+  "logic.list": "list",
 };
 
 /** A readable, unique block id ("gmail_k3f9a"): it also names the block in `{{steps.<id>.…}}` references. */

@@ -30,6 +30,7 @@ export async function appendParts(db: Db, params: ChatRunParams, parts: Part[]) 
       role: "assistant",
       parts,
       runId: params.runId,
+      authorBotId: params.botId ?? null,
       seq: nextMessageSeq(params.threadId),
     })
     // jsonb array concatenation: the message grows as the run goes on, across slices.

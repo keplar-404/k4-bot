@@ -31,7 +31,12 @@ export const computerActionSchema = z.discriminatedUnion("action", [
     amount: z.number().int().min(1).max(30).default(3),
   }),
   z.object({ action: z.literal("wait"), seconds: z.number().min(0.5).max(30) }),
-  z.object({ action: z.literal("open_url"), url: z.string().min(1).max(2048) }),
+  z.object({
+    action: z.literal("open_url"),
+    url: z.string().min(1).max(2048),
+    /** Open in the browser profile that holds this app account's login (set by open_app_in_browser, never by the model). */
+    app: z.object({ toolkit: z.string().regex(/^[a-z0-9_-]{1,64}$/i), accountId: z.string().regex(/^[A-Za-z0-9_-]{1,64}$/) }).optional(),
+  }),
 ]);
 export type ComputerAction = z.infer<typeof computerActionSchema>;
 

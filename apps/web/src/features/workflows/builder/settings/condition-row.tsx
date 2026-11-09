@@ -2,16 +2,25 @@
 
 import { Trash2Icon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { TemplateInput } from "../template/template-input";
 import type { Cond } from "./condition-ops";
-import { OPS, UNARY } from "./condition-ops";
+import {
+  OP_GROUPS,
+  OPS,
+  RIGHT_PLACEHOLDER,
+  TEXTUAL,
+  UNARY,
+} from "./condition-ops";
 
 export function ConditionRow({
   cond,
@@ -28,11 +37,11 @@ export function ConditionRow({
 }) {
   return (
     <div className="flex flex-col gap-2 rounded-lg border p-2.5">
-      <Input
+      <TemplateInput
         aria-label="Value to check"
-        placeholder="{{steps.x.output.status}}"
+        placeholder="Value to check: pick one with +"
         value={cond.left}
-        onChange={(e) => onChange({ left: e.target.value })}
+        onChange={(left) => onChange({ left })}
       />
       <Select
         value={cond.op}
@@ -42,20 +51,39 @@ export function ConditionRow({
           <SelectValue>{OPS.find(([o]) => o === cond.op)?.[1]}</SelectValue>
         </SelectTrigger>
         <SelectContent>
-          {OPS.map(([op, label]) => (
-            <SelectItem key={op} value={op}>
-              {label}
-            </SelectItem>
+          {OP_GROUPS.map((g) => (
+            <SelectGroup key={g.group}>
+              <SelectLabel>{g.group}</SelectLabel>
+              {g.ops.map(([op, label]) => (
+                <SelectItem key={op} value={op}>
+                  {label}
+                </SelectItem>
+              ))}
+            </SelectGroup>
           ))}
         </SelectContent>
       </Select>
       {!UNARY.has(cond.op) && (
-        <Input
+        <TemplateInput
           aria-label="Compare with"
-          placeholder="e.g. paid"
+          placeholder={RIGHT_PLACEHOLDER[cond.op] ?? "e.g. paid"}
           value={cond.right ?? ""}
-          onChange={(e) => onChange({ right: e.target.value })}
+          onChange={(right) => onChange({ right })}
         />
+      )}
+      {TEXTUAL.has(cond.op) && (
+        <label
+          htmlFor={`cond-case-${index}`}
+          className="flex items-center gap-2 text-muted-foreground text-xs"
+        >
+          <Switch
+            id={`cond-case-${index}`}
+            size="sm"
+            checked={cond.caseSensitive ?? false}
+            onCheckedChange={(v) => onChange({ caseSensitive: v || undefined })}
+          />
+          Match upper and lower case exactly
+        </label>
       )}
       {total > 1 && (
         <Button

@@ -69,3 +69,12 @@ export async function isKnownToolkit(db: Db, slug: string): Promise<boolean> {
     .where(inArray(composioToolkit.slug, [slug]));
   return (row?.n ?? 0) > 0;
 }
+
+/** Apps that need no login (Composio's own utility tools, for example): there is nothing to connect. */
+export async function isNoAuthToolkit(db: Db, slug: string): Promise<boolean> {
+  const [row] = await db
+    .select({ noAuth: composioToolkit.noAuth })
+    .from(composioToolkit)
+    .where(inArray(composioToolkit.slug, [slug]));
+  return Boolean(row?.noAuth);
+}

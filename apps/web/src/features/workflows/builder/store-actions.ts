@@ -18,10 +18,8 @@ export function connect(get: Get, set: Set, c: Connection) {
   const { nodes, edges } = get();
   const problem = connectionProblem(nodes, edges, c);
   if (problem) return void toast.error(problem);
-  const branch =
-    c.sourceHandle === "true" || c.sourceHandle === "false"
-      ? c.sourceHandle
-      : undefined;
+  // A named output (If: true/false; Switch: a rule or "otherwise") is the connection's branch.
+  const branch = c.sourceHandle ?? undefined;
   const edge: FlowEdge = {
     ...c,
     id: `e_${c.source}_${c.target}${branch ? `_${branch}` : ""}`,
@@ -62,11 +60,13 @@ export function addBlockTo(
     selected: true,
   };
   const anchorNode = nodes.find((n) => n.id === anchor);
-  // Added from the library (not dropped at a spot): chained after the anchor, unless that is an If (pick a branch).
+  // Added from the library (not dropped at a spot): chained after the anchor, unless that is an If or a Switch (the
+  // user picks which output).
   const link =
     !opts.at &&
     anchorNode &&
     anchorNode.data.block.kind !== "logic.if" &&
+    anchorNode.data.block.kind !== "logic.switch" &&
     !kind.startsWith("trigger.");
   set({
     nodes: [...nodes.map((n) => ({ ...n, selected: false })), node],

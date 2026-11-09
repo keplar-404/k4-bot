@@ -1,7 +1,7 @@
 import { CommandExitError, type Sandbox } from "@e2b/desktop";
 import { botUnixUser } from "../guards";
 import type { ExecResult } from "../types";
-import { ensureAccount, runAs } from "./accounts";
+import { APP_ACCOUNT_ID, ensureAccount, runAs } from "./accounts";
 import { cap, ComputerOffError, MAX_OUTPUT_CHARS, MAX_PARALLEL_EXEC } from "./constants";
 import { ComputerControl } from "./control";
 import { downloadAs, uploadAs } from "./file-io";
@@ -44,6 +44,43 @@ export class ComputerBots extends ComputerControl {
     this.directoryDirty = true;
     await this.releaseBot(botId);
     if (this.state === "running" && this.sbx) await this.purgeRemovedBots(this.sbx);
+  }
+
+  /** An app account was disconnected (or expired): every bot's browser logins for it go, now or on the next wake. */
+  async forgetAppAccount(accountId: string): Promise<void> {
+    if (!APP_ACCOUNT_ID.test(accountId)) return;
+    this.tables.queueProfileWipe(accountId);
+    if (this.state === "running" && this.sbx) await this.purgeRemovedBots(this.sbx);
+  }
+
+  /**
+   * The admin bot working in another bot's home: the command runs as THAT bot's Linux user, so it can create, change
+   * and delete that bot's files and nothing more (no root, no other accounts). Refused while that bot is working.
+   */
+  async execAsBot(adminBotId: string, targetBotId: string, command: string): Promise<ExecResult> {
+    if (this.tables.isRemoved(targetBotId)) return { output: "That bot was deleted.", exitCode: 1, truncated: false };
+    const busy = this.tables.working(adminBotId).find((w) => w.botId === targetBotId);
+    if (busy) return { output: `${busy.name} is using the computer right now. Try again when it has finished.`, exitCode: 75, truncated: false };
+    const target = botUnixUser(targetBotId);
+    if (!target.ok) return { output: target.reason, exitCode: 2, truncated: false };
+    if (command.length > 20_000) return { output: "Command too long.", exitCode: 2, truncated: false };
+    return this.withSandbox(adminBotId, async (sbx) => {
+      await this.botUser(sbx, adminBotId);
+      if (!this.botUsers.has(target.value)) {
+        await ensureAccount(sbx, target.value);
+        this.botUsers.add(target.value);
+      }
+      this.touch();
+      try {
+        const r = await runAs(sbx, target.value, command, 120_000);
+        const output = r.stdout + r.stderr;
+        return { output: cap(output), exitCode: r.exitCode ?? 0, truncated: output.length > MAX_OUTPUT_CHARS };
+      } catch (error) {
+        if (!(error instanceof CommandExitError)) throw error;
+        const output = error.stdout + error.stderr;
+        return { output: cap(output), exitCode: error.exitCode, truncated: output.length > MAX_OUTPUT_CHARS };
+      }
+    });
   }
 
   /** Shell for the file tools and the `execute` tool. Runs as the bot's own Linux user. */

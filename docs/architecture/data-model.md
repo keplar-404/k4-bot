@@ -11,6 +11,8 @@ reset by deleting things.
 
 ```
 user ─┬─ session, account, verification          (Better Auth)
+      ├─ bot_group ── bot_group_member ── bot      (group chats; chat_thread.group_id)
+      ├─ admin_audit                                (what the admin bot changed)
       ├─ bot ─┬─ chat_thread ─┬─ chat_message
       │       │               ├─ chat_event        (live stream log, pruned after 7 days)
       │       │               └─ research_task
@@ -45,15 +47,18 @@ shared: composio_toolkit (app catalog), composio_event (dedupe), checkpoints*, r
 
 | Table | Purpose |
 |---|---|
-| `bot` | A bot: name, avatar, role (and custom title), model and reasoning level, sub-agent and parallel-tool settings |
-| `chat_thread` | A conversation with one bot; `mode` (`ask` / `plan` / `allow_all`), `context_tokens` for the context meter |
-| `chat_message` | User and assistant messages; `parts` is a JSON list (text, reasoning, tool calls, files); ordered by a per-thread `seq` computed inside the insert |
+| `bot` | A bot: name, avatar, role (and custom title), model and reasoning level, sub-agent and parallel-tool settings; `kind` normal / admin (one admin per user, a partial unique index) |
+| `bot_group`, `bot_group_member` | Group chats: name, lead bot, shared notes (`memory`), members |
+| `admin_audit` | Each change the admin bot made (action, bot, details) |
+| `chat_thread` | A conversation with one bot, or a group's (`group_id`; `bot_id` is then the lead); `mode` (`ask` / `plan` / `allow_all`), `context_tokens` for the context meter |
+| `chat_message` | User and assistant messages; `parts` is a JSON list (text, reasoning, tool calls, files); `author_bot_id` (group chats); ordered by a per-thread `seq` computed inside the insert |
 | `chat_event` | Every live event of a thread, numbered gap-free by the relay; clients replay from their last `seq` |
-| `checkpoints`, `checkpoint_blobs`, `checkpoint_writes` | LangGraph checkpoints: the agent's state between slices of a run |
+| `checkpoints`, `checkpoint_blobs`, `checkpoint_writes` | LangGraph checkpoints: the agent's state between slices of a run (keyed by thread, or `<thread>:<bot>` in a group chat) |
 | `agent_usage` | Tokens per run and model; the daily budget sums these. `thread_id` is set null (not deleted) when a chat goes away |
 | `research_task` | Paid `/deep-research` jobs keyed by a hash of the request, so a retry resumes instead of paying twice |
 | `bot_memory` | One bot's long-term notes (only that bot reads or writes them) |
 | `user_preferences` | Preferences shared by all of the user's bots |
+| `memory_event` | Automatic memory updates (before/after) for Undo; kept 30 days |
 
 ### Files and integrations
 
@@ -82,6 +87,7 @@ The user's connections themselves live at Composio (keyed by the user id); they 
 | `workflow_run` | One run: trigger, status, the graph snapshot it runs, input, error, failed block |
 | `workflow_run_step` | One row per block per run (rewritten on every attempt): status, attempt, input, output, error |
 | `bot_workflow` | Workflows a bot may see and run; `created_by_bot` counts toward its daily creation cap |
+| `webhook_request` | Calls to webhook workflows (status, reason, hashed IP, run); kept 7 days |
 
 ### Secrets and tasks
 
@@ -94,7 +100,7 @@ The user's connections themselves live at Composio (keyed by the user id); they 
 
 | Column | Shape defined in |
 |---|---|
-| `workflow.graph`, `published_graph`, `workflow_run.graph` | `modules/workflows/graph/schema.ts` (`graphSchema`) |
+| `workflow.graph`, `published_graph`, `workflow_run.graph` | `modules/workflows/graph/schema.ts` (`graphSchema`; the draft may hold `pins`, a test run's copy `stopAfter`) |
 | `scheduled_task.schedule`, schedule triggers | `modules/schedules/config.ts` (`scheduleConfig`) |
 | `chat_message.parts` | `modules/agent/parts.ts` |
 

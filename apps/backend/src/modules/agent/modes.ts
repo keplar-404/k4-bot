@@ -42,6 +42,9 @@ const PLAN_ALLOWED = new Set([
   "get_workflow",
   "workflow_run_status",
   "list_scheduled_tasks",
+  "request_app_connections",
+  "admin_list_bots",
+  "admin_list_groups",
 ]);
 
 /** `readOnlyApps`: names of connected-app (MCP) tools that only read; they stay available in Plan mode. */
@@ -50,7 +53,7 @@ export function planAllows(name: string, readOnlyApps: readonly string[] = []) {
 }
 
 /** Asked in every mode, even Allow all: they cost money (computer minutes) or destroy data. */
-const ALWAYS_ASK = new Set(["turn_on_computer", "sandbox_delete"]);
+const ALWAYS_ASK = new Set(["turn_on_computer", "sandbox_delete", "admin_delete_bot", "admin_run_as_bot"]);
 
 /** Which tools pause for the user's approval. Plan needs none: nothing that changes anything is offered. */
 export function approvalsFor(

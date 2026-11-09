@@ -21,7 +21,7 @@ export function buildRunAgent(
   env: Env,
   db: Db,
   params: ChatRunParams,
-  parts: Pick<BuildAgentOptions, "bot" | "skills" | "apps" | "subagents" | "peers" | "contextLength" | "memory" | "mode" | "account"> & { stub?: ComputerStub; images: Array<{ name: string; dataUrl: string }> },
+  parts: Pick<BuildAgentOptions, "bot" | "skills" | "apps" | "subagents" | "peers" | "contextLength" | "memory" | "mode" | "account" | "extraTools" | "extraApprovals"> & { stub?: ComputerStub; images: Array<{ name: string; dataUrl: string }> },
 ): Streamable {
   const { stub, images, ...rest } = parts;
   const isCoding = rest.bot?.role === "coding";

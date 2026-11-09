@@ -1,3 +1,4 @@
+import { handOverGroupThreads } from "../groups/store";
 import { and, eq } from "drizzle-orm";
 import type { Env } from "../../config/env";
 import type { Db } from "../../db";
@@ -12,6 +13,8 @@ import { sandboxFor } from "../sandbox/sandbox-backend";
  * and files are removed from the user's computer (now if it is awake, otherwise on its next wake).
  */
 export async function deleteBotEverything(db: Db, env: Env, userId: string, id: string) {
+  // Group chats it was made for live on with another member (only a group with no one else left goes with it).
+  await handOverGroupThreads(db, userId, id);
   const threads = await db
     .select({ id: chatThread.id })
     .from(chatThread)

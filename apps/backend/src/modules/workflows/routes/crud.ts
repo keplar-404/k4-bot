@@ -6,9 +6,7 @@ import { getRequestContext } from "../../../shared/context";
 import { validate } from "../../../shared/validate";
 import { graphSchema } from "../graph/schema";
 import { structureIssues } from "../graph/validate";
-import { liveRelay } from "../live/publish";
-import { releaseAppTrigger } from "../store/publish";
-import { activeRunIds, stopRuns } from "../store/run-control";
+import { removeWorkflow } from "../store/remove";
 import { dailyRuns, statsByWorkflow } from "../store/runs";
 import * as store from "../store/workflows";
 import { workflowDto } from "./dto";
@@ -86,13 +84,7 @@ const crud = new Hono<AuthGuardEnv>()
     const { id } = c.req.valid("param");
 
     const found = await store.getWorkflow(db, userId, id);
-    if (!found) return c.json(NOT_FOUND, 404);
-    const running = await activeRunIds(db, userId, id);
-    if (!(await store.deleteWorkflow(db, userId, id))) return c.json(NOT_FOUND, 404);
-    // Nothing of it may keep going: its app listener, its runs (they would keep calling apps), its open builders.
-    if (found.composioTriggerId) await releaseAppTrigger(env, db, found.composioTriggerId, id);
-    await stopRuns(env, running);
-    await liveRelay(env, id).closeAll().catch((error) => console.error("[workflows] live sockets not closed", error));
+    if (!found || !(await removeWorkflow(env, db, userId, found))) return c.json(NOT_FOUND, 404);
     return c.json({ ok: true });
   });
 

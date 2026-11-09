@@ -49,6 +49,37 @@ assert.deepEqual(await runBlocks(step, deps, looped, ctx), { status: "succeeded"
 assert.deepEqual(ctx.steps.x?.output, { v: "2:c" }, "the last pass's output stays");
 assert.ok(["block:x#0", "block:x#1", "block:x#2"].every((n) => names.includes(n)));
 
+// Done output: the block there runs once, after every item, and reads each pass's result.
+const withDone = graphSchema.parse({
+  nodes: [
+    { id: "t", kind: "trigger.manual", position: pos, config: {} },
+    { id: "each", kind: "logic.loop", position: pos, config: { items: "{{trigger.inputs.list}}" } },
+    set("x", "{{loop.item}}!"),
+    set("sum", "{{steps.each.output.results}}"),
+  ],
+  edges: [
+    { id: "a", source: "t", target: "each" },
+    { id: "b", source: "each", target: "x" },
+    { id: "c", source: "each", target: "sum", branch: "done" },
+  ],
+});
+assert.deepEqual(publishIssues(withDone), []);
+const doneCtx = ctxOf();
+assert.deepEqual(await runBlocks(step, deps, withDone, doneCtx), { status: "succeeded" });
+assert.ok(names.includes("block:sum") && !names.includes("block:sum#0"), "after Done runs once");
+assert.deepEqual((doneCtx.steps.sum?.output as { v: unknown }).v, [{ v: "a!" }, { v: "b!" }, { v: "c!" }]);
+const crossed = graphSchema.parse({ ...withDone, edges: [...withDone.edges, { id: "d", source: "x", target: "sum" }] });
+assert.ok(publishIssues(crossed).some((i) => /both repeated/.test(i.message)));
+
+// Test runs: a pinned block is not run (its pin stands in), and "test this step" skips what comes after it.
+const chain = graph([{ id: "t", kind: "trigger.manual", position: pos, config: {} }, set("a", "A"), set("b", "{{steps.a.output.v}}!"), set("c", "C")], [["t", "a"], ["a", "b"], ["b", "c"]]);
+const pinned = ctxOf();
+names.length = 0;
+await runBlocks(step, deps, chain, pinned, { pins: { a: { v: "pinned" } }, stopAfter: "b" });
+assert.deepEqual(pinned.steps.b?.output, { v: "pinned!" });
+assert.ok(names.includes("pin:a") && !names.includes("block:a"), "pinned: not run");
+assert.ok(names.includes("skip:c") && !names.includes("block:c"), "after the tested step: skipped");
+
 // Not a list: the loop block fails with a clear message.
 const bad = ctxOf();
 bad.trigger = { inputs: { list: "nope" } };
@@ -77,5 +108,43 @@ answer = { approved: true, note: "", at: "now" };
 const approved = ctxOf();
 await runBlocks(step, deps, asked, approved);
 assert.deepEqual(approved.steps.send?.output, { v: "yes" });
+
+// Switch: the first matching rule's output runs, the others are skipped; no match → "otherwise".
+const switched = graphSchema.parse({
+  nodes: [
+    { id: "t", kind: "trigger.manual", position: pos, config: {} },
+    {
+      id: "sw",
+      kind: "logic.switch",
+      position: pos,
+      config: {
+        rules: [
+          { id: "vip", conditions: [{ left: "{{trigger.inputs.tier}}", op: "equals", right: "vip" }] },
+          { id: "pro", conditions: [{ left: "{{trigger.inputs.tier}}", op: "equals", right: "pro" }] },
+        ],
+      },
+    },
+    set("a", "vip"),
+    set("b", "pro"),
+    set("c", "other"),
+  ],
+  edges: [
+    { id: "e0", source: "t", target: "sw" },
+    { id: "e1", source: "sw", target: "a", branch: "vip" },
+    { id: "e2", source: "sw", target: "b", branch: "pro" },
+    { id: "e3", source: "sw", target: "c", branch: "otherwise" },
+  ],
+});
+assert.deepEqual(publishIssues(switched), []);
+const routeOf = async (tier: string) => {
+  const c: RunContext = { trigger: { inputs: { tier } }, steps: {}, run: { id: "r", startedAt: "" } };
+  await runBlocks(step, deps, switched, c);
+  return ["a", "b", "c"].filter((id) => c.steps[id]);
+};
+assert.deepEqual(await routeOf("pro"), ["b"]);
+assert.deepEqual(await routeOf("VIP"), ["a"], "text comparison ignores case");
+assert.deepEqual(await routeOf("free"), ["c"]);
+const staleEdge = graphSchema.parse({ ...switched, edges: [...switched.edges, { id: "e4", source: "sw", target: "c", branch: "gone" }] });
+assert.ok(publishIssues(staleEdge).some((i) => /no longer exists/.test(i.message)));
 
 console.log("walk: all checks passed");

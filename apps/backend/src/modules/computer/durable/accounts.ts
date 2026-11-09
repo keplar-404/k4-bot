@@ -1,5 +1,5 @@
 import type { Sandbox } from "@e2b/desktop";
-import { botHome, botUnixUser } from "../guards";
+import { botHome, botUnixUser, shellQuote } from "../guards";
 import { BOT_MAX_PROCESSES, STAGE_DIR } from "./constants";
 import type { ComputerTables } from "./tables";
 
@@ -59,4 +59,23 @@ export async function purgeAccounts(sbx: Sandbox, tables: ComputerTables, botUse
     tables.markPurged(bot_id);
   }
   return pending.length;
+}
+
+/** Composio ids are like "ca_AbC123": nothing else may reach the shell or a path. */
+export const APP_ACCOUNT_ID = /^[A-Za-z0-9_-]{1,64}$/;
+
+/** Where a bot's browser keeps its logins for one connected app account (see openInBrowser). */
+export const appProfileDir = (user: string, toolkit: string, accountId: string) => `${botHome(user)}/.k4/profiles/${toolkit}/${accountId}`;
+
+/** Deletes every bot's browser logins for disconnected app accounts, closing the browsers that use them first. */
+export async function wipeAppProfiles(sbx: Sandbox, tables: ComputerTables) {
+  for (const id of tables.pendingProfileWipes()) {
+    if (APP_ACCOUNT_ID.test(id)) {
+      await sbx.commands.run(
+        `pkill -KILL -f ${shellQuote(`user-data-dir=/home/[^ ]*/\\.k4/profiles/[^/ ]*/${id}( |$)`)}; rm -rf /home/*/.k4/profiles/*/${shellQuote(id)}; true`,
+        { user: "root", timeoutMs: 60_000 },
+      );
+    }
+    tables.profileWiped(id);
+  }
 }

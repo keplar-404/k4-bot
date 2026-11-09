@@ -51,6 +51,8 @@ export interface ChatMessageView {
   createdAt: number;
   seq?: number;
   error?: ChatErrorInfo;
+  /** Group chats: the bot that wrote this assistant message. */
+  botId?: string;
 }
 
 export type RunState =

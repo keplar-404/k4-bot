@@ -6,13 +6,27 @@ import {
   MessageScrollerProvider,
   MessageScrollerViewport,
 } from "@/components/ui/message-scroller";
+import { useBots } from "@/features/bots/hooks/use-bots";
+import type { Source } from "@/features/chat/components/prompt-bar/data";
 import { useAttachments } from "@/features/chat/hooks/use-attachments";
 import { useChat } from "@/features/chat/hooks/use-chat";
+import { type Group, mentionKey } from "@/features/groups/api";
 import { toCatalog } from "./catalog";
 import { MessageList } from "./message-list";
 import { Prompts } from "./prompts";
 import { ScrollToEndOnSend } from "./scroll-to-end";
+import { TodoPanel } from "./todo-panel";
 import { useChatEffects } from "./use-effects";
+
+/** In a group chat "@" offers its bots first, written as @bot:name (only group chats route by them). */
+const botMentions = (group: Group): Source[] =>
+  group.members.map((m) => ({
+    key: `bot:${m.id}`,
+    name: `bot:${mentionKey(m.name)}`,
+    desc: `${m.name}${m.id === group.leadBotId ? " · lead" : ""}`,
+    section: "Bots",
+    glyph: "bot",
+  }));
 /**
  * Renders every state the transport can produce. If a failure has no branch
  * here, the user sees a frozen screen, which is the bug this file exists to
@@ -24,7 +38,10 @@ import { useChatEffects } from "./use-effects";
 export function ChatView({
   botId,
   beforeComposer,
+  group,
 }: {
+  /** A group chat: its bots answer here; `botId` is its lead. */
+  group?: Group;
   botId: string;
   /** Shown above the composer with the other prompts (e.g. the computer's end-of-session prompt). */
   beforeComposer?: ReactNode;
@@ -52,8 +69,9 @@ export function ChatView({
     dismissError,
     approve,
     reject,
-  } = useChat(botId);
+  } = useChat(botId, group?.id);
   const attachments = useAttachments(botId);
+  const { bots } = useBots();
   useChatEffects(botId, connection, error, dismissError);
   const catalog = toCatalog(models);
   const last = messages.at(-1);
@@ -70,6 +88,8 @@ export function ChatView({
               isLoading={isLoading}
               thinking={thinking}
               onRetry={(id) => void retry(id)}
+              authorOf={(m) => bots.find((b) => b.id === (m.botId ?? botId))}
+              group={Boolean(group)}
             />
           </MessageScrollerViewport>
           {/* Shows only when scrolled away from the latest message; scrolls back on click. */}
@@ -82,7 +102,15 @@ export function ChatView({
         approval={approval}
         prompt={prompt}
         sleeping={sleeping}
-        beforeComposer={beforeComposer}
+        beforeComposer={
+          <>
+            <TodoPanel
+              messages={messages}
+              working={run !== "idle" && run !== "done" && run !== "failed"}
+            />
+            {beforeComposer}
+          </>
+        }
         attachments={attachments}
         catalog={catalog}
         modelId={modelId}
@@ -95,6 +123,7 @@ export function ChatView({
         onReject={() => void reject()}
         chooseModel={chooseModel}
         onModeChange={(m) => void setMode(m)}
+        mentionExtras={group ? botMentions(group) : undefined}
       />
     </div>
   );

@@ -3,13 +3,26 @@ import { and, desc, eq } from "drizzle-orm";
 import { getRequestContext } from "../../../shared/context";
 import type { AuthGuardEnv } from "../../../middleware/auth-guard";
 import { publicDomains } from "../../agent/domains";
-import { bot } from "../../../db/schema";
+import { adminAudit, bot } from "../../../db/schema";
 import { composioAppsOf } from "../composio-apps";
 import { botColumns, idsOf, integrationLinks } from "../queries";
 
 const list = new Hono<AuthGuardEnv>()
   // Per-role defaults and suggestions for the bot form (static: changes only with a deploy).
   .get("/domains", (c) => c.json({ domains: publicDomains() }, 200, { "Cache-Control": "private, max-age=3600" }))
+
+  // What the admin bot changed, newest first (the user's own log only).
+  .get("/admin/audit", async (c) => {
+    const { db } = getRequestContext(c);
+    const items = await db
+      .select({ id: adminAudit.id, action: adminAudit.action, detail: adminAudit.detail, createdAt: adminAudit.createdAt })
+      .from(adminAudit)
+      .where(eq(adminAudit.userId, c.get("session").user.id))
+      .orderBy(desc(adminAudit.createdAt))
+      .limit(100);
+    c.header("Cache-Control", "no-store");
+    return c.json({ items });
+  })
 
   .get("/", async (c) => {
     const { db } = getRequestContext(c);

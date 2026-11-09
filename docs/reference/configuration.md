@@ -27,6 +27,7 @@ with a message naming the variable. Locally they go in `apps/backend/.dev.vars`;
 | `TAVILY_API_KEY` | Web search, crawling, `/deep-research` |
 | `COMPOSIO_API_KEY` | Connected apps, app blocks, bot app tools, app events |
 | `COMPOSIO_WEBHOOK_SECRET` | Accepting app events (≥ 16 characters; from `bun run composio:webhook`) |
+| `TYPESAFE_API_KEY` | The workflow Decide block (TypeSafe Jev) |
 | `E2B_API_KEY` | The computer and code sandboxes |
 | `SECRETS_ENCRYPTION_KEY` | Secrets vault and MCP tokens (32 random bytes, base64) |
 | `SECRETS_ENCRYPTION_KEY_PREVIOUS` | The old key while rotating |

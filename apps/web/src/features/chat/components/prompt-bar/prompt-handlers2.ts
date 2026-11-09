@@ -1,4 +1,3 @@
-import { SOURCES } from "./data";
 import type { PromptHandlers } from "./prompt-handlers";
 import type { PromptState } from "./prompt-state";
 import type { PromptBarProps } from "./types";
@@ -14,11 +13,12 @@ export function usePromptHandlers2(
     state.setEffortOpen(false);
   };
   const pick = (row: { key: string; name: string }) => {
-    const source = SOURCES.find((s) => s.key === row.key);
+    const source = props.sources?.find((s) => s.key === row.key);
     if (source?.attach) {
       state.fileInputRef.current?.click();
       if (h.token) state.setDraft(state.draft.slice(0, h.token.start));
     } else if (h.menu === "at") {
+      state.setMentions((m) => [...m, { name: row.name, logo: source?.logo, glyph: source?.glyph }]);
       state.setDraft(
         `${h.token ? state.draft.slice(0, h.token.start) : state.draft}@${row.name} `,
       );
@@ -35,6 +35,7 @@ export function usePromptHandlers2(
     if (!h.canSend) return;
     props.onSend?.(state.draft.trim());
     state.setDraft("");
+    state.setMentions([]);
     closeMenus();
   };
   const takeFiles = (list: FileList | null | undefined) => {

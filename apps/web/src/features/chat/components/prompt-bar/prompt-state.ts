@@ -2,10 +2,15 @@ import type { createShader } from "glimm";
 import { useRef, useState } from "react";
 import { RAINBOW } from "./data";
 
+/** A picked "@" mention: its name as written, and its app logo or icon. */
+export type Mention = { name: string; logo?: string | null; glyph?: string };
+
 /** A measured menu row: where to draw the hover highlight. */
 type Box = { top: number; height: number };
 export function usePromptState() {
   const [draft, setDraft] = useState("");
+  /** What was picked from the "@" menu: highlighted in the draft, with its logo or icon. */
+  const [mentions, setMentions] = useState<Mention[]>([]);
   const [dismissed, setDismissed] = useState(false);
   const [plusOpen, setPlusOpen] = useState(false);
   const [modelOpen, setModelOpen] = useState(false);
@@ -16,7 +21,6 @@ export function usePromptState() {
   const [effortMenuBottom, setEffortMenuBottom] = useState(0);
   const [dragging, setDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [connected, setConnected] = useState(false);
   const [active, setActive] = useState(0);
   const [listening, setListening] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -40,6 +44,8 @@ export function usePromptState() {
   const shaderRef = useRef<ReturnType<typeof createShader> | null>(null);
   const sweepingRef = useRef(false);
   return {
+    mentions,
+    setMentions,
     draft,
     setDraft,
     dismissed,
@@ -61,8 +67,6 @@ export function usePromptState() {
     dragging,
     setDragging,
     fileInputRef,
-    connected,
-    setConnected,
     active,
     setActive,
     listening,

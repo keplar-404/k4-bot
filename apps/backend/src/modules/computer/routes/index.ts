@@ -1,5 +1,7 @@
 import { Hono } from "hono";
 import { authGuard, type AuthGuardEnv } from "../../../middleware/auth-guard";
+import accounts from "./accounts";
+import appLogin from "./app-login";
 import control from "./control";
 import stream from "./stream";
 import viewer from "./viewer";
@@ -19,6 +21,8 @@ const computer = new Hono<AuthGuardEnv>()
     return authGuard(c, next);
   })
   .route("/", control)
+  .route("/", accounts)
+  .route("/", appLogin)
   .route("/", viewer)
   .route("/", stream);
 

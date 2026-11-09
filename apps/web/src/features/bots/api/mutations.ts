@@ -62,3 +62,15 @@ export async function saveBotModel(
   await throwIfFailed(res, "Failed to save the model");
   patchCachedBot(id, { modelId, reasoningEffort });
 }
+
+/** The user's admin bot (manages their other bots and groups). The server keeps one per user. */
+export async function createAdminBot(): Promise<Bot> {
+  const res = await api.api.v1.bots.admin.$post(
+    {},
+    { init: { credentials: "include" } },
+  );
+  await throwIfFailed(res, "Failed to add the admin bot");
+  const data = (await res.json()) as { bot: Bot };
+  invalidateBots();
+  return data.bot;
+}

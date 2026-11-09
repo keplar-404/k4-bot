@@ -8,7 +8,7 @@ import type { BlockResult } from "../execute-block";
 import { redact, secretNamesIn } from "../redact";
 import { resolveDeep, type RunContext } from "../template";
 import { runApp } from "./app";
-import { runHttp } from "./http";
+import { runHttp } from "./http-pages";
 
 export type ActionNode = Extract<WorkflowNode, { kind: "action.app" | "action.http" }>;
 

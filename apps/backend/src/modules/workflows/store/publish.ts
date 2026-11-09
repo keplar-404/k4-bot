@@ -3,7 +3,7 @@ import type { Env } from "../../../config/env";
 import type { Db } from "../../../db";
 import { workflow } from "../../../db/schema";
 import { startAppTrigger, stopAppTrigger } from "../../composio/triggers";
-import { graphSchema, type WorkflowNode } from "../graph/schema";
+import { graphSchema, liveGraph, type WorkflowNode } from "../graph/schema";
 import { newWebhookToken, nextRunAt, triggerOf } from "../graph/triggers";
 import { type GraphIssue, publishIssues } from "../graph/validate";
 import { countWorkflows, MAX_ACTIVE, setStatus, type WorkflowRow } from "./workflows";
@@ -44,7 +44,7 @@ export async function publishWorkflow(env: Env, db: Db, userId: string, row0: Wo
   const webhook = trigger?.kind === "trigger.webhook" && !w.webhookTokenHash ? await newWebhookToken() : null;
   const row = await setStatus(db, userId, w.id, {
     status: "active",
-    publishedGraph: w.graph,
+    publishedGraph: liveGraph(w.graph),
     publishedVersion: w.publishedVersion + 1,
     triggerKind: trigger?.kind ?? null,
     nextRunAt: nextRunAt(trigger),

@@ -9,7 +9,12 @@ type Panels = {
   /** The settings on the right. Closed, selecting a block does not open it. */
   settings: boolean;
   shortcuts: boolean;
-  toggle: (panel: "library" | "settings" | "shortcuts", open?: boolean) => void;
+  /** The settings window widened to three columns (input, settings, output) on wide screens. */
+  wide: boolean;
+  toggle: (
+    panel: "library" | "settings" | "shortcuts" | "wide",
+    open?: boolean,
+  ) => void;
 };
 
 /** Storage can throw (private windows, blocked site data): then the panels just start open. */
@@ -44,12 +49,17 @@ export const usePanels = create<Panels>()(
       library: true,
       settings: true,
       shortcuts: false,
+      wide: false,
       toggle: (panel, open) => set((s) => ({ [panel]: open ?? !s[panel] })),
     }),
     {
       name: "workflow-builder-panels",
       storage: safeStorage,
-      partialize: ({ library, settings }) => ({ library, settings }),
+      partialize: ({ library, settings, wide }) => ({
+        library,
+        settings,
+        wide,
+      }),
     },
   ),
 );

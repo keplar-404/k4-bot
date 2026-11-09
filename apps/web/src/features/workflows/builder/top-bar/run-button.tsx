@@ -4,20 +4,13 @@ import { Loader2Icon, PlayIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
 import { runWorkflow, type WorkflowApiError } from "../../api";
 import { isActive, useRunView } from "../../live/run-view-store";
 import { refreshRuns } from "../../live/use-live-runs";
 import { useBuilder } from "../store";
 import type { SaveState } from "../use-autosave";
+import { RunFormDialog } from "./run-form-dialog";
+import { SampleDialog } from "./sample-dialog";
 
 const MAX_SAMPLE = 256 * 1024;
 
@@ -30,8 +23,17 @@ export function RunButton({ save }: { save: { state: SaveState } }) {
   );
   const [busy, setBusy] = useState(false);
   const [sample, setSample] = useState<string | null>(null);
+  const [formOpen, setFormOpen] = useState(false);
   if (!w) return null;
   const webhook = w.graph.nodes.some((n) => n.kind === "trigger.webhook");
+  // These test runs pretend to receive something: a webhook body, an app event's data.
+  const sampleKind = webhook
+    ? ("webhook" as const)
+    : w.graph.nodes.some((n) => n.kind === "trigger.app")
+      ? ("app" as const)
+      : null;
+  const manual = w.graph.nodes.find((n) => n.kind === "trigger.manual");
+  const fields = manual?.kind === "trigger.manual" ? manual.config.fields : [];
 
   async function start(input?: unknown) {
     setBusy(true);
@@ -40,6 +42,7 @@ export function RunButton({ save }: { save: { state: SaveState } }) {
       useRunView.getState().view(run.id);
       void refreshRuns(w!.id);
       setSample(null);
+      setFormOpen(false);
     } catch (e) {
       const err = e as WorkflowApiError;
       const first = err.issues?.[0]?.nodeId;
@@ -67,40 +70,38 @@ export function RunButton({ save }: { save: { state: SaveState } }) {
         size="sm"
         variant="outline"
         disabled={busy || going || save.state !== "saved"}
-        onClick={() => (webhook ? setSample("{}") : void start())}
+        onClick={() =>
+          sampleKind
+            ? setSample("{}")
+            : fields.length > 0
+              ? setFormOpen(true)
+              : void start()
+        }
       >
         {busy || going ? (
           <Loader2Icon className="animate-spin" />
         ) : (
           <PlayIcon />
         )}
-        {webhook ? "Test run" : "Run"}
+        {sampleKind ? "Test run" : "Run"}
       </Button>
-      <Dialog
-        open={sample !== null}
-        onOpenChange={(open) => !open && setSample(null)}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Test run</DialogTitle>
-            <DialogDescription>
-              The JSON body to pretend the webhook received. It runs your draft
-              for real, so apps are really called.
-            </DialogDescription>
-          </DialogHeader>
-          <Textarea
-            className="min-h-32 font-mono text-xs"
-            value={sample ?? ""}
-            onChange={(e) => setSample(e.target.value)}
-            aria-label="Sample JSON body"
-          />
-          <DialogFooter>
-            <Button disabled={busy} onClick={startWithSample}>
-              Run
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <RunFormDialog
+        fields={fields}
+        open={formOpen}
+        busy={busy}
+        onOpenChange={setFormOpen}
+        onRun={(inputs) => void start(inputs)}
+      />
+      {sampleKind && (
+        <SampleDialog
+          kind={sampleKind}
+          workflowId={w.id}
+          sample={sample}
+          busy={busy}
+          onChange={setSample}
+          onRun={startWithSample}
+        />
+      )}
     </>
   );
 }

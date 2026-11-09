@@ -12,59 +12,26 @@ export type Source = {
   key: string;
   name: string;
   desc: string;
+  /** Group in the "@" menu: Files, Apps, Workflows. */
+  section: string;
   glyph?: string;
-  brand?: string;
+  /** An app's logo URL (Composio catalog). */
+  logo?: string | null;
   attach?: boolean;
-  connect?: boolean;
+  /** An app that is not connected yet: its toolkit slug, for the inline Connect link. */
+  connect?: string;
 };
-export const SOURCES: Source[] = [
-  {
-    key: "attach",
-    name: "Add photos & files",
-    desc: "Upload from your computer",
-    glyph: "clip",
-    attach: true,
-  },
-  {
-    key: "scoop",
-    name: "Scoop Data",
-    desc: "Sales & churn metrics",
-    glyph: "chart",
-  },
-  {
-    key: "flavors",
-    name: "Flavor records",
-    desc: "26 makers, tags, links",
-    glyph: "layers",
-  },
-  {
-    key: "web",
-    name: "Web search",
-    desc: "Real-time news and info",
-    glyph: "globe",
-  },
-  {
-    key: "figma",
-    name: "Figma",
-    desc: "Design-to-code workflows",
-    brand: "figma",
-  },
-  {
-    key: "slack",
-    name: "Slack",
-    desc: "Read and manage Slack",
-    brand: "slack",
-  },
-  {
-    key: "gmail",
-    name: "Gmail",
-    desc: "Read and manage Gmail",
-    brand: "gmail",
-    connect: true,
-  },
-];
+/** Always first in the "@" menu: attach files from the computer. */
+export const ATTACH: Source = {
+  key: "attach",
+  name: "Add photos & files",
+  desc: "Upload from your computer",
+  section: "Files",
+  glyph: "clip",
+  attach: true,
+};
 export const COMMANDS = [
-  // Real: summarizes the chat on the server to free context (use-chat sends it with `compact`). The rest are the demo.
+  // Summarizes the chat on the server to free context (use-chat sends it with `compact`).
   {
     key: "compact",
     name: "/compact",
@@ -76,13 +43,7 @@ export const COMMANDS = [
     name: "/deep-research",
     desc: "In-depth research with a cited report",
   },
-  { key: "compare", name: "/compare", desc: "Flavor vs. last summer" },
-  { key: "churn-plan", name: "/churn-plan", desc: "Draft a churn schedule" },
-  { key: "restock", name: "/restock", desc: "Build a reorder list" },
-  { key: "draft-email", name: "/draft-email", desc: "Write a supplier email" },
-  { key: "summarize", name: "/summarize", desc: "Digest the thread so far" },
 ];
-export const DICTATION = "Compare pistachio weekends to last summer";
 export function parseToken(
   draft: string,
 ): { kind: "at" | "slash"; query: string; start: number } | null {

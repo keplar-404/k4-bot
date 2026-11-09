@@ -14,7 +14,7 @@ import type { RunContext } from "./template";
 type StepResult =
   | { status: "cancelled" }
   | { status: "failed"; error: string }
-  | { status: "succeeded"; outputJson: string; ifResult: boolean | null; passed: boolean | null };
+  | { status: "succeeded"; outputJson: string; ifResult: boolean | null; passed: boolean | null; route: string | null };
 
 /**
  * Runs one block as durable Workflow steps. Everything that writes happens INSIDE a step: code outside a step runs
@@ -22,7 +22,7 @@ type StepResult =
  * `key` names the steps: the block id, plus `#<n>` inside a For each, so every pass is its own durable step.
  */
 export function runNode(step: WorkflowStep, deps: NodeDeps, node: WorkflowNode, ctx: RunContext, key = node.id) {
-  if (node.kind === "logic.delay") return runDelay(step, deps, node, key);
+  if (node.kind === "logic.delay") return runDelay(step, deps, node, ctx, key);
   if (node.kind === "logic.approval") return runApproval(step, deps, node, ctx, key);
   return runWithRetries(step, deps, node, ctx, key);
 }
@@ -56,6 +56,7 @@ async function runWithRetries(
       output: JSON.parse(result.outputJson),
       ifResult: result.ifResult ?? undefined,
       passed: result.passed ?? undefined,
+      route: result.route ?? undefined,
     };
   } catch (error) {
     // The step timed out, or Workflows stopped retrying: the block failed, not the whole engine.
@@ -90,6 +91,7 @@ async function tryBlock(
       outputJson: JSON.stringify(result.output ?? null),
       ifResult: result.ifResult ?? null,
       passed: result.passed ?? null,
+      route: result.route ?? null,
     };
   }
 

@@ -15,6 +15,8 @@ import { SettingsTabs } from "./settings-tabs";
 
 const PANEL =
   "absolute top-3 right-3 bottom-3 z-10 flex w-[22rem] flex-col overflow-hidden rounded-xl border bg-card/95 shadow-lg backdrop-blur";
+/** Widened (≥ 1280 px only): room for input, settings and output side by side. */
+const WIDE = "xl:w-[min(78rem,calc(100%-1.5rem))]";
 
 /**
  * The settings window on the right. It opens and closes with its own button (like the block library), never by
@@ -22,6 +24,7 @@ const PANEL =
  */
 export function SettingsPanel() {
   const open = usePanels((s) => s.settings);
+  const wide = usePanels((s) => s.wide);
   const setOpen = (v: boolean) => usePanels.getState().toggle("settings", v);
   const { nodes, selectedId, updateBlock, removeBlock } = useBuilder();
   const issue = useBuilder(
@@ -67,7 +70,10 @@ export function SettingsPanel() {
   const b = node.data.block;
   const update = (next: BlockBody) => updateBlock(b.id, () => next);
   return (
-    <aside className={PANEL} aria-label="Block settings">
+    <aside
+      className={`${PANEL} ${wide ? WIDE : ""}`}
+      aria-label="Block settings"
+    >
       <SettingsHeader
         block={b}
         update={update}

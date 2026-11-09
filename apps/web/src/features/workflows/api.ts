@@ -79,7 +79,13 @@ export const pauseWorkflow = (id: string) =>
 
 export const runWorkflow = (
   id: string,
-  body: { mode: "test" | "live"; input?: unknown },
+  body: {
+    mode: "test" | "live";
+    input?: unknown;
+    /** Test runs: run only up to this block, with these sample outputs for blocks before it. */
+    until?: string;
+    pins?: Record<string, unknown>;
+  },
 ) =>
   request<{ run: RunSummary }>(`/${id}/run`, {
     method: "POST",

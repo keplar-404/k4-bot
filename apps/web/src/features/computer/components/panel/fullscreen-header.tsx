@@ -2,6 +2,8 @@ import {
   HandIcon,
   Loader2Icon,
   MonitorIcon,
+  PanelRightCloseIcon,
+  PanelRightOpenIcon,
   PauseIcon,
   XIcon,
 } from "lucide-react";
@@ -19,11 +21,15 @@ export function FullscreenHeader({
   doing,
   closeRef,
   onClose,
+  sideOpen,
+  onToggleSide,
 }: {
   computer: Computer;
   doing: string | null;
   closeRef: RefObject<HTMLButtonElement | null>;
   onClose: () => void;
+  sideOpen: boolean;
+  onToggleSide: () => void;
 }) {
   const { status, inControl, busy, pending } = computer;
   const live = status?.state === "running";
@@ -74,6 +80,17 @@ export function FullscreenHeader({
           Sleep
         </Button>
       )}
+      {/* Only below lg, where the Activity column starts hidden to give the screen the width. */}
+      <Button
+        size="icon-sm"
+        variant="ghost"
+        className="lg:hidden"
+        aria-label={sideOpen ? "Hide activity" : "Show activity"}
+        aria-pressed={sideOpen}
+        onClick={onToggleSide}
+      >
+        {sideOpen ? <PanelRightCloseIcon /> : <PanelRightOpenIcon />}
+      </Button>
       <Button
         ref={closeRef}
         size="icon-sm"

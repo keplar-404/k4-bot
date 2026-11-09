@@ -61,7 +61,7 @@ export class ComputerSession extends ComputerPower {
       // A fresh disk has no accounts left to purge.
       this.tables.markPurged();
       this.directoryDirty = true;
-      await this.setState("off", "Reset to a brand-new computer. Wake it to start fresh.");
+      await this.setState("off", "Setting up a brand-new computer…");
       this.broadcast({ type: "activity-batch", events: [] });
     } finally {
       this.pausing = false;

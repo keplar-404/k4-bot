@@ -1,4 +1,6 @@
+import type { StructuredToolInterface } from "@langchain/core/tools";
 import type { BaseCheckpointSaver } from "@langchain/langgraph-checkpoint";
+import type { InterruptOnConfig } from "langchain";
 import type { ChatMode } from "../chat/modes";
 import type { ComputerStub } from "../computer/sandbox-backend";
 import type { Env } from "../../config/env";
@@ -21,6 +23,8 @@ export interface AgentBot {
   subagentsEnabled: boolean;
   maxSubagents: number;
   maxParallelTools: number;
+  /** "admin" manages the user's other bots and groups (agent/admin); absent or "normal" otherwise. */
+  kind?: string;
 }
 
 export interface BuildAgentOptions {
@@ -67,6 +71,10 @@ export interface BuildAgentOptions {
   /** What tools that act on the user's account need: their Composio apps, workflows and secrets (agent/account-tools). */
   account?: AccountOptions;
   /** What a sub-agent group may use and how to account for it; required for the sub-agent tools (bots with the capability). */
+  /** Tools this run adds for its situation: a group chat's tools (groups/tools), the admin bot's (agent/admin). */
+  extraTools?: StructuredToolInterface[];
+  /** Extra approvals for those tools (asked first in Ask mode; `always` ones even in Allow all). */
+  extraApprovals?: Record<string, InterruptOnConfig>;
   subagents?: Pick<
     SubagentToolsOptions,
     "env" | "db" | "userId" | "threadId" | "runId" | "installedSkills" | "connectedApps" | "report" | "hub" | "sliceDeadline"

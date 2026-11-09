@@ -8,7 +8,12 @@ a deploy.
 Each user has one Linux desktop VM (E2B template `E2B_TEMPLATE`, default `desktop`), shared by all of their bots.
 
 - **Per-bot isolation:** each bot is its own Linux user with its own home folder, browser profile and files. Bots
-  cannot read each other's homes.
+  can read each other's homes (mode 755) but only change their own; browser profiles are private (700).
+- **App logins in the browser:** `open_app_in_browser({toolkit, url, account?})` opens a page in a separate browser
+  profile per connected app account (`~/.k4/profiles/<toolkit>/<accountId>`, 700). Composio's tokens never reach the
+  VM: the user signs in once by taking control, and that profile remembers it. With several accounts the bot asks which.
+  Disconnecting the app on the Connect page, or Composio reporting it expired, deletes those profiles for every bot
+  (at once if the computer is on, otherwise on its next wake).
 - **Provisioning:** created when the user verifies their email (scheduled, never blocking the request).
 - **Owner:** the `UserComputerDurableObject` (`modules/computer/user-computer.ts` and `durable/`), addressed by user id.
   It holds the power state (`off`, `starting`, `running`, `paused`, `error`), the session clock, the daily meter, the
@@ -18,7 +23,7 @@ Each user has one Linux desktop VM (E2B template `E2B_TEMPLATE`, default `deskto
 
 | Event | What happens |
 |---|---|
-| Wake (`POST /computer/wake` or the bot's `turn_on_computer`) | Resumes the paused VM (or makes a new one), hardens it, removes accounts of deleted bots, starts the screen servers |
+| Wake (`POST /computer/wake` or the bot's `turn_on_computer`) | Resumes the paused VM (or makes a new one), hardens it, removes accounts of deleted bots and logins of disconnected apps, starts the screen servers |
 | Idle `COMPUTER_IDLE_MINUTES` (5) | Paused with a screenshot saved (paused VMs are not billed) |
 | Session `COMPUTER_SESSION_MINUTES` (20) | Ends; bots and the user are warned `COMPUTER_WRAP_MINUTES` (5) before, and "Wrap up" lets bots finish |
 | Daily `COMPUTER_MAX_MINUTES_PER_DAY` (120) | No more waking until 00:00 UTC |

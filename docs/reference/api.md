@@ -28,6 +28,7 @@ Sign up, sign in (email or Google), sign out, verify email, forgot / reset passw
 | GET | `/bots/domains` | Roles with their defaults and recommendations |
 | GET | `/bots/:id` | One bot |
 | POST | `/bots` | Create (name, avatar, role, capabilities, skills, MCP servers, apps) |
+| POST | `/bots/admin` | Create the user's admin bot (returns the existing one if there is one) |
 | PATCH | `/bots/:id` | Update |
 | PUT | `/bots/:id/model` | Remember the chosen model and reasoning level |
 | DELETE | `/bots/:id` | Delete (its chats go too; usage rows stay for the daily caps) |
@@ -37,8 +38,8 @@ Sign up, sign in (email or Google), sign out, verify email, forgot / reset passw
 
 | Method | Path | |
 |---|---|---|
-| GET | `/threads?botId=&cursor=` | Threads, newest first |
-| POST | `/threads` | New thread `{ botId, title?, mode? }` |
+| GET | `/threads?botId=&groupId=&cursor=` | Threads, newest first (a bot's own, or a group's) |
+| POST | `/threads` | New thread `{ botId \| groupId, title?, mode? }` |
 | PUT | `/threads/:id/mode` | `{ mode: "ask" \| "plan" \| "allow_all" }` |
 | GET | `/threads/:id/messages?before=&limit=` | History page, last event `seq`, pending approval/question, usage |
 | POST | `/threads/:id/messages` | Send `{ content, messageId?, fileIds?, modelId?, reasoningEffort?, retry?, compact? }` → `202 { runId, userMessageId }` |
@@ -47,9 +48,14 @@ Sign up, sign in (email or Google), sign out, verify email, forgot / reset passw
 | POST | `/runs/:runId/resume` | Answer an approval or a question |
 | POST | `/runs/:runId/stop` | Stop a run |
 
+## Groups (`/groups`)
+
+`GET /` (with members), `POST / { name, botIds, leadBotId? }`, `PATCH /:id { name?, botIds?, leadBotId?, memory? }`,
+`DELETE /:id` (stops and deletes its chat).
+
 ## Memory (`/memory`)
 
-`GET|PUT /preferences`, `GET|PUT /bots/:id` (one bot's memory).
+`GET|PUT /preferences`, `GET|PUT /bots/:id` (one bot's memory). `POST /events/:id/undo` (undo an automatic update).
 
 ## Files (`/files`)
 
@@ -64,6 +70,7 @@ Sign up, sign in (email or Google), sign out, verify email, forgot / reset passw
 | GET, PUT | `/settings` | Computer settings |
 | POST | `/session/wrap` | Wrap up the session |
 | GET | `/snapshot` | Last saved screenshot |
+| GET | `/accounts` | The bots' Linux accounts on the computer (sizes only while it runs) |
 | POST | `/control/take`, `/control/keep`, `/control/release` | The mouse-and-keyboard lease |
 | POST | `/ws-token`, then GET `/ws` | Status socket |
 | POST | `/viewer` | Path of the live view for a mode |
@@ -102,8 +109,10 @@ Sign up, sign in (email or Google), sign out, verify email, forgot / reset passw
 | POST | `/:id/publish`, `/:id/pause` | Turn on (returns `webhookToken` once for webhook triggers) / off |
 | POST | `/:id/webhook-token` | New webhook URL (the old one stops working) |
 | GET, PUT | `/:id/bots` | Bots this workflow is shared with |
-| POST | `/:id/run` | `{ mode: "test" \| "live", input? }` |
+| POST | `/:id/run` | `{ mode: "test" \| "live", input?, until?, pins? }`; a manual trigger's form is checked (422 with what is missing) |
 | GET | `/:id/runs`, `/runs/:runId` | Run list; one run with every step |
+| GET | `/approvals` | Every waiting "Ask me first" across your workflows |
+| GET | `/:id/hook-requests` | The last 50 calls to a webhook workflow |
 | POST | `/runs/:runId/cancel` | Cancel |
 | POST | `/runs/:runId/steps/:nodeId/answer` | Answer an "Ask me first" block `{ approved, note? }` |
 | POST | `/:id/live-token`, then GET `/:id/live` | Live run socket |

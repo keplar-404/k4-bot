@@ -1,0 +1,2 @@
+ALTER TABLE "memory_event" ADD COLUMN "group_id" text;--> statement-breakpoint
+ALTER TABLE "memory_event" ADD CONSTRAINT "memory_event_group_id_bot_group_id_fk" FOREIGN KEY ("group_id") REFERENCES "public"."bot_group"("id") ON DELETE cascade ON UPDATE no action;

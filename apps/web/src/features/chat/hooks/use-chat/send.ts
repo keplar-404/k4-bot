@@ -15,7 +15,7 @@ export async function sendImpl(
   let threadId = ctx.threadRef.current;
   if (!threadId) {
     try {
-      const { thread } = await createThread(botId, ctx.mode);
+      const { thread } = await createThread(botId, ctx.mode, ctx.groupId);
       threadId = thread.id;
       ctx.threadRef.current = threadId;
       void ctx.connect(threadId);

@@ -11,7 +11,7 @@ import { userMessage } from "./errors";
 import type { RunParams } from "./params";
 import { RunLog } from "./run-log";
 import type { RunContext } from "./template";
-import { runBlocks } from "./walk";
+import { runBlocks, type TestOptions } from "./walk";
 
 /**
  * WorkflowRunner: one run of a workflow, block by block in order. It runs the graph saved on the run (a snapshot),
@@ -43,7 +43,7 @@ export class WorkflowRunner extends WorkflowEntrypoint<Env, RunParams> {
         run: { id: params.runId, startedAt },
       };
       const deps: NodeDeps = { env, db, log, run: { id: params.runId, userId: params.userId } };
-      const result = await runBlocks(step, deps, loaded.graph, ctx);
+      const result = await runBlocks(step, deps, loaded.graph, ctx, loaded.test);
 
       if (result.status === "failed") await fail(result.error, result.nodeId);
       if (result.status === "succeeded") {
@@ -69,7 +69,7 @@ export class WorkflowRunner extends WorkflowEntrypoint<Env, RunParams> {
 async function loadGraph(
   db: Db,
   params: RunParams,
-): Promise<{ error: string } | { graph: WorkflowGraph; input: unknown }> {
+): Promise<{ error: string } | { graph: WorkflowGraph; input: unknown; test: TestOptions }> {
   const run = await getRun(db, params.userId, params.runId);
   if (!run) return { error: "The run no longer exists." };
 
@@ -77,5 +77,7 @@ async function loadGraph(
   if (!parsed.success) return { error: "The workflow is not valid." };
   const problem = structureIssues(parsed.data)[0];
   if (problem) return { error: problem.message };
-  return { graph: parsed.data, input: run.input };
+  // Pins and "test this step" apply to test runs only, whatever the stored copy holds.
+  const test = run.trigger === "test" ? { pins: parsed.data.pins ?? {}, stopAfter: parsed.data.stopAfter } : { pins: {} };
+  return { graph: parsed.data, input: run.input, test };
 }

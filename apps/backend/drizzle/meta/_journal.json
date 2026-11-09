@@ -134,6 +134,41 @@
       "when": 1794159329053,
       "tag": "0018_jittery_meteorite",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1794238219196,
+      "tag": "0019_spotty_prowler",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1794238660614,
+      "tag": "0020_right_sway",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1794242486735,
+      "tag": "0021_crazy_calypso",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1794246177391,
+      "tag": "0022_romantic_blade",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1794246663932,
+      "tag": "0023_cultured_emma_frost",
+      "breakpoints": true
     }
   ]
 }

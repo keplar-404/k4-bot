@@ -18,7 +18,7 @@ export function usePromptEffects(
     const target = state.rowRefs.current[state.active];
     if (target)
       state.setRowBox({ top: target.offsetTop, height: target.offsetHeight });
-  }, [h.menu, h.query, state.active, state.connected, h.rows.length]);
+  }, [h.menu, h.query, state.active, h.rows.length]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: effect copied from original prompt-bar; dependency list preserved intentionally
   useLayoutEffect(() => {

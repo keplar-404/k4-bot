@@ -9,7 +9,9 @@ import { getRequestContext } from "../../../shared/context";
 import { timingSafeEqualString } from "../../../shared/relay-token";
 import { RunStartError, startRun } from "../engine/start";
 import { hashToken } from "../graph/triggers";
+import { logHook } from "../store/hook-log";
 import { getWorkflowForHook, type WorkflowRow } from "../store/workflows";
+import { hookRefusal } from "./hook-auth";
 
 const MAX_BODY_BYTES = 256 * 1024;
 const params = z.object({ id: z.uuid(), token: z.string().regex(/^[A-Za-z0-9_-]{43}$/) });
@@ -39,7 +41,19 @@ const hooks = new Hono<{ Bindings: Env }>().post("/:id/:token", workflowHookLimi
 
   const { db, env } = getRequestContext(c);
   const found = await getWorkflowForHook(db, id);
-  if (!found || !(await tokenMatches(found, token))) return c.json(NOT_FOUND, 404);
+  if (!found) return c.json(NOT_FOUND, 404);
+  const ip = c.req.header("cf-connecting-ip") ?? "unknown";
+  const log = (status: number, reason: string, runId?: string) => logHook(db, { workflowId: id, status, reason, ip, runId });
+  if (!(await tokenMatches(found, token))) {
+    await log(404, "wrong URL token, or the workflow is off");
+    return c.json(NOT_FOUND, 404);
+  }
+  // The trigger's own checks: IP allowlist, then a header secret or a body signature (hook-auth.ts).
+  const refused = await hookRefusal(env, db, found, { ip, header: (n) => c.req.header(n), body: text });
+  if (refused) {
+    await log(401, refused);
+    return c.json({ error: "UNAUTHORIZED", message: "This request is not allowed." }, 401);
+  }
 
   let body: unknown;
   try {
@@ -66,11 +80,13 @@ const hooks = new Hono<{ Bindings: Env }>().post("/:id/:token", workflowHookLimi
       graph: found.publishedGraph,
       input: { body, headers, receivedAt: new Date().toISOString() },
     });
+    await log(202, "started a run", run.id);
     return c.json({ runId: run.id }, 202);
   } catch (error) {
     if (!(error instanceof RunStartError)) throw error;
     // NOT_FOUND here would mean it was deleted mid-request; the caller learns nothing new from a 422.
     const status = error.status === 404 ? 422 : error.status;
+    await log(status, error.message);
     return c.json({ error: error.code, message: error.message }, status);
   }
 });

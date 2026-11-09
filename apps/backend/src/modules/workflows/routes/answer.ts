@@ -7,13 +7,29 @@ import { userLimit } from "../../../middleware/rate-limit";
 import { getRequestContext } from "../../../shared/context";
 import { validate } from "../../../shared/validate";
 import { type ApprovalAnswer, approvalEventType } from "../engine/approval";
+import { waitingApprovals } from "../store/approvals";
+import { recentHooks } from "../store/hook-log";
+import { getWorkflow } from "../store/workflows";
 import { getRun } from "../store/runs";
 
 const params = z.object({ runId: z.uuid(), nodeId: z.string().regex(/^[A-Za-z0-9_-]{1,40}$/) });
 const body = z.object({ approved: z.boolean(), note: z.string().max(2000).default("") });
 
 /** The user's answer to an "Ask me first" block: the waiting run wakes up and goes on (or stops that path). */
-const answer = new Hono<AuthGuardEnv>().post(
+const answer = new Hono<AuthGuardEnv>()
+  // The builder's Requests list for a webhook workflow (the user's own only).
+  .get("/:id/hook-requests", validate("param", z.object({ id: z.uuid() })), async (c) => {
+    const { db } = getRequestContext(c);
+    const found = await getWorkflow(db, c.get("session").user.id, c.req.valid("param").id);
+    if (!found) return c.json({ error: "NOT_FOUND", message: "Workflow not found." }, 404);
+    return c.json({ items: await recentHooks(db, found.id) });
+  })
+  // The Approvals page: every waiting "Ask me first" across the user's workflows.
+  .get("/approvals", async (c) => {
+    const { db } = getRequestContext(c);
+    return c.json({ items: await waitingApprovals(db, c.get("session").user.id) });
+  })
+  .post(
   "/runs/:runId/steps/:nodeId/answer",
   userLimit,
   validate("param", params),

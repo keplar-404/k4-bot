@@ -38,7 +38,7 @@ export function buildAgent(options: BuildAgentOptions) {
   const subagentTools = subagentToolsFor(options, { model, createModel, domain, today, saveFiles: saveGroupFiles });
 
   const screen: ScreenHolder = {};
-  const computerTools = computer ? createComputerTools({ computer: computer.stub, botId: bot.id, runId: computer.runId, screen }) : [];
+  const computerTools = computer ? createComputerTools({ computer: computer.stub, botId: bot.id, runId: computer.runId, screen, account: options.account }) : [];
   // Without vision the model cannot use the screen, so it is not offered the mouse and keyboard.
   const view: ViewHolder = { images: model.vision ? (options.files?.attached ?? []) : [] };
   const fileTools = options.files
@@ -46,13 +46,13 @@ export function buildAgent(options: BuildAgentOptions) {
     : [];
   const features = featureTools(options);
   const account = options.account ? accountTools(options.account, bot.id) : null;
-  const modes = modeSetup(options, account?.approvals ?? {});
+  const modes = modeSetup(options, { ...account?.approvals, ...options.extraApprovals });
   const approvals = modes.approvals;
   const appNames = [...(options.apps?.names ?? []), ...(account?.appNames ?? [])];
   const tools = [
     ...(options.web ? createWebTools(options.web) : []),
     ...subagentTools,
-    ...computerTools.filter((t) => model.vision || t.name !== "computer"),
+    ...computerTools.filter((t) => model.vision || (t.name !== "computer" && t.name !== "open_app_in_browser")),
     ...fileTools,
     ...features.tools,
     ...(account?.tools ?? []),

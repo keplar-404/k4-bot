@@ -2,6 +2,7 @@
 
 import type { Prompt } from "@/features/chat/lib/stream/types";
 import { AgentQuestion } from "./agent-question";
+import { ConnectAppsItem } from "./connect-apps-item";
 import { ModeSwitchItem } from "./mode-switch-item";
 import { SecretRequestItem } from "./secret-request-item";
 
@@ -23,6 +24,16 @@ export function PausedInput({
         // The server saves the mode when it receives this answer and tells every tab (thread.mode), so the picker follows.
         onSwitch={(mode) => onAnswer(`switched:${mode}`)}
         onStay={() => onAnswer("stay")}
+      />
+    );
+  }
+  if (prompt.kind === "connect_apps" && prompt.apps?.length) {
+    return (
+      <ConnectAppsItem
+        key={prompt.runId}
+        apps={prompt.apps}
+        why={prompt.why}
+        onDone={onAnswer}
       />
     );
   }

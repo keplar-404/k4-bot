@@ -37,6 +37,19 @@ const manage = new Hono<AuthGuardEnv>()
     return c.json({ bot: { ...created, skillIds: skillIds ?? [], mcpServerIds: mcpServerIds ?? [], composioApps: composioApps ?? [] } }, 201);
   })
 
+  // The user's one admin bot (it manages their other bots and groups). Creating it twice returns the first.
+  .post("/admin", userLimit, async (c) => {
+    const { db } = getRequestContext(c);
+    const userId = c.get("session").user.id;
+    const d = domainFor("assistant").defaults;
+    await db
+      .insert(bot)
+      .values({ id: crypto.randomUUID(), userId, kind: "admin", name: "Admin", description: "Manages your bots and groups.", role: "assistant", shape: "hexagone", color: "encre", expression: "attentif", subagentsEnabled: d.subagents, maxSubagents: d.maxSubagents, maxParallelTools: d.maxParallelTools })
+      .onConflictDoNothing();
+    const [admin] = await db.select().from(bot).where(and(eq(bot.userId, userId), eq(bot.kind, "admin"))).limit(1);
+    return c.json({ bot: admin }, 201);
+  })
+
   .patch("/:id", userLimit, validate("json", createBotSchema), async (c) => {
     const { db, env } = getRequestContext(c);
     const userId = c.get("session").user.id;

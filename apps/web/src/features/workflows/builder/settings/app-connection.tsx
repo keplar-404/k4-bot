@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { authorizeApp } from "@/features/connect/api";
 import { useConnections } from "@/features/connect/use-connections";
+import { useNoAuth } from "./use-no-auth";
 
 /**
  * Whether the user has connected this app. Connecting goes to Composio in this tab and comes back to this workflow
@@ -21,6 +22,7 @@ export function AppConnection({
   const conns = useConnections();
   const [opening, setOpening] = useState(false);
   const state = conns.stateOf(toolkit);
+  const noAuth = useNoAuth(toolkit);
 
   const connect = async () => {
     setOpening(true);
@@ -36,6 +38,12 @@ export function AppConnection({
     }
   };
 
+  if (noAuth)
+    return (
+      <p className="text-muted-foreground text-sm">
+        No login needed: {appName} works without connecting.
+      </p>
+    );
   if (!conns.ready)
     return (
       <p className="text-muted-foreground text-xs">

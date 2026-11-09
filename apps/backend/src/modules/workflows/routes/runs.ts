@@ -5,6 +5,8 @@ import { userLimit, workflowRunLimit } from "../../../middleware/rate-limit";
 import { getRequestContext } from "../../../shared/context";
 import { validate } from "../../../shared/validate";
 import { RunStartError, startRun } from "../engine/start";
+import { readForm } from "../graph/manual-form";
+import type { WorkflowNode } from "../graph/schema";
 import { triggerOf } from "../graph/triggers";
 import { publishLive } from "../live/publish";
 import { cancelRunRow } from "../store/run-control";
@@ -17,19 +19,25 @@ const runBody = z.object({
   /** "test" runs the draft; "live" runs the published copy of a workflow that is on. */
   mode: z.enum(["live", "test"]).default("test"),
   input: z.unknown().optional(),
+  /** Test runs: "Test this step" (run only up to this block) and sample outputs for blocks before it. */
+  until: z.string().regex(/^[A-Za-z0-9_-]{1,40}$/).optional(),
+  pins: z.record(z.string().regex(/^[A-Za-z0-9_-]{1,40}$/), z.unknown()).optional(),
 });
 
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
 /** What the trigger block hands the first step, so a test run looks like the real thing. */
-function triggerInput(kind: string | undefined, input: unknown) {
+function triggerInput(trigger: WorkflowNode | undefined, input: unknown) {
+  const kind = trigger?.kind;
   const now = new Date().toISOString();
   if (kind === "trigger.webhook") return { body: input ?? {}, headers: {}, receivedAt: now };
   if (kind === "trigger.schedule") return { scheduledAt: now };
   // A test of an app-event workflow: the sample event the user typed stands in for the real one.
   if (kind === "trigger.app") return { event: "test", data: isPlainObject(input) ? input : {}, eventId: "test", receivedAt: now };
-  return { inputs: isPlainObject(input) ? input : {} };
+  const raw = isPlainObject(input) ? input : {};
+  // A manual trigger's form: values typed and required fields checked (problems go back to the person).
+  return trigger?.kind === "trigger.manual" ? readForm(trigger.config.fields, raw) : { inputs: raw };
 }
 
 /** Start and cancel runs. */
@@ -37,11 +45,13 @@ const runs = new Hono<AuthGuardEnv>()
   .post("/:id/run", workflowRunLimit, validate("param", idParam), validate("json", runBody), async (c) => {
     const { db, env } = getRequestContext(c);
     const userId = c.get("session").user.id;
-    const { mode, input } = c.req.valid("json");
+    const { mode, input, until, pins } = c.req.valid("json");
     const found = await getWorkflow(db, userId, c.req.valid("param").id);
     if (!found) return c.json({ error: "NOT_FOUND", message: "Workflow not found." }, 404);
 
-    const graph = mode === "test" ? found.graph : found.publishedGraph;
+    // A test runs the draft (with its pins, the extra ones sent, and where to stop); a live run the published copy.
+    const graph =
+      mode === "test" ? { ...found.graph, pins: { ...pins, ...found.graph.pins }, ...(until ? { stopAfter: until } : {}) } : found.publishedGraph;
     if (!graph || (mode === "live" && found.status !== "active")) {
       return c.json({ error: "NOT_READY", message: "Turn the workflow on first." }, 422);
     }
@@ -50,13 +60,15 @@ const runs = new Hono<AuthGuardEnv>()
       return c.json({ error: "NOT_READY", message }, 422);
     }
 
+    const triggerData = triggerInput(triggerOf(graph), input);
+    if ("problems" in triggerData) return c.json({ error: "INVALID_INPUT", message: triggerData.problems.join(" ") }, 422);
     try {
       const run = await startRun(env, db, {
         workflowId: found.id,
         userId,
         trigger: mode === "test" ? "test" : "manual",
         graph,
-        input: triggerInput(triggerOf(graph)?.kind, input),
+        input: triggerData,
       });
       return c.json({ run }, 201);
     } catch (error) {

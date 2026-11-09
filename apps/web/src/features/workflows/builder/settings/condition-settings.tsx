@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/select";
 import type { BlockBody } from "../blocks";
 import type { Cond } from "./condition-ops";
+import { ConditionGroup } from "./condition-group";
 import { ConditionRow } from "./condition-row";
 import { SettingsSection } from "./field";
 
@@ -25,8 +26,9 @@ export function ConditionSettings({
   update: (b: CondBlock) => void;
 }) {
   const { conditions, combine } = block.config;
-  const set = (next: Cond[], c = combine) =>
-    update({ ...block, config: { combine: c, conditions: next } } as CondBlock);
+  const groups = block.config.groups ?? [];
+  const set = (next: Cond[], c = combine, g = groups) =>
+    update({ ...block, config: { combine: c, conditions: next, groups: g } } as CondBlock);
   const edit = (i: number, patch: Partial<Cond>) =>
     set(conditions.map((c, j) => (j === i ? { ...c, ...patch } : c)));
   return (
@@ -55,7 +57,8 @@ export function ConditionSettings({
       </Select>
       {conditions.map((c, i) => (
         <ConditionRow
-          key={`${c.left}|${c.op}|${c.right ?? ""}`}
+          // biome-ignore lint/suspicious/noArrayIndexKey: rows are controlled and hold no state; two empty rows have identical content, so content cannot be the key
+          key={i}
           cond={c}
           index={i}
           total={conditions.length}
@@ -63,18 +66,43 @@ export function ConditionSettings({
           onRemove={() => set(conditions.filter((_, j) => j !== i))}
         />
       ))}
-      {conditions.length < 10 && (
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() =>
-            set([...conditions, { left: "", op: "equals", right: "" }])
-          }
-        >
-          <PlusIcon />
-          Add condition
-        </Button>
-      )}
+      {groups.map((g, i) => (
+        <ConditionGroup
+          // biome-ignore lint/suspicious/noArrayIndexKey: groups have no id; their place is their identity
+          key={i}
+          group={g}
+          index={i}
+          onChange={(next) => set(conditions, combine, groups.map((x, j) => (j === i ? next : x)))}
+          onRemove={() => set(conditions, combine, groups.filter((_, j) => j !== i))}
+        />
+      ))}
+      <div className="flex flex-wrap gap-2">
+        {conditions.length < 10 && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() =>
+              set([...conditions, { left: "", op: "equals", right: "" }])
+            }
+          >
+            <PlusIcon />
+            Add condition
+          </Button>
+        )}
+        {groups.length < 5 && (
+          <Button
+            size="sm"
+            variant="ghost"
+            title="A group counts as one condition with its own all / any, e.g. A and (B or C)"
+            onClick={() =>
+              set(conditions, combine, [...groups, { combine: "any", conditions: [{ left: "", op: "equals", right: "" }] }])
+            }
+          >
+            <PlusIcon />
+            Add group
+          </Button>
+        )}
+      </div>
     </SettingsSection>
   );
 }

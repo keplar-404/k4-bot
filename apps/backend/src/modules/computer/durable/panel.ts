@@ -40,6 +40,25 @@ export class ComputerPanel extends ComputerBots {
     }
   }
 
+  /**
+   * The bot accounts on the computer and their home sizes (KB), read from the machine itself. Null while it is not
+   * running: listing accounts never wakes it (that costs computer time).
+   */
+  async accountsOnDisk(): Promise<Array<{ user: string; kb: number }> | null> {
+    if (this.state !== "running") return null;
+    const sbx = this.sbx ?? (await this.live());
+    // Bot accounts are named u_<id>; du runs as root because each home is private to its bot.
+    const out = await sbx.commands.run(
+      "for h in /home/u_*; do [ -d \"$h\" ] && du -sk \"$h\"; done 2>/dev/null || true",
+      { user: "root", timeoutMs: 20_000 },
+    );
+    return out.stdout
+      .split("\n")
+      .map((line) => line.trim().split(/\s+/))
+      .filter(([kb, path]) => kb && path?.startsWith("/home/u_"))
+      .map(([kb, path]) => ({ user: path!.slice("/home/".length), kb: Number(kb) || 0 }));
+  }
+
   /** The panel's status and activity socket. */
   override async fetch(request: Request): Promise<Response> {
     if (new URL(request.url).pathname !== "/ws" || request.headers.get("Upgrade") !== "websocket") {

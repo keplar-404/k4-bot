@@ -72,4 +72,5 @@ export type RunStep = {
   output?: unknown;
   error?: string | null;
 };
-export type RunDetail = RunSummary & { steps: RunStep[] };
+/** `input`: what the trigger handed the run (a webhook's { body }, an app event's { data }, a form's { inputs }). */
+export type RunDetail = RunSummary & { steps: RunStep[]; input?: unknown };

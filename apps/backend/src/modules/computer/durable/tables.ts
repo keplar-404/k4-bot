@@ -8,6 +8,7 @@ import { ACTIVITY_KEEP, BUSY_MS } from "./constants";
  *  workers:      bots using the computer in a run that has not ended (cleared when its slice ends);
  *  removed_bots: deleted bots. Their account is purged now if the computer is awake, otherwise on
  *                its next wake, and a run still in flight can never use the computer again.
+ *  profile_wipes: disconnected app accounts whose browser logins must be deleted (same now-or-next-wake rule).
  */
 export class ComputerTables {
   constructor(private readonly sql: SqlStorage) {
@@ -16,6 +17,7 @@ export class ComputerTables {
       CREATE TABLE IF NOT EXISTS bots (bot_id TEXT PRIMARY KEY, name TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS removed_bots (bot_id TEXT PRIMARY KEY, purged INTEGER NOT NULL DEFAULT 0);
       CREATE TABLE IF NOT EXISTS workers (bot_id TEXT PRIMARY KEY, last_touch INTEGER NOT NULL);
+      CREATE TABLE IF NOT EXISTS profile_wipes (account_id TEXT PRIMARY KEY);
     `);
   }
 
@@ -73,6 +75,18 @@ export class ComputerTables {
     if (botId) this.sql.exec("UPDATE removed_bots SET purged = 1 WHERE bot_id = ?", botId);
     // A fresh disk has no accounts, so nothing of a deleted bot is left to purge.
     else this.sql.exec("UPDATE removed_bots SET purged = 1");
+  }
+
+  queueProfileWipe(accountId: string) {
+    this.sql.exec("INSERT INTO profile_wipes (account_id) VALUES (?) ON CONFLICT DO NOTHING", accountId);
+  }
+
+  pendingProfileWipes() {
+    return this.sql.exec<{ account_id: string }>("SELECT account_id FROM profile_wipes").toArray().map((r) => r.account_id);
+  }
+
+  profileWiped(accountId: string) {
+    this.sql.exec("DELETE FROM profile_wipes WHERE account_id = ?", accountId);
   }
 
   addActivity(event: ActivityEvent) {

@@ -3,23 +3,53 @@
 import { Loader2Icon, RotateCcwIcon } from "lucide-react";
 import { Markdown } from "@/components/markdown";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
-import { Message, MessageContent } from "@/components/ui/message";
+import {
+  Message,
+  MessageAvatar,
+  MessageContent,
+} from "@/components/ui/message";
 import { MessageScrollerItem } from "@/components/ui/message-scroller";
+import { BloubAvatar } from "@/features/avatar/components/bloub-avatar";
+import type { Bot } from "@/features/bots/api";
 import { AgentParts } from "@/features/chat/components/agent-parts";
 import type { ChatMessageView } from "@/features/chat/lib/protocol";
 import { FileList } from "@/features/files/components/file-list";
 
+/** Who writes the assistant messages: shown as an avatar next to each answer. */
+export type MessageAuthor = Pick<
+  Bot,
+  "name" | "shape" | "color" | "expression"
+>;
+
 export function MessageItem({
   m,
+  author,
+  group = false,
   onRetry,
 }: {
   m: ChatMessageView;
+  author?: MessageAuthor;
+  /** A group chat: each answer is labelled with its bot's name. */
+  group?: boolean;
   onRetry: (id: string) => void;
 }) {
   const isUser = m.role === "user";
   return (
     <MessageScrollerItem key={m.id} messageId={m.id}>
       <Message align={isUser ? "end" : "start"}>
+        {!isUser && author && (
+          <MessageAvatar
+            title={author.name}
+            className="mt-0.5 shrink-0 self-start bg-transparent"
+          >
+            <BloubAvatar
+              size={28}
+              shape={author.shape}
+              color={author.color}
+              expression={author.expression}
+            />
+          </MessageAvatar>
+        )}
         <MessageContent
           className={
             isUser ? "max-w-[85%] md:max-w-[50%]" : "max-w-full md:max-w-[70%]"
@@ -45,7 +75,18 @@ export function MessageItem({
               )}
             </>
           ) : m.parts ? (
-            <AgentParts parts={m.parts} streaming={m.state === "sending"} />
+            <>
+              {group && author && (
+                <span className="text-xs font-medium text-muted-foreground">
+                  {author.name}
+                </span>
+              )}
+              <AgentParts
+                parts={m.parts}
+                streaming={m.state === "sending"}
+                who={group ? author?.name : undefined}
+              />
+            </>
           ) : (
             m.text && (
               <Markdown isStreaming={m.state === "sending"}>{m.text}</Markdown>

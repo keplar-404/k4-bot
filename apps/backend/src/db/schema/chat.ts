@@ -10,6 +10,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { user } from "./auth";
 import { bot } from "./bot";
+import { botGroup } from "./group";
 
 export const chatThread = pgTable(
   "chat_thread",
@@ -26,6 +27,8 @@ export const chatThread = pgTable(
     contextTokens: integer("context_tokens").notNull().default(0),
     /** Permission mode for this chat: allow_all | plan | ask. */
     mode: text("mode").notNull().default("ask"),
+    /** Set for a group chat; `bot_id` is then the bot that leads it when the thread was made. */
+    groupId: text("group_id").references(() => botGroup.id, { onDelete: "cascade" }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()
@@ -37,6 +40,7 @@ export const chatThread = pgTable(
     index("chat_thread_userId_idx").on(table.userId),
     index("chat_thread_botId_idx").on(table.botId),
     index("chat_thread_updatedAt_idx").on(table.updatedAt),
+    index("chat_thread_groupId_idx").on(table.groupId),
   ],
 );
 
@@ -51,6 +55,8 @@ export const chatMessage = pgTable(
     role: text("role").notNull(),
     parts: jsonb("parts").notNull().$type<unknown>(),
     runId: text("run_id"),
+    /** Group chats: which bot wrote this assistant message. */
+    authorBotId: text("author_bot_id"),
     seq: bigint("seq", { mode: "number" }).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },

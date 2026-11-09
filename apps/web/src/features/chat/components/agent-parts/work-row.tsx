@@ -21,18 +21,23 @@ export function WorkRow({
   work,
   working,
   streaming,
+  who,
 }: {
   work: MessagePart[];
   /** Still working: no final answer yet. */
   working: boolean;
   streaming: boolean;
+  /** Group chats: the bot doing this work. Its row stays folded (several bots' steps would flood the chat). */
+  who?: string;
 }) {
-  const [open, setOpen] = useState(working);
-  useEffect(() => setOpen(working), [working]);
+  const [open, setOpen] = useState(working && !who);
+  useEffect(() => setOpen(working && !who), [working, who]);
   const steps = work.filter((p) => p.type === "tool").length;
-  const title = working
-    ? currentActivity(work)
-    : `${workSummary(work)}${steps > 1 ? ` · ${steps} steps` : ""}`;
+  const title = `${who ? `${who} · ` : ""}${
+    working
+      ? currentActivity(work)
+      : `${workSummary(work)}${steps > 1 ? ` · ${steps} steps` : ""}`
+  }`;
 
   return (
     <Trace>

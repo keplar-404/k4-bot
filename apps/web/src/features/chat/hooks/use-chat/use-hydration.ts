@@ -4,6 +4,7 @@ import type { ChatCtx } from "./types";
 export function useHydration(
   ctxRef: React.MutableRefObject<ChatCtx | null>,
   botId: string,
+  groupId?: string,
 ): void {
   // biome-ignore lint/correctness/useExhaustiveDependencies: refs and setters are stable; deps preserved from original
   useEffect(() => {
@@ -19,7 +20,7 @@ export function useHydration(
 
     void (async () => {
       try {
-        const { threads } = await ctx.listThreads(botId);
+        const { threads } = await ctx.listThreads(botId, groupId);
         if (cancelled) return;
         const tid = threads[0]?.id;
         if (!tid) {
@@ -48,5 +49,5 @@ export function useHydration(
       if (ctx.resendTimerRef.current) clearTimeout(ctx.resendTimerRef.current);
       ctx.wsRef.current?.close();
     };
-  }, [botId]);
+  }, [botId, groupId]);
 }

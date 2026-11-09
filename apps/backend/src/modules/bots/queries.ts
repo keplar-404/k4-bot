@@ -17,6 +17,7 @@ export const botColumns = {
   expression: bot.expression,
   modelId: bot.modelId,
   reasoningEffort: bot.reasoningEffort,
+  kind: bot.kind,
 };
 
 export type IntegrationLink = { botId: string; id: string };

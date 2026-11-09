@@ -1,6 +1,6 @@
 import { ensureDraft } from "./drafts";
 import { friendlyProviderError, reasonMessage } from "./provider-error";
-import type { StreamState } from "./types";
+import type { Prompt, StreamState } from "./types";
 import { going } from "./types";
 
 export function handleRunEvent(
@@ -10,6 +10,20 @@ export function handleRunEvent(
   payload: Record<string, unknown>,
 ): StreamState {
   switch (type) {
+    // Group chats: the next bot took its turn (a new run the client did not start).
+    case "run.started": {
+      const next = ensureDraft({ ...state, draftId: null }, runId);
+      const botId =
+        typeof payload.botId === "string" ? payload.botId : undefined;
+      return {
+        ...next,
+        run: "running",
+        ...going,
+        messages: next.messages.map((m) =>
+          m.id === next.draftId && botId ? { ...m, botId } : m,
+        ),
+      };
+    }
     case "run.resumed":
       return { ...state, run: "running", ...going };
     case "run.waiting_input":
@@ -21,6 +35,9 @@ export function handleRunEvent(
           kind: String(payload.kind ?? "info"),
           question: String(payload.question ?? "The bot needs your input."),
           ...optionalText(payload),
+          ...(Array.isArray(payload.apps)
+            ? { apps: payload.apps as NonNullable<Prompt["apps"]> }
+            : {}),
         },
       };
     case "run.sleeping":

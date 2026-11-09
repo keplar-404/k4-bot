@@ -10,7 +10,7 @@ export type NodeDeps = { env: Env; db: Db; log: RunLog; run: { id: string; userI
 export type NodeResult =
   | { status: "cancelled" }
   | { status: "failed"; error: string }
-  | { status: "succeeded"; output: unknown; ifResult?: boolean; passed?: boolean };
+  | { status: "succeeded"; output: unknown; ifResult?: boolean; passed?: boolean; route?: string };
 
 /** A write as its own durable step: it happens once, and is skipped when the run resumes past it. */
 export function once(step: WorkflowStep, name: string, write: () => Promise<unknown>) {

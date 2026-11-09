@@ -1,11 +1,12 @@
 "use client";
 
-import { PlusIcon, Trash2Icon } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import type { Block, BlockBody } from "../blocks";
+import type { BlockBody } from "../blocks";
+import { TemplateInput } from "../template/template-input";
 import { Field, SettingsSection } from "./field";
+import { HttpAuth } from "./http-auth";
+import { HttpHeaders } from "./http-headers";
+import { HttpPagination } from "./http-pagination";
 
 type HttpBlock = Extract<BlockBody, { kind: "action.http" }>;
 
@@ -39,10 +40,10 @@ export function HttpSettings({
         </select>
       </Field>
       <Field id="http-url" label="URL">
-        <Input
+        <TemplateInput
           id="http-url"
           value={block.config.url}
-          onChange={(e) => set({ url: e.target.value })}
+          onChange={(url) => set({ url })}
           placeholder="https://api.example.com/endpoint"
         />
       </Field>
@@ -74,60 +75,20 @@ export function HttpSettings({
           <option value="text">Text</option>
         </select>
       </Field>
-      <SettingsSection title="Headers">
-        {block.config.headers.map((h, i) => (
-          <div
-            // biome-ignore lint/suspicious/noArrayIndexKey: header rows have no id and are only edited in place
-            key={i}
-            className="grid grid-cols-[1fr_1.6fr_auto] items-center gap-2"
-          >
-            <Input
-              aria-label="Header name"
-              placeholder="Authorization"
-              value={h.name}
-              onChange={(e) => {
-                const next = [...block.config.headers];
-                next[i] = { ...h, name: e.target.value };
-                set({ headers: next });
-              }}
-            />
-            <Input
-              aria-label="Header value"
-              placeholder="Bearer {{secrets.TOKEN}}"
-              value={h.value}
-              onChange={(e) => {
-                const next = [...block.config.headers];
-                next[i] = { ...h, value: e.target.value };
-                set({ headers: next });
-              }}
-            />
-            <Button
-              size="icon-sm"
-              variant="ghost"
-              aria-label="Remove header"
-              onClick={() =>
-                set({ headers: block.config.headers.filter((_, j) => j !== i) })
-              }
-            >
-              <Trash2Icon />
-            </Button>
-          </div>
-        ))}
-        {block.config.headers.length < 10 && (
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() =>
-              set({
-                headers: [...block.config.headers, { name: "", value: "" }],
-              })
-            }
-          >
-            <PlusIcon />
-            Add header
-          </Button>
-        )}
-      </SettingsSection>
+      <HttpHeaders
+        kind="query"
+        headers={block.config.query}
+        onChange={(query) => set({ query })}
+      />
+      <HttpAuth auth={block.config.auth} onChange={(auth) => set({ auth })} />
+      <HttpPagination
+        value={block.config.pagination}
+        onChange={(pagination) => set({ pagination })}
+      />
+      <HttpHeaders
+        headers={block.config.headers}
+        onChange={(headers) => set({ headers })}
+      />
       <SettingsSection title="Body">
         <select
           className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
@@ -147,14 +108,13 @@ export function HttpSettings({
           <option value="form">Form</option>
         </select>
         {block.config.body.type !== "none" && (
-          <Textarea
+          <TemplateInput
+            multiline
             className="font-mono text-xs"
-            rows={3}
+            aria-label="Body"
             value={block.config.body.value}
-            onChange={(e) =>
-              set({ body: { ...block.config.body, value: e.target.value } })
-            }
-            placeholder='{"key": "{{trigger.body.value}}"}'
+            onChange={(value) => set({ body: { ...block.config.body, value } })}
+            placeholder='{"key": "value"}'
           />
         )}
       </SettingsSection>

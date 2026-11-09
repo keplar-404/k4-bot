@@ -4,6 +4,7 @@ import {
   BrainIcon,
   MoreHorizontalIcon,
   PencilIcon,
+  ScrollTextIcon,
   Trash2Icon,
 } from "lucide-react";
 import Link from "next/link";
@@ -16,7 +17,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  SidebarMenu,
   SidebarMenuAction,
   SidebarMenuButton,
   SidebarMenuItem,
@@ -41,8 +41,9 @@ export function BotItem({
   return (
     <SidebarMenuItem>
       <SidebarMenuButton
-        className="h-9 [&_svg]:size-7"
+        className="h-9 [&_svg]:size-7 group-data-[collapsible=icon]:p-0.5!"
         isActive={active}
+        tooltip={bot.name}
         render={<Link href={`/dashboard/bot/${bot.id}`} />}
       >
         <BloubAvatar
@@ -55,7 +56,9 @@ export function BotItem({
       </SidebarMenuButton>
       <DropdownMenu>
         <DropdownMenuTrigger
-          render={<SidebarMenuAction className="top-2! cursor-pointer" />}
+          render={
+            <SidebarMenuAction className="top-2! cursor-pointer group-data-[collapsible=icon]:hidden" />
+          }
         >
           <MoreHorizontalIcon />
           <span className="sr-only">More options for {bot.name}</span>
@@ -70,6 +73,12 @@ export function BotItem({
               <BrainIcon />
               Memory
             </DropdownMenuItem>
+            {bot.kind === "admin" && (
+              <DropdownMenuItem render={<Link href="/dashboard/admin-log" />}>
+                <ScrollTextIcon />
+                Activity log
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem
               variant="destructive"
               onClick={() => onDelete(bot.id)}

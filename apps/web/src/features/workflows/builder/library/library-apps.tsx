@@ -21,7 +21,7 @@ export function LibraryApps({ query }: { query: string }) {
           payload={{ kind: "action.app", toolkit: app.slug }}
           icon={<AppLogo src={app.logo} name={app.name} size="sm" />}
           title={app.name}
-          hint={`${app.toolsCount.toLocaleString()} actions`}
+          hint={`${app.toolsCount.toLocaleString()} actions${app.noAuth ? " · no login needed" : ""}`}
           onAdd={() => addBlock("action.app", { toolkit: app.slug })}
         />
       ))}

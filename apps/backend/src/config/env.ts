@@ -60,6 +60,8 @@ export const envSchema = z.object({
   SANDBOX_MAX_MINUTES_PER_DAY: z.coerce.number().int().positive().default(240),
   // --- Composio (per-user connected apps: Gmail, Slack, GitHub, ...) ---
   COMPOSIO_API_KEY: z.string().optional(),
+  // --- TypeSafe (Jev decision model) for the workflow Decide block: https://docs.typesafe.ai ---
+  TYPESAFE_API_KEY: z.string().optional(),
   // --- Secrets users give us (MCP tokens, workflow secrets): AES-256-GCM, see shared/secrets.ts ---
   /** 32 random bytes, base64. Generate with: openssl rand -base64 32 */
   SECRETS_ENCRYPTION_KEY: z.string().optional(),

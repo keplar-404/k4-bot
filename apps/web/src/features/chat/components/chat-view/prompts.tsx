@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import PromptBar from "@/features/chat/components/prompt-bar";
+import type { Source } from "@/features/chat/components/prompt-bar/data";
 import type { useAttachments } from "@/features/chat/hooks/use-attachments";
 import type { FileRef } from "@/features/chat/lib/protocol";
 import type { ChatUsage, Prompt } from "@/features/chat/lib/stream/types";
@@ -30,7 +31,10 @@ export function Prompts({
   mode,
   onModeChange,
   usage,
+  mentionExtras,
 }: {
+  /** Extra "@" entries (a group's bots). */
+  mentionExtras?: Source[];
   run: string;
   approval: {
     runId: string;
@@ -91,6 +95,7 @@ export function Prompts({
         onSelect={chooseModel}
         mode={mode}
         onModeChange={onModeChange}
+        mentionExtras={mentionExtras}
       />
       <UsageMeter
         usage={usage}
@@ -98,6 +103,7 @@ export function Prompts({
           catalog.find((m) => m.key === modelId)?.contextLength ??
           catalog[0]?.contextLength
         }
+        free={catalog.find((m) => m.key === modelId)?.free ?? false}
       />
     </div>
   );

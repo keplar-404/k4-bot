@@ -34,6 +34,7 @@ export function accountTools(options: AccountOptions, botId: string) {
     ...apps?.approvals,
     turn_on_workflow: askFirst("Turn on this workflow?"),
     run_workflow: askFirst("Run this workflow now?"),
+    delete_workflow: askFirst("Delete this workflow?"),
     schedule_task: askFirst("Schedule this task?"),
     change_scheduled_task: askFirst("Change this scheduled task?"),
   };

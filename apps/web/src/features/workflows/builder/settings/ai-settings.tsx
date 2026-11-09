@@ -8,8 +8,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
 import type { BlockBody } from "../blocks";
+import { TemplateInput } from "../template/template-input";
 import { AiAppsNote } from "./ai-apps-note";
 import { AiKnowledge } from "./ai-knowledge";
 import { BotPicker } from "./bot-picker";
@@ -44,13 +44,14 @@ export function AiSettings({
           id="ai-prompt"
           label="What should it do"
           required
-          hint="Paste data from earlier steps, e.g. “Write a short, friendly reply to {{trigger.data.message_text}}”. Data from apps is marked as data, so text inside an email cannot give the bot orders."
+          hint="Add data from earlier steps with + (or drag it from the Data tab), e.g. “Write a short, friendly reply to [the message]”. Data from apps is marked as data, so text inside an email cannot give the bot orders."
         >
-          <Textarea
+          <TemplateInput
             id="ai-prompt"
-            rows={6}
+            multiline
+            className="min-h-32"
             value={block.config.prompt}
-            onChange={(e) => set({ prompt: e.target.value })}
+            onChange={(prompt) => set({ prompt })}
           />
         </Field>
         <Field
@@ -67,7 +68,9 @@ export function AiSettings({
             onValueChange={(v) => set({ output: v as "text" | "json" })}
           >
             <SelectTrigger id="ai-output" className="w-full">
-              <SelectValue />
+              <SelectValue>
+                {block.config.output === "json" ? "JSON fields" : "Text"}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="text">Text</SelectItem>

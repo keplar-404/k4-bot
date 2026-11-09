@@ -29,6 +29,13 @@ export const GLYPHS: Record<string, ReactNode> = {
     <path d="m21.4 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" />
   ),
   chart: <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />,
+  bot: (
+    <g>
+      <path d="M12 8V4H8" />
+      <rect width="16" height="12" x="4" y="8" rx="2" />
+      <path d="M2 14h2M20 14h2M15 13v2M9 13v2" />
+    </g>
+  ),
   layers: (
     <g>
       <path d="M12 2 2 7l10 5 10-5-10-5z" />

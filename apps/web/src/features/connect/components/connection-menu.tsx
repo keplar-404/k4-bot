@@ -2,6 +2,7 @@
 
 import {
   Loader2Icon,
+  MonitorIcon,
   MoreHorizontalIcon,
   PlusIcon,
   UnplugIcon,
@@ -16,7 +17,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useState } from "react";
 import type { Connection } from "../api";
+import { BotLoginDialog } from "./bot-login-dialog";
 
 /** The "…" menu of a connected app: add another account, or disconnect one of them. */
 export function ConnectionMenu({
@@ -32,7 +35,10 @@ export function ConnectionMenu({
   onConnect: () => void;
   onDisconnect: (c: Connection) => void;
 }) {
+  const [loginOpen, setLoginOpen] = useState(false);
+  const hasActive = connections.some((c) => c.status === "ACTIVE");
   return (
+    <>
     <DropdownMenu>
       <DropdownMenuTrigger
         render={
@@ -58,6 +64,12 @@ export function ConnectionMenu({
             <PlusIcon />
             Connect another account
           </DropdownMenuItem>
+          {hasActive && (
+            <DropdownMenuItem onClick={() => setLoginOpen(true)}>
+              <MonitorIcon />
+              Log in on a bot&apos;s computer…
+            </DropdownMenuItem>
+          )}
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         {connections.map((c) => (
@@ -74,5 +86,7 @@ export function ConnectionMenu({
         ))}
       </DropdownMenuContent>
     </DropdownMenu>
+    <BotLoginDialog appName={appName} connections={connections} open={loginOpen} onOpenChange={setLoginOpen} />
+    </>
   );
 }

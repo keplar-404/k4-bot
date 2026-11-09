@@ -1,12 +1,16 @@
 import { z } from "zod";
 import { MODES } from "./modes";
 
-export const createThreadSchema = z.object({
-  botId: z.string().min(1),
-  title: z.string().max(200).optional(),
-  /** The permission mode picked before the first message; omitted = ask. */
-  mode: z.enum(MODES).optional(),
-});
+export const createThreadSchema = z
+  .object({
+    botId: z.string().min(1).optional(),
+    /** A group chat: the thread belongs to the group and its lead bot. */
+    groupId: z.uuid().optional(),
+    title: z.string().max(200).optional(),
+    /** The permission mode picked before the first message; omitted = ask. */
+    mode: z.enum(MODES).optional(),
+  })
+  .refine((v) => v.botId || v.groupId, { message: "botId or groupId is required" });
 
 export const sendMessageSchema = z
   .object({

@@ -4,6 +4,7 @@ import { useCallback } from "react";
 import {
   BotApiError,
   type CreateBotInput,
+  createAdminBot as createAdminBotApi,
   createBot as createBotApi,
   deleteBot as deleteBotApi,
   updateBot as updateBotApi,
@@ -53,6 +54,15 @@ export function useBots() {
     [mutate, setBots],
   );
 
+  /** The user's admin bot (the server keeps one; a second call returns it). */
+  const addAdminBot = useCallback(
+    () =>
+      mutate(createAdminBotApi, (admin) =>
+        setBots((current) => [admin, ...current.filter((b) => b.id !== admin.id)]),
+      ),
+    [mutate, setBots],
+  );
+
   const deleteBot = useCallback(
     async (id: string) => {
       await mutate(
@@ -83,5 +93,6 @@ export function useBots() {
     createBot,
     updateBot,
     deleteBot,
+    addAdminBot,
   };
 }

@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import type { Env } from "../../config/env";
 import { composioEvent } from "../../db/schema";
 import { getRequestContext } from "../../shared/context";
+import { computerFor } from "../computer/sandbox-backend";
 import { pauseForExpiredAccount } from "./auto-pause";
 import { startListeningWorkflows } from "./event-runs";
 import { verifyEvent } from "./verify-event";
@@ -34,7 +35,10 @@ const composioEvents = new Hono<{ Bindings: Env }>().post("/", async (c) => {
   if (!fresh) return c.json({ ok: true, duplicate: true });
 
   try {
-    if (expired) return c.json({ ok: true, paused: await pauseForExpiredAccount(env, db, expired) });
+    if (expired) {
+      await computerFor(env, expired.userId).forgetAppAccount(expired.accountId).catch((e) => console.error("[composio-events] forget logins", e));
+      return c.json({ ok: true, paused: await pauseForExpiredAccount(env, db, expired) });
+    }
     const started = await startListeningWorkflows(env, db, event!, eventId);
     return c.json({ ok: true, started });
   } catch (error) {

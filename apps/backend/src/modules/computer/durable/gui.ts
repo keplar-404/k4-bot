@@ -1,7 +1,7 @@
 import type { Sandbox } from "@e2b/desktop";
 import { botHome, checkKeys, checkTypedText, checkUrl, shellQuote } from "../guards";
 import type { ComputerAction } from "../types";
-import { runAs } from "./accounts";
+import { appProfileDir, runAs } from "./accounts";
 import { sleep } from "./constants";
 
 const q = (n: number) => String(Math.round(n));
@@ -58,18 +58,24 @@ export async function doAction(sbx: Sandbox, user: string, action: ComputerActio
     case "open_url": {
       const checked = checkUrl(action.url, allowedHosts);
       if (!checked.ok) return { ok: false, text: checked.reason };
-      await openInBrowser(sbx, user, checked.value);
-      return { ok: true, text: `Opened ${checked.value} in your browser window.` };
+      await openInBrowser(sbx, user, checked.value, action.app);
+      return { ok: true, text: `Opened ${checked.value} in your ${action.app ? `${action.app.toolkit} login` : "browser"} window.` };
     }
   }
 }
 
-/** Own profile + own window class per bot: cookies and windows are never shared between bots. */
-async function openInBrowser(sbx: Sandbox, user: string, url: string) {
+/**
+ * Own profile + own window class per bot: cookies and windows are never shared between bots. With `app`, a separate
+ * profile per connected app account, so each login stays apart and is deleted when that account is disconnected.
+ */
+async function openInBrowser(sbx: Sandbox, user: string, url: string, app?: { toolkit: string; accountId: string }) {
+  const dir = app ? appProfileDir(user, app.toolkit, app.accountId) : `${botHome(user)}/.chrome`;
+  // 700 from .k4 down: other bots may read this home, never its logins.
+  if (app) await runAs(sbx, user, `mkdir -p ${shellQuote(dir)} && chmod 700 ${shellQuote(`${botHome(user)}/.k4`)} ${shellQuote(dir)}`, 15_000);
   await runAs(
     sbx,
     user,
-    `nohup google-chrome --class=${shellQuote(`k4_${user}`)} --user-data-dir=${shellQuote(`${botHome(user)}/.chrome`)} ` +
+    `nohup google-chrome --class=${shellQuote(`k4_${user}`)} --user-data-dir=${shellQuote(dir)} ` +
       `--no-first-run --no-default-browser-check --start-maximized --new-window ${shellQuote(url)} >/dev/null 2>&1 &`,
     15_000,
     true,

@@ -1,6 +1,6 @@
 import { and, count, eq, sql } from "drizzle-orm";
 import type { Db } from "../../db";
-import { bot, botSandbox } from "../../db/schema";
+import { bot, botSandbox, sandboxUsage } from "../../db/schema";
 import { dayOf } from "./policy";
 
 /** Every query is scoped to the owner: a bot id alone never reaches another user's sandbox. */
@@ -33,12 +33,15 @@ export const countForUser = (db: Db, userId: string) =>
   db.select({ n: count() }).from(botSandbox).where(eq(botSandbox.userId, userId)).then((r) => Number(r[0]?.n ?? 0));
 
 /** Seconds the user's sandboxes ran today (UTC). */
-export const secondsToday = (db: Db, userId: string) =>
-  db
-    .select({ s: sql<number>`coalesce(sum(${botSandbox.usageSeconds}), 0)` })
-    .from(botSandbox)
-    .where(and(eq(botSandbox.userId, userId), eq(botSandbox.usageDay, dayOf(Date.now()))))
-    .then((r) => Number(r[0]?.s ?? 0));
+/** Sandbox seconds used today: the bots' sandboxes plus workflow Code blocks (one daily budget). */
+export async function secondsToday(db: Db, userId: string) {
+  const day = dayOf(Date.now());
+  const [[bots], [code]] = await Promise.all([
+    db.select({ s: sql<number>`coalesce(sum(${botSandbox.usageSeconds}), 0)` }).from(botSandbox).where(and(eq(botSandbox.userId, userId), eq(botSandbox.usageDay, day))),
+    db.select({ s: sql<number>`coalesce(sum(${sandboxUsage.seconds}), 0)` }).from(sandboxUsage).where(and(eq(sandboxUsage.userId, userId), eq(sandboxUsage.day, day))),
+  ]);
+  return Number(bots?.s ?? 0) + Number(code?.s ?? 0);
+}
 
 export const create = (db: Db, row: { botId: string; userId: string; sandboxId: string; purpose: string; template: string }) =>
   db.insert(botSandbox).values({ ...row, status: "running" });

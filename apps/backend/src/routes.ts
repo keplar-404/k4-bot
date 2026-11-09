@@ -14,6 +14,7 @@ import models from "./modules/agent/routes";
 import memory from "./modules/memory/routes";
 import secrets from "./modules/secrets/routes";
 import tasks from "./modules/tasks/routes";
+import groups from "./modules/groups/routes";
 import hooks from "./modules/workflows/routes/hooks";
 
 import type { Env } from "./config/env";
@@ -37,6 +38,7 @@ const routes = new Hono<{ Bindings: Env }>()
   .route("/memory", memory)
   .route("/secrets", secrets)
   .route("/tasks", tasks)
+  .route("/groups", groups)
   .route("/hooks", hooks);
 
 export default routes;

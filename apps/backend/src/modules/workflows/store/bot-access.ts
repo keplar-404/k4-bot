@@ -6,8 +6,20 @@ export const MAX_BOT_CREATIONS_PER_DAY = 10;
 const MAX_BOTS_PER_WORKFLOW = 20;
 const MAX_LISTED = 50;
 
-/** The user's workflows this bot may see and run: shared with it, or made by it. */
+/** The user's admin bot manages every workflow of that user (never another user's). */
+async function isAdminBot(db: Db, userId: string, botId: string) {
+  const [row] = await db.select({ kind: bot.kind }).from(bot).where(and(eq(bot.id, botId), eq(bot.userId, userId))).limit(1);
+  return row?.kind === "admin";
+}
+
+async function anyWorkflowOfUser(db: Db, userId: string, workflowId: string) {
+  const [row] = await db.select().from(workflow).where(and(eq(workflow.id, workflowId), eq(workflow.userId, userId))).limit(1);
+  return row ?? null;
+}
+
+/** The user's workflows this bot may see and run: shared with it, or made by it (the admin bot: all of them). */
 export async function workflowsOfBot(db: Db, userId: string, botId: string) {
+  if (await isAdminBot(db, userId, botId)) return db.select().from(workflow).where(eq(workflow.userId, userId)).limit(MAX_LISTED);
   const rows = await db
     .select({ workflow })
     .from(botWorkflow)
@@ -19,11 +31,34 @@ export async function workflowsOfBot(db: Db, userId: string, botId: string) {
 
 /** One workflow, only if it is the user's and this bot may use it. */
 export async function workflowOfBot(db: Db, userId: string, botId: string, workflowId: string) {
+  if (await isAdminBot(db, userId, botId)) return anyWorkflowOfUser(db, userId, workflowId);
   const [row] = await db
     .select({ workflow })
     .from(botWorkflow)
     .innerJoin(workflow, eq(workflow.id, botWorkflow.workflowId))
     .where(and(eq(botWorkflow.botId, botId), eq(botWorkflow.workflowId, workflowId), eq(workflow.userId, userId)))
+    .limit(1);
+  return row?.workflow ?? null;
+}
+
+/**
+ * One workflow, only if this bot made it. Shared workflows can be read and run, never changed, turned on or off, or
+ * deleted by a bot: those are the user's (or the creating bot's) to manage.
+ */
+export async function ownWorkflowOfBot(db: Db, userId: string, botId: string, workflowId: string) {
+  if (await isAdminBot(db, userId, botId)) return anyWorkflowOfUser(db, userId, workflowId);
+  const [row] = await db
+    .select({ workflow })
+    .from(botWorkflow)
+    .innerJoin(workflow, eq(workflow.id, botWorkflow.workflowId))
+    .where(
+      and(
+        eq(botWorkflow.botId, botId),
+        eq(botWorkflow.workflowId, workflowId),
+        eq(botWorkflow.createdByBot, true),
+        eq(workflow.userId, userId),
+      ),
+    )
     .limit(1);
   return row?.workflow ?? null;
 }
