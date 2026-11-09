@@ -26,6 +26,13 @@ export class ComputerPanel extends ComputerBots {
     try {
       // After a Durable Object eviction the VM is still running: reconnecting to it costs nothing.
       const sbx = this.sbx ?? (await this.live());
+      // E2B pauses a VM on its own (its timeout ran out while this object thought it was running): say it is asleep,
+      // so the panel shows its wake button instead of trying to connect to a screen that is not there.
+      if (!(await sbx.isRunning({ requestTimeoutMs: 5000 }).catch(() => false))) {
+        this.sbx = undefined;
+        await this.setState("paused", "Your computer went to sleep. Wake it to see the screen.");
+        return { error: "asleep" };
+      }
       await this.ensureVnc(sbx);
       return { host: sbx.getHost((mode === "watch" ? VIEW : CONTROL).web), token: sbx.trafficAccessToken ?? "" };
     } catch (error) {

@@ -33,6 +33,8 @@ export function useChatEffects(
       toast.dismiss("connection");
     }
   }, [connection]);
+  // The toast never times out: leaving the chat must take it away, or it follows the user to every other page.
+  useEffect(() => () => void toast.dismiss("connection"), []);
 
   useEffect(() => {
     if (!error) return;

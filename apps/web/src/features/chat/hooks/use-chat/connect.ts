@@ -73,7 +73,8 @@ export async function connectImpl(
     const info = ctx.toInfo(e);
     ctx.setError(info);
     if (ctx.FATAL.has(info.kind)) {
-      ctx.setConnection("offline");
+      // Signed out, no access, or the chat is gone: not a network problem. The error toast says what happened.
+      ctx.setConnection("idle");
       return;
     }
     ctx.setConnection(info.kind === "network" ? "offline" : "reconnecting");

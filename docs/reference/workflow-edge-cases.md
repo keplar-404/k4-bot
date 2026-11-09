@@ -1,4 +1,4 @@
-# 10 — Edge cases: what happens, and how it is handled
+# Workflow edge cases: what happens, and how it is handled
 
 Status (2026-11-08): **Handled** = in the code; **Tested** = covered by a check script or the end-to-end runs; **Open** =
 known gap, with the reason.
@@ -52,7 +52,7 @@ block says what it reads (`{{trigger.data.record.email}}`, `{{steps.supabase_x.o
 | Starting the runs fails (database down) | The event id is forgotten and 500 returned, so Composio retries | Handled |
 | A cap is reached | 200 returned (no pointless retries); the run is not started and the log says why | Handled |
 | The app account is disconnected or its token expires | `composio.connected_account.expired` (signed like every event) turns off each workflow that uses that app and account; the builder and the list say why | Handled, Tested |
-| Local development | Composio cannot reach localhost: `composio dev triggers listen --forward http://127.0.0.1:8787/api/v1/composio/events` | Documented |
+| Local development | Composio cannot reach localhost: expose the API with a tunnel and point the subscription at it (see the troubleshooting guide) | Documented |
 
 ## 4. Actions
 
