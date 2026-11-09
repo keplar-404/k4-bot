@@ -29,3 +29,9 @@ export function useModeState() {
 }
 
 export type ModeState = ReturnType<typeof useModeState>;
+
+/** Mode picker fields that travel with the other handlers (`merged` in index.tsx). */
+export type ModeHandlers = ModeState & {
+  mode?: "allow_all" | "plan" | "ask";
+  onModeChange?: (mode: "allow_all" | "plan" | "ask") => void;
+};

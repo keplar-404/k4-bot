@@ -38,9 +38,12 @@ export function SchemaFieldText({
       <Control
         id={id}
         value={value === undefined ? "" : String(value)}
+        // The grey text is what the field does when left empty, so it shows the default; an example only fills in
+        // when there is none (an example such as "10" next to a default of 1 would promise a value that is not used).
         placeholder={
-          example(schema) ??
-          (schema.default !== undefined ? String(schema.default) : undefined)
+          schema.default !== undefined && schema.default !== ""
+            ? String(schema.default)
+            : example(schema)
         }
         onChange={(e) =>
           onChange(e.target.value === "" ? undefined : e.target.value)

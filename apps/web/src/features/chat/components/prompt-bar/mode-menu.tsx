@@ -1,5 +1,5 @@
 import { Icon } from "./icons";
-import type { ModeState } from "./mode-state";
+import type { ModeHandlers } from "./mode-state";
 import type { PromptHandlers } from "./prompt-handlers";
 import type { PromptHandlers2 } from "./prompt-handlers2";
 import type { PromptState } from "./prompt-state";
@@ -9,7 +9,7 @@ export function ModeMenu({
   h,
 }: {
   state: PromptState;
-  modeState: ModeState;
+  modeState: ModeHandlers;
   h: PromptHandlers & PromptHandlers2;
 }) {
   if (!modeState.modeOpen) return null;
@@ -25,7 +25,7 @@ export function ModeMenu({
     // biome-ignore lint/a11y/noStaticElementInteractions: menu container clears the gliding highlight
     <div
       onMouseLeave={() => modeState.setModeHovered(null)}
-      className="absolute z-10 w-44 rounded-[10px] bg-surface p-1 shadow-raised"
+      className="absolute z-10 w-64 rounded-[10px] bg-surface p-1 shadow-raised"
       style={{
         left: modeState.modeMenuLeft,
         bottom: modeState.modeMenuBottom,
@@ -55,17 +55,21 @@ export function ModeMenu({
           onMouseEnter={() => modeState.setModeHovered(i)}
           onClick={() => {
             modeState.setModeOpen(false);
-            (h as any).onModeChange?.(m);
+            modeState.onModeChange?.(m);
             state.inputRef.current?.focus();
           }}
-          className="relative z-10 flex h-7.5 w-full items-center gap-2 rounded-[6px] px-2 text-left"
+          className="relative z-10 flex w-full items-start gap-2 rounded-[6px] px-2 py-1.5 text-left whitespace-normal"
         >
-          <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-ink">
-            {labels[m]}
+          <span className="min-w-0 flex-1">
+            <span className="block text-[12.5px] font-medium text-ink">
+              {labels[m]}
+            </span>
+            <span className="block text-[11px] leading-snug text-ink-3 break-words">
+              {descs[m]}
+            </span>
           </span>
-          <span className="shrink-0 text-[10.5px] text-ink-3">{descs[m]}</span>
           <span
-            className={`shrink-0 text-ink ${m === (h as any).mode ? "" : "invisible"}`}
+            className={`mt-0.5 shrink-0 text-ink ${m === modeState.mode ? "" : "invisible"}`}
           >
             <Icon size={13} strokeWidth={2.5}>
               <path d="M20 6L9 17l-5-5" />

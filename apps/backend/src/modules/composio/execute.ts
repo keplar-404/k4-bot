@@ -64,6 +64,8 @@ export async function executeAction(env: Env, args: ActionArgs): Promise<ActionR
     });
     if (!res.successful) {
       const error = res.error ?? "The action failed.";
+      // The log id finds this call in Composio's dashboard logs; it never goes to the model or the user.
+      console.warn("[composio] action failed", args.slug, res.logId);
       return failed(error.slice(0, 500), FATAL_ERROR_TEXT.test(error));
     }
     return { ok: true, data: clip(res.data, args.maxChars) };

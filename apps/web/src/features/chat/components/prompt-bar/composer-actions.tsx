@@ -1,8 +1,16 @@
 import { Icon } from "./icons";
+import type { ModeHandlers } from "./mode-state";
 import type { PromptHandlers } from "./prompt-handlers";
 import type { PromptHandlers2 } from "./prompt-handlers2";
 import type { PromptState } from "./prompt-state";
 import type { PromptBarProps } from "./types";
+
+const MODE_LABEL = {
+  allow_all: "Allow all",
+  plan: "Plan",
+  ask: "Ask",
+} as const;
+
 export function ComposerActions({
   state,
   props,
@@ -10,7 +18,7 @@ export function ComposerActions({
 }: {
   state: PromptState;
   props: PromptBarProps;
-  h: PromptHandlers & PromptHandlers2;
+  h: PromptHandlers & PromptHandlers2 & ModeHandlers;
 }) {
   return (
     <>
@@ -20,6 +28,7 @@ export function ComposerActions({
         aria-expanded={state.plusOpen}
         onClick={() => {
           state.setModelOpen(false);
+          h.setModeOpen(false);
           state.setPlusOpen((c: boolean) => !c);
           state.inputRef.current?.focus();
         }}
@@ -33,19 +42,19 @@ export function ComposerActions({
         className={`flex items-center gap-0.5 ${state.wide ? "col-start-2 row-start-2 justify-self-start" : "col-start-3 row-start-1"}`}
       >
         <button
-          ref={(state as any).modeRef}
+          ref={h.modeRef}
           type="button"
-          aria-expanded={(state as any).modeOpen}
+          aria-expanded={h.modeOpen}
           aria-label="Permission mode"
           onClick={() => {
             state.setPlusOpen(false);
             state.setModelOpen(false);
             state.setEffortOpen(false);
-            (state as any).setModeOpen((c: boolean) => !c);
+            h.setModeOpen((c: boolean) => !c);
           }}
-          className={`flex h-7 shrink-0 items-center gap-1 px-1.5 text-[12px] font-medium transition-colors duration-150 rounded-[8px] ${(state as any).modeOpen ? "bg-hover text-ink" : "text-ink-3 hover:bg-hover hover:text-ink"}`}
+          className={`flex h-7 shrink-0 items-center gap-1 px-1.5 text-[12px] font-medium transition-colors duration-150 rounded-[8px] ${h.modeOpen ? "bg-hover text-ink" : "text-ink-3 hover:bg-hover hover:text-ink"}`}
         >
-          {(h as any).mode ?? "ask"}
+          {MODE_LABEL[h.mode ?? "ask"]}
         </button>
         {h.efforts.length > 0 && (
           <button
@@ -56,6 +65,7 @@ export function ComposerActions({
             onClick={() => {
               state.setPlusOpen(false);
               state.setModelOpen(false);
+              h.setModeOpen(false);
               state.setEffortOpen((c: boolean) => !c);
             }}
             className={`flex h-7 shrink-0 items-center px-1.5 text-[11px] font-medium uppercase tracking-wide transition-colors duration-150 rounded-[8px] ${state.effortOpen ? "bg-hover text-ink" : "text-ink-3 hover:bg-hover hover:text-ink"}`}
@@ -72,6 +82,7 @@ export function ComposerActions({
           onClick={() => {
             state.setPlusOpen(false);
             state.setEffortOpen(false);
+            h.setModeOpen(false);
             state.setModelOpen((c: boolean) => !c);
           }}
           className="flex h-7 shrink-0 items-center gap-1 px-1.5 text-[12px] font-medium text-ink-2 transition-colors duration-150 hover:bg-hover hover:text-ink rounded-[8px]"

@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { ComposerShell } from "./composer-shell";
 import { EffortMenu } from "./effort-menu";
 import { Icon } from "./icons";
+import { useModeEffects } from "./mode-effects";
 import { ModeMenu } from "./mode-menu";
 import { useModeState } from "./mode-state";
 import { ModelMenu } from "./model-menu";
@@ -67,6 +68,7 @@ export default function PromptBar({
   const merged = { ...h, ...h2, ...modeState, mode, onModeChange };
   usePromptEffects(state, merged);
   usePromptEffects2(state, merged);
+  useModeEffects(state, merged);
   const takeFiles = merged.takeFiles;
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: drop target for files; the + menu and paste do the same by keyboard
@@ -106,7 +108,7 @@ export default function PromptBar({
         <PlusMenu state={state} h={merged} props={props} />
         <ModelMenu state={state} h={merged} />
         <EffortMenu state={state} h={merged} />
-        <ModeMenu state={state} modeState={modeState} h={merged} />
+        <ModeMenu state={state} modeState={merged} h={merged} />
         <ComposerShell state={state} props={props} h={merged} />
       </div>
     </div>

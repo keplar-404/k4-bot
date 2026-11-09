@@ -55,6 +55,8 @@ export function listTools(composio: Composio, toolkit: string): Promise<ToolSumm
     const res = (await composio.tools.getRawComposioTools({
       toolkits: [toolkit],
       limit: 1000,
+      // Without this the SDK returns only Composio's curated "important" subset, so less common actions would be missing.
+      important: false,
     })) as unknown as RawTool[] | { items: RawTool[] };
     const items = Array.isArray(res) ? res : res.items;
     return items.map(summary).sort((a, b) => a.name.localeCompare(b.name));

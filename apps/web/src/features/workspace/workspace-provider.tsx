@@ -31,7 +31,12 @@ export function WorkspaceProvider({
 }) {
   const [state, setState] = useState(INITIAL);
   const [editorOpen, setEditorOpen] = useState(false);
-  const [sidebarOpen, setSidebarOpenState] = useState<boolean>(() => readSidebarOpen());
+  // Start from a server-safe default so SSR and the first client render agree;
+  // the saved choice is read after mount to avoid a hydration mismatch.
+  const [sidebarOpen, setSidebarOpenState] = useState<boolean>(true);
+  useEffect(() => {
+    setSidebarOpenState(readSidebarOpen());
+  }, []);
 
   /** Every open/close of the right side bar is kept in this browser, so a reload starts it the same way. */
   const setSidebarOpen = useCallback((open: boolean) => {

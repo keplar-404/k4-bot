@@ -54,7 +54,7 @@ export function ActionPicker({
           aria-label="Search actions"
         />
       </InputGroup>
-      <div className="flex max-h-72 flex-col overflow-y-auto rounded-lg border">
+      <div className="flex max-h-96 flex-col overflow-y-auto rounded-lg border pt-2">
         {tools === null
           ? [0, 1, 2, 3].map((i) => <Skeleton key={i} className="m-2 h-9" />)
           : shown.map((t) => (

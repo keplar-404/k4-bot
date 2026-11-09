@@ -1,3 +1,4 @@
+import type { ModeHandlers } from "./mode-state";
 import type { PromptHandlers } from "./prompt-handlers";
 import type { PromptHandlers2 } from "./prompt-handlers2";
 import type { PromptState } from "./prompt-state";
@@ -9,7 +10,7 @@ export function ComposerTextarea({
 }: {
   state: PromptState;
   props: PromptBarProps;
-  h: PromptHandlers & PromptHandlers2;
+  h: PromptHandlers & PromptHandlers2 & ModeHandlers;
 }) {
   return (
     <textarea
