@@ -53,7 +53,7 @@ export function TemplateInput({
         "aria-multiline": String(multiline),
         class: cn(
           "min-w-0 flex-1 px-3 py-1.5 outline-none",
-          multiline ? "min-h-20" : "whitespace-nowrap overflow-x-auto",
+          multiline ? "min-h-20" : "min-h-9 leading-6",
         ),
       },
       // A one-line field never gets a second line.
@@ -100,11 +100,14 @@ export function TemplateInput({
     <div
       className={cn(
         "flex w-full min-w-0 items-start rounded-md border border-input bg-transparent text-sm shadow-xs transition-[color,box-shadow] focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50 dark:bg-input/30",
-        multiline ? "min-h-20" : "h-9 items-center",
+        multiline ? "min-h-20" : "min-h-9",
         className,
       )}
     >
-      <EditorContent editor={editor} className="flex min-w-0 flex-1" />
+      <EditorContent
+        editor={editor}
+        className="flex min-w-0 flex-1 [&_.ProseMirror]:break-words"
+      />
       <DataPickerButton
         onPick={(path) =>
           editor

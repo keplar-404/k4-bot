@@ -1,9 +1,9 @@
 "use client";
 
 import { Maximize2Icon } from "lucide-react";
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { type FileRef, fileUrl, formatBytes } from "@/features/files/api";
+import { fieldSetter, useLocalStore } from "@/lib/store/local-store";
 import { DownloadButton } from "./download-button";
 import { ImageLightbox } from "./image-lightbox";
 
@@ -20,7 +20,10 @@ export function ImagePreview({
   compact: boolean;
   onBroken: () => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [{ open }, , store] = useLocalStore(() => ({
+    open: false,
+  }));
+  const setOpen = fieldSetter(store, "open");
   return (
     <figure
       className={`group/file relative overflow-hidden rounded-xl border bg-muted/40 ${compact ? "w-40" : "w-full max-w-sm"}`}

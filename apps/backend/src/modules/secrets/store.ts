@@ -1,7 +1,7 @@
 import { and, count, eq, sql } from "drizzle-orm";
 import type { Db } from "../../db";
 import type { Env } from "../../config/env";
-import { userSecret, workflow } from "../../db/schema";
+import { composioToolkit, userSecret, workflow } from "../../db/schema";
 import { encryptSecret, secretHint } from "../../shared/secrets";
 
 export const SECRET_NAME = /^[A-Z][A-Z0-9_]{1,40}$/;
@@ -16,16 +16,20 @@ export const secretContext = (userId: string, recordId: string) => ({
 
 const byName = (userId: string, name: string) => and(eq(userSecret.userId, userId), eq(userSecret.name, name));
 
-/** Names, labels and hints only: a value never leaves the server once saved. */
+/** Names, labels and hints only: a value never leaves the server once saved. With the app's name and logo (the catalog). */
 export function listSecrets(db: Db, userId: string) {
   return db
     .select({
       name: userSecret.name,
       label: userSecret.label,
+      app: userSecret.app,
+      appName: composioToolkit.name,
+      appLogo: composioToolkit.logo,
       hint: userSecret.hint,
       updatedAt: userSecret.updatedAt,
     })
     .from(userSecret)
+    .leftJoin(composioToolkit, eq(composioToolkit.slug, userSecret.app))
     .where(eq(userSecret.userId, userId))
     .orderBy(userSecret.name);
 }
@@ -40,7 +44,7 @@ export async function saveSecret(
   env: Env,
   db: Db,
   userId: string,
-  secret: { name: string; label: string; value: string },
+  secret: { name: string; label: string; value: string; app?: string | null },
 ): Promise<"created" | "updated" | "limit"> {
   const [existing] = await db
     .select({ id: userSecret.id })
@@ -55,7 +59,7 @@ export async function saveSecret(
 
   const id = existing?.id ?? crypto.randomUUID();
   const value = await encryptSecret(env, secret.value, secretContext(userId, id));
-  const fields = { label: secret.label, value, hint: secretHint(secret.value) };
+  const fields = { label: secret.label, app: secret.app ?? null, value, hint: secretHint(secret.value) };
   if (existing) {
     await db
       .update(userSecret)

@@ -42,23 +42,39 @@ export async function writeDirectory(sbx: Sandbox, tables: ComputerTables) {
   await sbx.files.write("/home/BOTS.md", text, { user: "root" });
 }
 
-/** Removes the accounts of deleted bots. Returns how many were purged. */
+/**
+ * Removes the accounts of deleted bots, and checks they are really gone: no Linux user and no home folder left.
+ * A bot whose account is still there stays pending (tried again on the next purge). Returns how many were removed.
+ */
 export async function purgeAccounts(sbx: Sandbox, tables: ComputerTables, botUsers: Set<string>): Promise<number> {
-  const pending = tables.pendingPurges();
-  for (const { bot_id } of pending) {
+  let removed = 0;
+  for (const { bot_id } of tables.pendingPurges()) {
     const user = botUnixUser(bot_id);
-    if (user.ok) {
-      // Stop everything it runs (its browser too), delete what it left in the shared temp folders (by owner,
-      // so nobody else's files), then the account with its home (files, browser profile and all).
-      await sbx.commands.run(
-        `pkill -KILL -u ${user.value}; find /tmp /var/tmp /dev/shm -xdev -user ${user.value} -delete 2>/dev/null; userdel -r -f ${user.value} 2>/dev/null; true`,
-        { user: "root", timeoutMs: 120_000 },
-      );
-      botUsers.delete(user.value);
+    if (!user.ok) {
+      tables.markPurged(bot_id);
+      continue;
     }
-    tables.markPurged(bot_id);
+    const u = user.value;
+    const home = botHome(u);
+    // Stop everything it runs (its browser too), delete what it left in the shared temp folders (by owner,
+    // so nobody else's files), then the account with its home (files, browser profile and all). `u` is u_<hex>.
+    const r = await sbx.commands
+      .run(
+        `pkill -KILL -u ${u}; sleep 1; find /tmp /var/tmp /dev/shm -xdev -user ${u} -delete 2>/dev/null; ` +
+          `userdel -r -f ${u} 2>/dev/null; rm -rf -- ${home}; ` +
+          `if id -u ${u} >/dev/null 2>&1 || [ -e ${home} ]; then echo LEFT; else echo GONE; fi`,
+        { user: "root", timeoutMs: 120_000 },
+      )
+      .catch((e: unknown) => ({ stdout: `ERROR ${String(e)}` }));
+    if (r.stdout.trim().endsWith("GONE")) {
+      botUsers.delete(u);
+      tables.markPurged(bot_id);
+      removed++;
+    } else {
+      console.error("[computer] account not removed, will retry", u, r.stdout.slice(0, 200));
+    }
   }
-  return pending.length;
+  return removed;
 }
 
 /** Composio ids are like "ca_AbC123": nothing else may reach the shell or a path. */

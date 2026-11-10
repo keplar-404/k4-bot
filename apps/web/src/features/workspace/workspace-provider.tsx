@@ -1,27 +1,13 @@
 "use client";
 
-import {
-  type ReactNode,
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { type ReactNode, useEffect, useMemo } from "react";
+import { useShallow } from "zustand/react/shallow";
+import { useWorkspaceStore } from "./store";
 import type { WorkspaceApi, WorkspaceFile } from "./types";
 import { WorkspaceContext } from "./use-workspace";
-import {
-  addTab,
-  closeTab,
-  INITIAL,
-  newStart,
-  pickTool,
-  readSidebarOpen,
-  restoreState,
-  saveSidebarOpen,
-  saveState,
-} from "./workspace-state";
+import { addTab, closeTab, newStart, pickTool } from "./workspace-state";
 
-/** The bot page's side-bar tabs: which are open and which is shown, remembered per bot in this browser. */
+/** The bot page's side-bar tabs from the workspace store: which are open and which is shown, remembered per bot. */
 export function WorkspaceProvider({
   botId,
   children,
@@ -29,31 +15,28 @@ export function WorkspaceProvider({
   botId: string;
   children: ReactNode;
 }) {
-  const [state, setState] = useState(INITIAL);
-  const [editorOpen, setEditorOpen] = useState(false);
-  // Start from a server-safe default so SSR and the first client render agree;
-  // the saved choice is read after mount to avoid a hydration mismatch.
-  const [sidebarOpen, setSidebarOpenState] = useState<boolean>(true);
-  useEffect(() => {
-    setSidebarOpenState(readSidebarOpen());
-  }, []);
-
-  /** Every open/close of the right side bar is kept in this browser, so a reload starts it the same way. */
-  const setSidebarOpen = useCallback((open: boolean) => {
-    setSidebarOpenState(open);
-    saveSidebarOpen(open);
-  }, []);
-
-  useEffect(() => setState(restoreState(botId)), [botId]);
-  useEffect(() => saveState(botId, state), [botId, state]);
+  const s = useWorkspaceStore(
+    useShallow((st) => ({
+      tabs: st.tabs,
+      editorOpen: st.editorOpen,
+      sidebarOpen: st.sidebarOpen,
+      bind: st.bind,
+      setTabs: st.setTabs,
+      setEditorOpen: st.setEditorOpen,
+      setSidebarOpen: st.setSidebarOpen,
+      setSidebarOpenState: st.setSidebarOpenState,
+    })),
+  );
+  const { bind } = s;
+  useEffect(() => bind(botId), [bind, botId]);
 
   const api = useMemo<WorkspaceApi>(
     () => ({
-      ...state,
+      ...s.tabs,
       open: (file: WorkspaceFile) => {
-        setSidebarOpen(true);
-        setState((s) =>
-          addTab(s, {
+        s.setSidebarOpen(true);
+        s.setTabs((t) =>
+          addTab(t, {
             id: file.id,
             kind: "file",
             title: file.name,
@@ -62,26 +45,26 @@ export function WorkspaceProvider({
         );
       },
       openUrl: (url: string) =>
-        setState((s) =>
-          addTab(s, {
+        s.setTabs((t) =>
+          addTab(t, {
             id: `browser-${Date.now()}`,
             kind: "browser",
             title: new URL(url).hostname,
             url,
           }),
         ),
-      close: (id: string) => setState((s) => closeTab(s, id)),
-      newTab: () => setState((s) => newStart(s, `start-${Date.now()}`)),
+      close: (id: string) => s.setTabs((t) => closeTab(t, id)),
+      newTab: () => s.setTabs((t) => newStart(t, `start-${Date.now()}`)),
       pick: (startId, kind) =>
-        setState((s) => pickTool(s, startId, kind, `browser-${Date.now()}`)),
-      setActive: (activeId: string) => setState((s) => ({ ...s, activeId })),
-      sidebarOpen,
-      setSidebarOpen,
-      setSidebarOpenState,
-      editorOpen,
-      setEditorOpen,
+        s.setTabs((t) => pickTool(t, startId, kind, `browser-${Date.now()}`)),
+      setActive: (activeId: string) => s.setTabs((t) => ({ ...t, activeId })),
+      sidebarOpen: s.sidebarOpen,
+      setSidebarOpen: s.setSidebarOpen,
+      setSidebarOpenState: s.setSidebarOpenState,
+      editorOpen: s.editorOpen,
+      setEditorOpen: s.setEditorOpen,
     }),
-    [state, editorOpen, sidebarOpen, setSidebarOpen, setSidebarOpenState],
+    [s],
   );
 
   return (

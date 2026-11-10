@@ -1,11 +1,11 @@
 "use client";
 
 import { PlugIcon, RefreshCwIcon } from "lucide-react";
-import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { authorizeApp } from "@/features/connect/api";
 import { useConnections } from "@/features/connect/use-connections";
+import { fieldSetter, useLocalStore } from "@/lib/store/local-store";
 import { useNoAuth } from "./use-no-auth";
 
 /**
@@ -20,7 +20,10 @@ export function AppConnection({
   appName: string;
 }) {
   const conns = useConnections();
-  const [opening, setOpening] = useState(false);
+  const [{ opening }, , store] = useLocalStore(() => ({
+    opening: false,
+  }));
+  const setOpening = fieldSetter(store, "opening");
   const state = conns.stateOf(toolkit);
   const noAuth = useNoAuth(toolkit);
 

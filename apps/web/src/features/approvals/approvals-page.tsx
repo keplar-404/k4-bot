@@ -2,64 +2,23 @@
 
 import { CheckIcon, ShieldCheckIcon, XIcon } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
-import { toast } from "sonner";
+import { useEffect } from "react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
-import { request } from "@/features/workflows/api";
-
-type Approval = {
-  runId: string;
-  nodeId: string;
-  question: string;
-  since: string;
-  workflowId: string;
-  workflowName: string;
-  trigger: string;
-  botId: string | null;
-};
-
-const answer = (a: Approval, approved: boolean) =>
-  request<{ ok: true }>(`/runs/${a.runId}/steps/${a.nodeId}/answer`, {
-    method: "POST",
-    body: JSON.stringify({ approved, note: "" }),
-  });
+import { useApprovalsStore } from "./store";
 
 /** Every workflow run waiting at an "Ask me first" block, in one place: approve or decline without opening the builder. */
 export function ApprovalsPage() {
-  const [items, setItems] = useState<Approval[] | null>(null);
-  const [busy, setBusy] = useState<string | null>(null);
-  const load = useCallback(
-    () =>
-      request<{ items: Approval[] }>("/approvals").then(
-        (r) => setItems(r.items),
-        (e: Error) => toast.error(e.message),
-      ),
-    [],
-  );
+  const items = useApprovalsStore((s) => s.items);
+  const busy = useApprovalsStore((s) => s.busy);
+  const load = useApprovalsStore((s) => s.load);
+  const decide = useApprovalsStore((s) => s.decide);
   useEffect(() => {
     void load();
     // New approvals appear while the page is open (a scheduled or bot-started run reaches its block).
     const timer = setInterval(() => !document.hidden && void load(), 15_000);
     return () => clearInterval(timer);
   }, [load]);
-
-  const decide = async (a: Approval, approved: boolean) => {
-    setBusy(a.runId + a.nodeId);
-    try {
-      await answer(a, approved);
-      toast.success(
-        approved
-          ? "Approved: the run goes on."
-          : "Declined: the steps after it are skipped.",
-      );
-      await load();
-    } catch (e) {
-      toast.error((e as Error).message);
-    } finally {
-      setBusy(null);
-    }
-  };
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">

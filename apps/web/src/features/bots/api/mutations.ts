@@ -40,13 +40,20 @@ export async function updateBot(
   return data.bot;
 }
 
-export async function deleteBot(id: string): Promise<void> {
+/** What happened to the bot's Linux account on the computer (checked on the VM when it is awake). */
+export type ComputerCleanup = "removed" | "pending" | "failed";
+
+export async function deleteBot(id: string): Promise<ComputerCleanup> {
   const res = await api.api.v1.bots[":id"].$delete(
     { param: { id } },
     { init: { credentials: "include" } },
   );
   await throwIfFailed(res, "Failed to delete bot");
   invalidateBots();
+  const body = (await res.json().catch(() => null)) as {
+    computer?: ComputerCleanup;
+  } | null;
+  return body?.computer ?? "pending";
 }
 
 /** Saves the model (and reasoning level) picked for a bot, so it is still selected after a refresh. */

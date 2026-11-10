@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect } from "react";
 import { toast } from "sonner";
 import { redirectToSignIn } from "@/features/auth/auth-redirect";
 import { BASE } from "@/features/files/api/library";
@@ -10,13 +10,19 @@ import {
   type SandboxRow,
   startSandbox,
 } from "@/features/sandboxes/api";
+import { useSandboxesStore } from "@/features/sandboxes/store";
+import { fieldSetter, useLocalStore } from "@/lib/store/local-store";
 
 type Row = Omit<SandboxRow, "botName">;
 
 /** This bot's sandbox (null when it has none yet) and the actions on it; reloads after each action. */
 export function useBotSandbox(botId: string) {
-  const [row, setRow] = useState<Row | null | undefined>(undefined);
-  const [busy, setBusy] = useState(false);
+  const [{ row, busy }, , store] = useLocalStore(() => ({
+    row: undefined as Row | null | undefined,
+    busy: false,
+  }));
+  const setRow = fieldSetter(store, "row");
+  const setBusy = fieldSetter(store, "busy");
 
   const reload = useCallback(async () => {
     const res = await fetch(`${BASE}/api/v1/sandbox/${botId}`, {
@@ -27,7 +33,7 @@ export function useBotSandbox(botId: string) {
       sandbox?: Row | null;
     } | null;
     setRow(res.ok ? (body?.sandbox ?? null) : null);
-  }, [botId]);
+  }, [botId, setRow]);
 
   useEffect(() => void reload(), [reload]);
 
@@ -38,6 +44,9 @@ export function useBotSandbox(botId: string) {
         await call(botId);
         toast.success(done);
         await reload();
+        // The Sandboxes page (if it was opened) shows the change too.
+        if (useSandboxesStore.getState().data)
+          void useSandboxesStore.getState().reload();
       } catch (e) {
         toast.error((e as Error).message);
       } finally {

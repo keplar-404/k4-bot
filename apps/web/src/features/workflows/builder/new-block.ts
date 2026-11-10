@@ -69,7 +69,14 @@ export function newBlock(
             username: "",
             headerName: "X-API-Key",
           },
-          pagination: { mode: "none", param: "page", start: 1, itemsPath: "", nextPath: "", maxPages: 5 },
+          pagination: {
+            mode: "none",
+            param: "page",
+            start: 1,
+            itemsPath: "",
+            nextPath: "",
+            maxPages: 5,
+          },
           headers: [],
           body: { type: "none", value: "" },
           timeoutSeconds: 15,
@@ -92,7 +99,15 @@ export function newBlock(
       return {
         ...base,
         kind,
-        config: { mode: "for", amount: 5, unit: "minutes", until: "", days: [1], at: "09:00", timezone: "UTC" },
+        config: {
+          mode: "for",
+          amount: 5,
+          unit: "minutes",
+          until: "",
+          days: [1],
+          at: "09:00",
+          timezone: "UTC",
+        },
       };
     case "ai.decide":
       return {
@@ -125,7 +140,10 @@ export function newBlock(
       return {
         ...base,
         kind,
-        config: { fields: [{ key: "value", value: "", type: "text" }], base: "" },
+        config: {
+          fields: [{ key: "value", value: "", type: "text" }],
+          base: "",
+        },
       };
     default:
       return newDataBlock(kind, base);

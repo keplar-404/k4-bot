@@ -85,7 +85,6 @@ export function ConnectionCell({
         appName={appName}
         connections={state.connections}
         busy={busy}
-        onConnect={onConnect}
         onDisconnect={onDisconnect}
       />
     </div>

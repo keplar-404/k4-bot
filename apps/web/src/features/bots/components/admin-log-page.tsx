@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
+import { create } from "zustand";
 import { PageHeader } from "@/components/layout/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { request } from "@/features/chat/lib/client/http";
@@ -34,16 +35,27 @@ function summary(detail: Entry["detail"]) {
   return parts.join(" · ");
 }
 
+/** The admin bot's change log, reloaded each time the page opens. */
+const useAdminLog = create<{
+  items: Entry[] | null;
+  error: string | null;
+  load: () => Promise<void>;
+}>()((set) => ({
+  items: null,
+  error: null,
+  load: () =>
+    request<{ items: Entry[] }>("/api/v1/bots/admin/audit").then(
+      (r) => set({ items: r.items, error: null }),
+      (e: Error) => set({ error: e.message }),
+    ),
+}));
+
 /** Everything the admin bot changed (kept 90 days), so the user can check its work. */
 export function AdminLogPage() {
-  const [items, setItems] = useState<Entry[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  useEffect(() => {
-    request<{ items: Entry[] }>("/api/v1/bots/admin/audit").then(
-      (r) => setItems(r.items),
-      (e: Error) => setError(e.message),
-    );
-  }, []);
+  const items = useAdminLog((s) => s.items);
+  const error = useAdminLog((s) => s.error);
+  const load = useAdminLog((s) => s.load);
+  useEffect(() => void load(), [load]);
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
       <PageHeader title="Admin bot activity" />
@@ -63,7 +75,9 @@ export function AdminLogPage() {
           {items.map((e) => (
             <li key={e.id} className="flex flex-col gap-0.5 px-3 py-2">
               <span className="flex items-baseline justify-between gap-3 text-sm">
-                <span className="font-medium">{WORDS[e.action] ?? e.action}</span>
+                <span className="font-medium">
+                  {WORDS[e.action] ?? e.action}
+                </span>
                 <time
                   className="shrink-0 text-muted-foreground text-xs"
                   dateTime={e.createdAt}

@@ -79,7 +79,7 @@ export function ScheduleEditor({
           id={`${idPrefix}-tz`}
           value={value.timezone}
           maxLength={64}
-          placeholder="Europe/Berlin"
+          placeholder="Your city zone, e.g. Asia/Dhaka"
           onChange={(e) => set({ timezone: e.target.value })}
         />
       </div>

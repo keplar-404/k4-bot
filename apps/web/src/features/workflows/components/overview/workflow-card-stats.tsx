@@ -1,16 +1,21 @@
 import type { WorkflowListItem } from "../../api";
 import { successRate, timeAgo } from "../../describe";
+import { useWorkflowListStore } from "../../list-store";
 import { RunStatusBadge } from "../status-badges";
+import { RANGE_INFO } from "./range";
 
-/** Runs this week, success rate, and how the last run ended. */
+/** Runs and success rate in the overview's period, and how the last run ended. */
 export function WorkflowCardStats({ w }: { w: WorkflowListItem }) {
+  const range = useWorkflowListStore((s) => s.range);
   const rate = successRate(w.stats);
   return (
     <dl className="grid grid-cols-3 gap-2 border-t pt-3 text-xs">
       <div>
-        <dt className="text-muted-foreground">Runs · 7d</dt>
+        <dt className="text-muted-foreground">
+          Runs · {RANGE_INFO[range].short}
+        </dt>
         <dd className="font-medium text-sm tabular-nums">
-          {(w.stats?.runs7d ?? 0).toLocaleString()}
+          {(w.stats?.runsInRange ?? 0).toLocaleString()}
         </dd>
       </div>
       <div>

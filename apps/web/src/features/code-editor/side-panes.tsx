@@ -1,19 +1,24 @@
 "use client";
 
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BrowserTab } from "@/features/workspace/browser/browser-tab";
+import { fieldSetter, useLocalStore } from "@/lib/store/local-store";
 import { previewUrl } from "./api";
 import { TerminalPane } from "./terminal-pane";
 import type { TerminalLine } from "./types";
 
 /** The app the bot is serving: pick its port, then it opens in the panel's browser (public E2B preview URL). */
 function Preview({ botId }: { botId: string }) {
-  const [port, setPort] = useState("3000");
-  const [url, setUrl] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [{ port, url, error }, , store] = useLocalStore(() => ({
+    port: "3000",
+    url: null as string | null,
+    error: null as string | null,
+  }));
+  const setPort = fieldSetter(store, "port");
+  const setUrl = fieldSetter(store, "url");
+  const setError = fieldSetter(store, "error");
   const show = async () => {
     try {
       setUrl(await previewUrl(botId, Number(port)));

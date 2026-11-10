@@ -1,6 +1,11 @@
 "use client";
 
-import { Loader2Icon, MoonIcon, PowerIcon } from "lucide-react";
+import {
+  ChevronRightIcon,
+  Loader2Icon,
+  MoonIcon,
+  PowerIcon,
+} from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,6 +15,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { useBotList } from "@/features/bots/hooks/use-bot-list";
 import {
   ComputerProvider,
@@ -105,19 +115,25 @@ function VmContent() {
 
       <VmAccounts running={running} />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Activity</CardTitle>
-          <CardDescription>What each bot did on the computer.</CardDescription>
-        </CardHeader>
-        <CardContent>
+      <Collapsible className="rounded-xl border">
+        <CollapsibleTrigger className="group flex w-full items-center gap-2 px-4 py-3 text-left text-sm font-medium">
+          <ChevronRightIcon className="size-4 text-muted-foreground transition-transform group-data-panel-open:rotate-90" />
+          Activity
+          <span className="font-normal text-muted-foreground">
+            What each bot did on the computer
+          </span>
+          <span className="ml-auto text-muted-foreground text-xs tabular-nums">
+            {computer.activity.length}
+          </span>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="border-t px-4 py-3">
           <Activity
             events={computer.activity}
             names={names}
             className="max-h-80"
           />
-        </CardContent>
-      </Card>
+        </CollapsibleContent>
+      </Collapsible>
 
       <ResetComputer disabled={!status || status.state === "starting"} />
     </div>

@@ -1,11 +1,11 @@
 "use client";
 
 import { Loader2Icon, RefreshCwIcon } from "lucide-react";
-import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import type { LibraryFile } from "@/features/files/api/library";
 import { DeleteFileDialog } from "@/features/files/components/library/delete-file-dialog";
+import { fieldSetter, useLocalStore } from "@/lib/store/local-store";
 import { useWorkspace } from "../use-workspace";
 import { FileRow } from "./file-row";
 import { useBotFiles } from "./use-bot-files";
@@ -15,8 +15,12 @@ export function FilesTab({ botId }: { botId: string }) {
   const { files, loading, error, hasMore, refresh, loadMore, remove } =
     useBotFiles(botId);
   const { close } = useWorkspace();
-  const [deleting, setDeleting] = useState<LibraryFile | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [{ deleting, busy }, , store] = useLocalStore(() => ({
+    deleting: null as LibraryFile | null,
+    busy: false,
+  }));
+  const setDeleting = fieldSetter(store, "deleting");
+  const setBusy = fieldSetter(store, "busy");
 
   const confirmDelete = async () => {
     if (!deleting) return;

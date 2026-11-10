@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { fieldSetter, useLocalStore } from "@/lib/store/local-store";
 import { fetchTriggers, type TriggerType } from "./tools-api";
 
 /** How quickly an event arrives, in words: pushed by the app at once, or checked on a timer by Composio. */
@@ -17,14 +18,18 @@ export function EventPicker({
   toolkit: string;
   onPick: (t: TriggerType) => void;
 }) {
-  const [events, setEvents] = useState<TriggerType[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [{ events, error }, , store] = useLocalStore(() => ({
+    events: null as TriggerType[] | null,
+    error: null as string | null,
+  }));
+  const setEvents = fieldSetter(store, "events");
+  const setError = fieldSetter(store, "error");
 
   useEffect(() => {
     setEvents(null);
     setError(null);
     fetchTriggers(toolkit).then(setEvents, (e: Error) => setError(e.message));
-  }, [toolkit]);
+  }, [toolkit, setError, setEvents]);
 
   if (error) return <p className="text-destructive text-sm">{error}</p>;
   if (events === null)

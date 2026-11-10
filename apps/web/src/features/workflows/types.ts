@@ -13,9 +13,10 @@ export type RunStatus =
 
 export type WorkflowStats = {
   runs: number;
-  runs7d: number;
-  succeeded7d: number;
-  failed7d: number;
+  /** Runs and outcomes in the period picked on the overview (day, week, month or year view). */
+  runsInRange: number;
+  succeededInRange: number;
+  failedInRange: number;
   lastStatus: RunStatus | null;
 };
 
@@ -39,8 +40,12 @@ export type Workflow = {
 };
 
 export type WorkflowListItem = Workflow & { stats: WorkflowStats | null };
-export type DailyRuns = {
-  day: string;
+/** The overview's periods: one bar per day (last 14), week (12), month (12) or year (5). */
+export type RunRange = "day" | "week" | "month" | "year";
+
+/** One bar of the overview chart: runs that started in the period beginning at `start` (UTC date). */
+export type RunsBucket = {
+  start: string;
   succeeded: number;
   failed: number;
   total: number;

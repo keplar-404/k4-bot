@@ -1,7 +1,7 @@
 "use client";
 
 import { Loader2Icon, PencilIcon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { fieldSetter, useLocalStore } from "@/lib/store/local-store";
 import {
   getMemory,
   type MemoryTarget,
@@ -52,11 +53,20 @@ export function MemoryDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const copy = COPY[target.kind];
-  const [data, setData] = useState<MemoryText | null>(null);
-  const [draft, setDraft] = useState("");
-  const [editing, setEditing] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [{ data, draft, editing, saving, error }, , store] = useLocalStore(
+    () => ({
+      data: null as MemoryText | null,
+      draft: "",
+      editing: false,
+      saving: false,
+      error: null as string | null,
+    }),
+  );
+  const setData = fieldSetter(store, "data");
+  const setDraft = fieldSetter(store, "draft");
+  const setEditing = fieldSetter(store, "editing");
+  const setSaving = fieldSetter(store, "saving");
+  const setError = fieldSetter(store, "error");
   const key = target.kind === "bot" ? target.botId : "preferences";
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: `key` identifies the target; reload when it opens

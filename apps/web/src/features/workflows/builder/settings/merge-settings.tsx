@@ -56,7 +56,7 @@ export function MergeSettings({
   const current = MODES.find((m) => m.mode === mode);
   return (
     <SettingsSection title="Merge">
-      <Field id="merge-mode" label="How" hint={current?.hint}>
+      <Field id="merge-mode" label="How to merge" hint={current?.hint}>
         <Select
           value={mode}
           onValueChange={(v) =>

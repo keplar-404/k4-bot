@@ -1,4 +1,5 @@
 import { request } from "@/features/chat/lib/client/http";
+import { useGroupsStore } from "./store";
 
 export type GroupMember = {
   id: string;
@@ -17,9 +18,8 @@ export type Group = {
 };
 export type GroupInput = { name: string; botIds: string[]; leadBotId?: string };
 
-/** Other parts of the page (sidebar, chat header) refresh when a group changes. */
-export const GROUPS_CHANGED = "k4:groups-changed";
-const changed = () => window.dispatchEvent(new Event(GROUPS_CHANGED));
+/** Every change is written into the shared groups store, so the sidebar and chat header update at once. */
+const store = () => useGroupsStore.getState();
 
 export const listGroups = () =>
   request<{ groups: Group[] }>("/api/v1/groups").then((r) => r.groups);
@@ -29,7 +29,7 @@ export async function createGroup(input: GroupInput) {
     method: "POST",
     body: JSON.stringify(input),
   });
-  changed();
+  store().upsert(group);
   return group;
 }
 
@@ -41,13 +41,13 @@ export async function updateGroup(
     method: "PATCH",
     body: JSON.stringify(patch),
   });
-  changed();
+  store().upsert(group);
   return group;
 }
 
 export async function deleteGroup(id: string) {
   await request(`/api/v1/groups/${id}`, { method: "DELETE" });
-  changed();
+  store().remove(id);
 }
 
 /** How a member is written in a message: @bot:storywriter (the server matches it the same way). */

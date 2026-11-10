@@ -10,6 +10,8 @@ export const userSecret = pgTable(
       .references(() => user.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     label: text("label").notNull().default(""),
+    /** The app it is for (a Composio toolkit slug), so the page shows its logo; null when not an app. */
+    app: text("app"),
     value: text("value").notNull(),
     hint: text("hint"),
     createdByBotId: text("created_by_bot_id"),

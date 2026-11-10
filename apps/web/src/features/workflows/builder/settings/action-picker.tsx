@@ -1,13 +1,14 @@
 "use client";
 
 import { SearchIcon } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupInput,
 } from "@/components/ui/input-group";
 import { Skeleton } from "@/components/ui/skeleton";
+import { fieldSetter, useLocalStore } from "@/lib/store/local-store";
 import { fetchTools, type ToolSummary } from "./tools-api";
 
 /** Every action the app offers, searchable; picking one pins its current version. */
@@ -18,16 +19,21 @@ export function ActionPicker({
   toolkit: string;
   onPick: (t: ToolSummary) => void;
 }) {
-  const [tools, setTools] = useState<ToolSummary[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [query, setQuery] = useState("");
+  const [{ tools, error, query }, , store] = useLocalStore(() => ({
+    tools: null as ToolSummary[] | null,
+    error: null as string | null,
+    query: "",
+  }));
+  const setTools = fieldSetter(store, "tools");
+  const setError = fieldSetter(store, "error");
+  const setQuery = fieldSetter(store, "query");
 
   useEffect(() => {
     setTools(null);
     fetchTools(toolkit)
       .then(setTools)
       .catch((e: Error) => setError(e.message));
-  }, [toolkit]);
+  }, [toolkit, setError, setTools]);
 
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();

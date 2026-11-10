@@ -26,12 +26,12 @@ export function SwitchRule({
   onRemove: () => void;
 }) {
   return (
-    <div className="flex flex-col gap-2 rounded-lg border bg-muted/30 p-2.5">
+    <div className="flex flex-col gap-2 border-primary/40 border-l-2 py-0.5 pl-3">
       <div className="flex items-center gap-2">
         <span className="shrink-0 font-medium text-xs">{index + 1}.</span>
         <Input
           aria-label="Path name"
-          placeholder={rule.id}
+          placeholder={`Path name, e.g. ${rule.id}`}
           maxLength={60}
           value={rule.label}
           onChange={(e) => onChange({ label: e.target.value })}

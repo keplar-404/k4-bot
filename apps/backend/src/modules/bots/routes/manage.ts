@@ -90,8 +90,8 @@ const manage = new Hono<AuthGuardEnv>()
     const userId = c.get("session").user.id;
     const id = c.req.param("id");
     if (!(await ownedBotId(db, userId, id))) return c.json({ error: "NOT_FOUND", message: "Bot not found" }, 404);
-    await deleteBotEverything(db, env, userId, id);
-    return c.json({ ok: true });
+    const computer = await deleteBotEverything(db, env, userId, id);
+    return c.json({ ok: true, computer });
   });
 
 export default manage;

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
+import { fieldSetter, useLocalStore } from "@/lib/store/local-store";
 import { appName } from "../block-label";
 import type { BlockBody } from "../blocks";
 import { AppConnection } from "./app-connection";
@@ -26,8 +27,12 @@ export function AppTriggerSettings({
 }) {
   const { toolkit, trigger } = block.config;
   const noAuth = useNoAuth(toolkit ?? "");
-  const [type, setType] = useState<TriggerType | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [{ type, error }, , store] = useLocalStore(() => ({
+    type: null as TriggerType | null,
+    error: null as string | null,
+  }));
+  const setType = fieldSetter(store, "type");
+  const setError = fieldSetter(store, "error");
   const setConfig = (config: AppTriggerBlock["config"]) =>
     update({ ...block, config });
 
@@ -36,7 +41,7 @@ export function AppTriggerSettings({
     setError(null);
     if (trigger)
       fetchTrigger(trigger).then(setType, (e: Error) => setError(e.message));
-  }, [trigger]);
+  }, [trigger, setError, setType]);
 
   if (!toolkit) {
     return (

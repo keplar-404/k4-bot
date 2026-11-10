@@ -1,10 +1,11 @@
 "use client";
 
 import { FileTextIcon, XIcon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { type LibraryFile, listFiles } from "@/features/files/api/library";
 import { FilePickerDialog } from "@/features/files/components/file-picker-dialog";
+import { fieldSetter, useLocalStore } from "@/lib/store/local-store";
 
 /** Documents a bot can read (the same kinds read_document reads). */
 const READABLE =
@@ -21,8 +22,12 @@ export function AiKnowledge({
   files: string[];
   onChange: (ids: string[]) => void;
 }) {
-  const [picking, setPicking] = useState(false);
-  const [names, setNames] = useState<Record<string, string>>({});
+  const [{ picking, names }, , store] = useLocalStore(() => ({
+    picking: false,
+    names: {} as Record<string, string>,
+  }));
+  const setPicking = fieldSetter(store, "picking");
+  const setNames = fieldSetter(store, "names");
   // Names for files picked earlier (the block stores only ids): the first page of the library is enough for most.
   useEffect(() => {
     if (files.length === 0 || files.every((id) => names[id])) return;
@@ -34,7 +39,7 @@ export function AiKnowledge({
         })),
       () => undefined,
     );
-  }, [files, names]);
+  }, [files, names, setNames]);
 
   return (
     <div className="flex flex-col gap-1.5">

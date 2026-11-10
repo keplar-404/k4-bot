@@ -90,9 +90,9 @@ export const TEXTUAL = new Set<Cond["op"]>([
 
 /** A hint in the second field for the chosen comparison. */
 export const RIGHT_PLACEHOLDER: Partial<Record<Cond["op"], string>> = {
-  date_after: "2026-01-31 or a date from earlier data",
-  date_before: "2026-01-31 or a date from earlier data",
-  date_equals: "2026-01-31",
+  date_after: "A date like 2026-01-31, or pick one with +",
+  date_before: "A date like 2026-01-31, or pick one with +",
+  date_equals: "A date like 2026-01-31, or pick one with +",
   length_equals: "3",
   length_gt: "0",
   length_lt: "10",

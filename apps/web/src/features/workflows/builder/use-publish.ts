@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
 import { toast } from "sonner";
 import { create } from "zustand";
 import { BASE } from "@/features/files/api/library";
+import { fieldSetter, useLocalStore } from "@/lib/store/local-store";
 import {
   pauseWorkflow,
   publishWorkflow,
@@ -26,7 +26,10 @@ const useRevealed = create<{
 /** Turn on (publish the current draft), turn off, and make a new webhook URL. */
 export function usePublish() {
   const setWorkflow = useBuilder((s) => s.setWorkflow);
-  const [busy, setBusy] = useState(false);
+  const [{ busy }, , store] = useLocalStore(() => ({
+    busy: false,
+  }));
+  const setBusy = fieldSetter(store, "busy");
   const revealed = useRevealed((s) => s.url);
   const setRevealed = useRevealed((s) => s.set);
 

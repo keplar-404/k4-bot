@@ -6,10 +6,26 @@ import type { WorkflowGraph } from "../graph/schema";
 export type WorkflowStats = {
   workflowId: string;
   runs: number;
-  runs7d: number;
-  succeeded7d: number;
-  failed7d: number;
+  /** Runs (and outcomes) in the chosen period (see RANGES). */
+  runsInRange: number;
+  succeededInRange: number;
+  failedInRange: number;
   lastStatus: string | null;
+};
+
+/** The overview's periods: one bar per day (14), week (12), month (12) or year (5), all UTC. */
+export const RANGES = {
+  day: { unit: "day", count: 14 },
+  week: { unit: "week", count: 12 },
+  month: { unit: "month", count: 12 },
+  year: { unit: "year", count: 5 },
+} as const;
+export type RunRange = keyof typeof RANGES;
+
+/** SQL for the first instant of the period: the start of the oldest bar. `unit` is from RANGES only. */
+const periodStart = (range: RunRange) => {
+  const { unit, count } = RANGES[range];
+  return sql.raw(`date_trunc('${unit}', now() at time zone 'utc') - interval '${count - 1} ${unit}'`);
 };
 
 export type RunTrigger = "manual" | "test" | "schedule" | "webhook" | "bot" | "app";
@@ -34,30 +50,33 @@ export async function createRun(db: Db, args: NewRun & { input?: unknown; botId?
   return row!;
 }
 
-/** Run counts per workflow of this user (all time, last 7 days, outcomes) in one query, for the overview cards. */
-export async function statsByWorkflow(db: Db, userId: string): Promise<WorkflowStats[]> {
+/** Run counts per workflow of this user (all time, in the chosen period, outcomes) in one query, for the cards. */
+export async function statsByWorkflow(db: Db, userId: string, range: RunRange = "week"): Promise<WorkflowStats[]> {
+  const from = periodStart(range);
   const result = await db.execute(sql`
     SELECT workflow_id AS "workflowId",
       count(*)::int AS runs,
-      count(*) FILTER (WHERE created_at > now() at time zone 'utc' - interval '7 days')::int AS "runs7d",
-      count(*) FILTER (WHERE status = 'succeeded' AND created_at > now() at time zone 'utc' - interval '7 days')::int AS "succeeded7d",
-      count(*) FILTER (WHERE status = 'failed' AND created_at > now() at time zone 'utc' - interval '7 days')::int AS "failed7d",
+      count(*) FILTER (WHERE created_at >= ${from})::int AS "runsInRange",
+      count(*) FILTER (WHERE status = 'succeeded' AND created_at >= ${from})::int AS "succeededInRange",
+      count(*) FILTER (WHERE status = 'failed' AND created_at >= ${from})::int AS "failedInRange",
       (array_agg(status ORDER BY created_at DESC))[1] AS "lastStatus"
     FROM workflow_run WHERE user_id = ${userId} GROUP BY workflow_id`);
   return result.rows as WorkflowStats[];
 }
 
-/** Runs per day for the last 14 days (all of this user's workflows), for the overview chart. */
-export async function dailyRuns(db: Db, userId: string) {
+/** Runs per day, week, month or year (all of this user's workflows), oldest first, for the overview chart. */
+export async function runsOverTime(db: Db, userId: string, range: RunRange = "day") {
+  const unit = sql.raw(`'${RANGES[range].unit}'`);
+  const step = sql.raw(`interval '1 ${RANGES[range].unit}'`);
   const result = await db.execute(sql`
-    SELECT to_char(d, 'YYYY-MM-DD') AS day,
+    SELECT to_char(b, 'YYYY-MM-DD') AS start,
       count(r.id) FILTER (WHERE r.status = 'succeeded')::int AS succeeded,
       count(r.id) FILTER (WHERE r.status = 'failed')::int AS failed,
       count(r.id)::int AS total
-    FROM generate_series((now() at time zone 'utc')::date - 13, (now() at time zone 'utc')::date, interval '1 day') d
-    LEFT JOIN workflow_run r ON r.user_id = ${userId} AND r.created_at::date = d::date
-    GROUP BY d ORDER BY d`);
-  return result.rows as Array<{ day: string; succeeded: number; failed: number; total: number }>;
+    FROM generate_series(${periodStart(range)}, date_trunc(${unit}, now() at time zone 'utc'), ${step}) b
+    LEFT JOIN workflow_run r ON r.user_id = ${userId} AND date_trunc(${unit}, r.created_at) = b
+    GROUP BY b ORDER BY b`);
+  return result.rows as Array<{ start: string; succeeded: number; failed: number; total: number }>;
 }
 
 /** A workflow's latest runs (the runs drawer). Graph and input stay out: the list only needs the outcome. */

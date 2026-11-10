@@ -1,59 +1,42 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
-import { toast } from "sonner";
+import { useEffect } from "react";
+import { useShallow } from "zustand/react/shallow";
 import {
   createWorkflow,
-  type DailyRuns,
   deleteWorkflow,
-  listWorkflows,
   pauseWorkflow,
   publishWorkflow,
   type WorkflowListItem,
 } from "./api";
+import { useWorkflowListStore } from "./list-store";
 
-/** The user's workflows with their run stats, and the actions the overview offers. */
+/** The user's workflows from the shared store, and the actions the overview offers. */
 export function useWorkflows() {
   const router = useRouter();
-  const [items, setItems] = useState<WorkflowListItem[] | null>(null);
-  const [daily, setDaily] = useState<DailyRuns[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState<string | null>(null);
-
-  const reload = useCallback(
-    () =>
-      listWorkflows()
-        .then((r) => {
-          setItems(r.items);
-          setDaily(r.daily);
-          setError(null);
-        })
-        .catch((e: Error) => setError(e.message)),
-    [],
-  );
+  const { items, series, range, setRange, loading, error, busy, reload, run } =
+    useWorkflowListStore(
+      useShallow((s) => ({
+        items: s.items,
+        series: s.series,
+        range: s.range,
+        setRange: s.setRange,
+        loading: s.loading,
+        error: s.error,
+        busy: s.busy,
+        reload: s.reload,
+        run: s.run,
+      })),
+    );
   useEffect(() => void reload(), [reload]);
-
-  const run = async (
-    key: string,
-    action: () => Promise<unknown>,
-    done?: string,
-  ) => {
-    setBusy(key);
-    try {
-      await action();
-      if (done) toast.success(done);
-      await reload();
-    } catch (e) {
-      toast.error((e as Error).message);
-    } finally {
-      setBusy(null);
-    }
-  };
 
   return {
     items,
-    daily,
+    series,
+    range,
+    setRange,
+    loading,
     error,
     busy,
     reload,

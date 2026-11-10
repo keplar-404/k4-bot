@@ -7,7 +7,6 @@ import {
   Loader2Icon,
   PlusIcon,
 } from "lucide-react";
-import { useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,6 +16,7 @@ import {
   connectMcp,
   type InstalledMcp,
 } from "@/features/integrations/api";
+import { fieldSetter, useLocalStore } from "@/lib/store/local-store";
 import { ServerCapabilities } from "./server-capabilities";
 import { TestConnectionButton } from "./test-connection-button";
 import { TokenSection } from "./token-section";
@@ -30,7 +30,10 @@ export function ServerDetails({
   installed?: InstalledMcp;
   onBack: () => void;
 }) {
-  const [busy, setBusy] = useState(false);
+  const [{ busy }, , store] = useLocalStore(() => ({
+    busy: false,
+  }));
+  const setBusy = fieldSetter(store, "busy");
   const connectNoKey = async () => {
     setBusy(true);
     try {

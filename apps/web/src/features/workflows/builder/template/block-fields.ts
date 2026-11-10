@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
+import { fieldSetter, useLocalStore } from "@/lib/store/local-store";
 import type { BlockBody } from "../blocks";
 import {
   fetchTool,
   fetchTrigger,
   type JsonSchema,
 } from "../settings/tools-api";
+import { builtinSchema } from "./builtin-schemas";
 
 /** The MIME type a dragged field carries: its reference path (dropped into a template field). */
 export const REF_DRAG_TYPE = "application/x-k4-ref";
@@ -82,31 +84,6 @@ export function fieldsOf(
   });
 }
 
-/** A Decide block's outputs, from its own questions: one field per answer (and its confidence). */
-function decideSchema(block: BlockBody): JsonSchema {
-  if (block.kind !== "ai.decide") return {};
-  const properties: Record<string, JsonSchema> = {};
-  for (const q of block.config.questions) {
-    const field =
-      q.type === "noul" ? "noul" : q.type === "choice" ? "choice" : "score";
-    properties[`answers.${q.id}.${field}`] = {
-      type: q.type === "choice" ? "string" : "number",
-      description:
-        q.type === "noul"
-          ? `Probability of yes (0–1): ${q.instructions}`
-          : q.type === "choice"
-            ? `The chosen label: ${q.instructions}`
-            : `Expected value 0–1 (not a level): ${q.instructions}`,
-    };
-    if (q.type !== "noul")
-      properties[`answers.${q.id}.confidence`] = {
-        type: "number",
-        description: "How sure (0–1)",
-      };
-  }
-  return { type: "object", properties };
-}
-
 /** A block's described fields (loaded from Composio for app blocks), or null while loading. */
 export function useBlockSchema(block: BlockBody): {
   prefix: string;
@@ -114,7 +91,10 @@ export function useBlockSchema(block: BlockBody): {
   loading: boolean;
 } {
   const { prefix, schema: source } = sourceOf(block);
-  const [schema, setSchema] = useState<JsonSchema | null>(null);
+  const [{ schema }, , store] = useLocalStore(() => ({
+    schema: null as JsonSchema | null,
+  }));
+  const setSchema = fieldSetter(store, "schema");
   const from = source?.from;
   const slug = source?.slug;
   useEffect(() => {
@@ -125,10 +105,11 @@ export function useBlockSchema(block: BlockBody): {
         ? fetchTrigger(slug).then((t) => t.payload)
         : fetchTool(slug).then((t) => t.output);
     load.then(setSchema, () => setSchema({}));
-  }, [from, slug]);
+  }, [from, slug, setSchema]);
+  // Built-in blocks describe their output from their own settings (Set fields, form questions…), live as they change.
   return {
     prefix,
-    schema: slug ? schema : {},
+    schema: slug ? schema : (builtinSchema(block) ?? {}),
     loading: Boolean(slug) && !schema,
   };
 }

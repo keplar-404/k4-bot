@@ -1,10 +1,10 @@
 "use client";
 
 import { Loader2Icon, Trash2Icon } from "lucide-react";
-import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { disconnectMcp, type InstalledMcp } from "@/features/integrations/api";
+import { fieldSetter, useLocalStore } from "@/lib/store/local-store";
 import { TestConnectionButton } from "./test-connection-button";
 
 /** The connected apps, each opening its page, with Disconnect (deletes the saved token). */
@@ -15,7 +15,10 @@ export function ConnectedList({
   installed: InstalledMcp[];
   onOpen: (serverId: string) => void;
 }) {
-  const [busy, setBusy] = useState<string | null>(null);
+  const [{ busy }, , store] = useLocalStore(() => ({
+    busy: null as string | null,
+  }));
+  const setBusy = fieldSetter(store, "busy");
   const remove = async (i: InstalledMcp) => {
     setBusy(i.id);
     try {

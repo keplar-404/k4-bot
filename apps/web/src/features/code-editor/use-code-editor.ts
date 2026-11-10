@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
+import { fieldSetter, useLocalStore } from "@/lib/store/local-store";
 import { listTree, readFile, type TreeEntry } from "./api";
 import type { Doc, TerminalLine } from "./types";
 import { useDocSave } from "./use-doc-save";
@@ -16,11 +17,20 @@ const MAX_LINES = 50;
  * changes; otherwise `stale` asks the user whether to reload.
  */
 export function useCodeEditor(botId: string) {
-  const [tree, setTree] = useState<TreeEntry[]>([]);
-  const [doc, setDoc] = useState<Doc | null>(null);
-  const [stale, setStale] = useState(false);
-  const [terminal, setTerminal] = useState<TerminalLine[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [{ tree, doc, stale, terminal, error }, , store] = useLocalStore(
+    () => ({
+      tree: [] as TreeEntry[],
+      doc: null as Doc | null,
+      stale: false,
+      terminal: [] as TerminalLine[],
+      error: null as string | null,
+    }),
+  );
+  const setTree = fieldSetter(store, "tree");
+  const setDoc = fieldSetter(store, "doc");
+  const setStale = fieldSetter(store, "stale");
+  const setTerminal = fieldSetter(store, "terminal");
+  const setError = fieldSetter(store, "error");
   const docRef = useRef(doc);
   docRef.current = doc;
   const treeTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -30,7 +40,7 @@ export function useCodeEditor(botId: string) {
       listTree(botId)
         .then(setTree)
         .catch((e: Error) => setError(e.message)),
-    [botId],
+    [botId, setError, setTree],
   );
   const open = useCallback(
     async (path: string) => {
@@ -48,7 +58,7 @@ export function useCodeEditor(botId: string) {
         setError((e as Error).message);
       }
     },
-    [botId],
+    [botId, setDoc, setError, setStale],
   );
 
   const onEvent = useCallback(
@@ -64,7 +74,7 @@ export function useCodeEditor(botId: string) {
       if (d.text === d.saved) void open(d.path);
       else setStale(true);
     },
-    [open, refreshTree],
+    [open, refreshTree, setStale, setTerminal],
   );
   const socket = useSandboxSocket(botId, onEvent);
 

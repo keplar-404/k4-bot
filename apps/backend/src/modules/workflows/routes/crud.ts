@@ -7,7 +7,7 @@ import { validate } from "../../../shared/validate";
 import { graphSchema } from "../graph/schema";
 import { structureIssues } from "../graph/validate";
 import { removeWorkflow } from "../store/remove";
-import { dailyRuns, statsByWorkflow } from "../store/runs";
+import { RANGES, type RunRange, runsOverTime, statsByWorkflow } from "../store/runs";
 import * as store from "../store/workflows";
 import { workflowDto } from "./dto";
 
@@ -22,21 +22,27 @@ const saveBody = z.object({
   expectedUpdatedAt: z.iso.datetime().optional(),
 });
 
+const listQuery = z.object({
+  range: z.enum(Object.keys(RANGES) as [RunRange, ...RunRange[]]).default("day"),
+});
+
 const NOT_FOUND = { error: "NOT_FOUND", message: "Workflow not found." } as const;
 
 /** Create, list, read, save (the draft) and delete the signed-in user's workflows. */
 const crud = new Hono<AuthGuardEnv>()
-  .get("/", async (c) => {
+  // `range` (day | week | month | year) sets the chart's bars and the period every count on the page is for.
+  .get("/", validate("query", listQuery), async (c) => {
     const { db } = getRequestContext(c);
     const userId = c.get("session").user.id;
-    const [rows, stats, daily] = await Promise.all([
+    const { range } = c.req.valid("query");
+    const [rows, stats, series] = await Promise.all([
       store.listWorkflows(db, userId),
-      statsByWorkflow(db, userId),
-      dailyRuns(db, userId),
+      statsByWorkflow(db, userId, range),
+      runsOverTime(db, userId, range),
     ]);
     const statsById = new Map(stats.map((s) => [s.workflowId, s]));
     const items = rows.map((w) => ({ ...workflowDto(w), stats: statsById.get(w.id) ?? null }));
-    return c.json({ items, daily });
+    return c.json({ items, series, range });
   })
 
   .post("/", userLimit, validate("json", createBody), async (c) => {

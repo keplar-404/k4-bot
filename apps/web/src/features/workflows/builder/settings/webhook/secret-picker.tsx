@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import {
   Select,
   SelectContent,
@@ -10,6 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { BASE } from "@/features/files/api/library";
+import { fieldSetter, useLocalStore } from "@/lib/store/local-store";
 import { Field } from "../field";
 
 type Secret = { name: string; label: string; hint: string | null };
@@ -24,7 +25,10 @@ export function SecretPicker({
   onChange: (name: string) => void;
   hint?: string;
 }) {
-  const [secrets, setSecrets] = useState<Secret[] | null>(null);
+  const [{ secrets }, , store] = useLocalStore(() => ({
+    secrets: null as Secret[] | null,
+  }));
+  const setSecrets = fieldSetter(store, "secrets");
   useEffect(() => {
     fetch(`${BASE}/api/v1/secrets`, { credentials: "include" })
       .then((r) =>
@@ -34,7 +38,7 @@ export function SecretPicker({
         (b: { items?: Secret[] }) => setSecrets(b.items ?? []),
         () => setSecrets([]),
       );
-  }, []);
+  }, [setSecrets]);
   return (
     <Field id="hook-secret" label="Secret" required hint={hint}>
       {secrets && secrets.length === 0 ? (

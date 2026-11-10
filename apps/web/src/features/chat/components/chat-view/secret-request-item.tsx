@@ -1,7 +1,6 @@
 "use client";
 
 import { KeyRoundIcon } from "lucide-react";
-import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +13,7 @@ import {
   ItemTitle,
 } from "@/components/ui/item";
 import { request } from "@/features/chat/lib/client/http";
+import { fieldSetter, useLocalStore } from "@/lib/store/local-store";
 
 /**
  * The bot asked for an API key or private value. It goes from this form straight to the secrets vault (encrypted on the
@@ -30,8 +30,12 @@ export function SecretRequestItem({
   why?: string;
   onDone: (saved: boolean) => void;
 }) {
-  const [value, setValue] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [{ value, busy }, , store] = useLocalStore(() => ({
+    value: "",
+    busy: false,
+  }));
+  const setValue = fieldSetter(store, "value");
+  const setBusy = fieldSetter(store, "busy");
 
   async function save() {
     if (!value || busy) return;

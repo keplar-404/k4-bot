@@ -1,10 +1,10 @@
 "use client";
 
 import { Loader2Icon, PlugZapIcon } from "lucide-react";
-import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { testMcp } from "@/features/integrations/api";
+import { fieldSetter, useLocalStore } from "@/lib/store/local-store";
 
 /**
  * Tests a connected app for real: the server connects with the saved token and lists the app's tools. The toast
@@ -19,7 +19,10 @@ export function TestConnectionButton({
   name: string;
   compact?: boolean;
 }) {
-  const [busy, setBusy] = useState(false);
+  const [{ busy }, , store] = useLocalStore(() => ({
+    busy: false,
+  }));
+  const setBusy = fieldSetter(store, "busy");
   const run = async () => {
     setBusy(true);
     try {

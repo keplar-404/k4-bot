@@ -18,7 +18,11 @@ export function OnErrorSelect({
   onChange: (v: "stop" | "continue") => void;
 }) {
   return (
-    <Field id="on-error" label="After the last try">
+    <Field
+      id="on-error"
+      label="If it still fails"
+      hint="Stop the whole run, or go on: later blocks can then read this block’s error."
+    >
       <Select
         value={value}
         onValueChange={(v) => onChange(v as "stop" | "continue")}

@@ -20,7 +20,7 @@ Logos come from `https://logos.composio.dev/api/<slug>`.
 3. `GET /composio/connections` lists the user's accounts live (status `ACTIVE`, `EXPIRED`, `FAILED`…); expired ones
    show **Reconnect**. `DELETE /composio/connections/:id` disconnects.
 
-A user may connect several accounts of one app; blocks and bots then say which one to use.
+One account per app: `POST /composio/authorize` answers 409 `ALREADY_CONNECTED` while a working connection exists, so the user disconnects it first to switch accounts. An expired or failed connection can be reconnected.
 
 ## Where app data comes from
 

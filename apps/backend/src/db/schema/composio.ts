@@ -20,6 +20,8 @@ export const composioToolkit = pgTable(
     triggersCount: integer("triggers_count").notNull().default(0),
     /** True for toolkits that need no account (connecting is not required). */
     noAuth: boolean("no_auth").notNull().default(false),
+    /** How the app signs in (Composio's `auth_schemes`: "OAUTH2", "API_KEY", "BEARER_TOKEN", "BASIC"…). */
+    authSchemes: jsonb("auth_schemes").$type<string[]>().notNull().default([]),
     /** Composio's popularity order (0 = most used): the default sort. */
     rank: integer("rank").notNull(),
     syncedAt: timestamp("synced_at").defaultNow().notNull(),

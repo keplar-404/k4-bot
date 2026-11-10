@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { fileUrl } from "@/features/files/api/library";
+import { useLocalStore } from "@/lib/store/local-store";
 
 /** Stored files never change, so each is fetched once per page load; a failed fetch is forgotten so it can be retried. */
 const cache = new Map<string, Promise<Blob>>();
@@ -27,11 +28,11 @@ function load(file: { id: string; mimeType: string }): Promise<Blob> {
 
 /** The file's bytes as a Blob plus an object URL for viewers; the URL is revoked when the view goes away. */
 export function useFileBlob(file: { id: string; mimeType: string }) {
-  const [state, setState] = useState<{
+  const [state, setState] = useLocalStore<{
     blob: Blob | null;
     url: string | null;
     error: string | null;
-  }>({ blob: null, url: null, error: null });
+  }>(() => ({ blob: null, url: null, error: null }));
 
   useEffect(() => {
     let url: string | null = null;
@@ -51,7 +52,7 @@ export function useFileBlob(file: { id: string; mimeType: string }) {
       live = false;
       if (url) URL.revokeObjectURL(url);
     };
-  }, [file.id, file.mimeType]);
+  }, [file.id, file.mimeType, setState]);
 
   return state;
 }

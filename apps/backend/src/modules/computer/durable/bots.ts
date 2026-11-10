@@ -39,11 +39,14 @@ export class ComputerBots extends ComputerControl {
    * and its account and files are removed now if the computer is awake, or on its next wake otherwise.
    * The computer is never woken just to delete.
    */
-  async removeBot(botId: string): Promise<void> {
+  async removeBot(botId: string): Promise<"removed" | "pending" | "failed"> {
     this.tables.removeBot(botId);
     this.directoryDirty = true;
     await this.releaseBot(botId);
-    if (this.state === "running" && this.sbx) await this.purgeRemovedBots(this.sbx);
+    if (this.state !== "running" || !this.sbx) return "pending";
+    await this.purgeRemovedBots(this.sbx).catch((e) => console.error("[computer] purge", e));
+    // Still pending = its Linux user or home folder is still on the computer (checked on the VM).
+    return this.tables.pendingPurges().some((p) => p.bot_id === botId) ? "failed" : "removed";
   }
 
   /** An app account was disconnected (or expired): every bot's browser logins for it go, now or on the next wake. */

@@ -1,22 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { GROUPS_CHANGED, type Group, listGroups } from "./api";
+import { useEffect } from "react";
+import { useGroupsStore } from "./store";
 
-/** The user's groups, reloaded whenever one is created, changed or deleted anywhere on the page. */
+/** The user's groups from the shared store (loaded once; every create, change or delete updates it). */
 export function useGroups() {
-  const [groups, setGroups] = useState<Group[] | null>(null);
-  const reload = useCallback(
-    () =>
-      listGroups()
-        .then(setGroups)
-        .catch(() => setGroups((g) => g ?? [])),
-    [],
-  );
+  const groups = useGroupsStore((s) => s.groups);
+  const reload = useGroupsStore((s) => s.load);
   useEffect(() => {
-    void reload();
-    window.addEventListener(GROUPS_CHANGED, reload);
-    return () => window.removeEventListener(GROUPS_CHANGED, reload);
+    if (useGroupsStore.getState().groups === null) void reload();
   }, [reload]);
   return { groups, reload };
 }

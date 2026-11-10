@@ -5,14 +5,16 @@ import { useState } from "react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { WorkflowListItem } from "../../api";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import type { RunRange, WorkflowListItem } from "../../api";
 import { useWorkflows } from "../../use-workflows";
 import { DeleteWorkflowDialog } from "./delete-workflow-dialog";
+import { RANGE_INFO, RANGES } from "./range";
 import { RunsChart } from "./runs-chart";
 import { StatTiles } from "./stat-tiles";
 import { WorkflowCard } from "./workflow-card";
 
-/** All of the user's workflows: how they ran this week, each as a card, and the way to make a new one. */
+/** All of the user's workflows: how they ran in the chosen period (day / week / month / year), each as a card, and the way to make a new one. */
 export function WorkflowsOverview() {
   const wf = useWorkflows();
   const [deleting, setDeleting] = useState<WorkflowListItem | null>(null);
@@ -68,18 +70,50 @@ export function WorkflowsOverview() {
           </div>
         ) : (
           <>
-            <StatTiles items={wf.items} />
-            <RunsChart daily={wf.daily} />
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {wf.items.map((w) => (
-                <WorkflowCard
-                  key={w.id}
-                  w={w}
-                  busy={wf.busy === w.id}
-                  onToggle={() => void wf.toggle(w)}
-                  onDelete={() => setDeleting(w)}
-                />
-              ))}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-col">
+                <h2 className="font-medium text-sm">Overview</h2>
+                <p className="text-muted-foreground text-xs">
+                  {RANGE_INFO[wf.range].period}, all workflows
+                </p>
+              </div>
+              <ToggleGroup
+                variant="outline"
+                size="sm"
+                spacing={0}
+                value={[wf.range]}
+                onValueChange={(v) => {
+                  const next = v[0] as RunRange | undefined;
+                  if (next) wf.setRange(next);
+                }}
+                aria-label="Period"
+              >
+                {RANGES.map((r) => (
+                  <ToggleGroupItem key={r} value={r} className="px-3">
+                    {RANGE_INFO[r].toggle}
+                  </ToggleGroupItem>
+                ))}
+              </ToggleGroup>
+            </div>
+            {/* Every number below follows the period; while a new one loads, the old numbers stay, dimmed. */}
+            <div
+              className="flex flex-col gap-5 transition-opacity data-[loading=true]:opacity-60"
+              data-loading={wf.loading}
+              aria-busy={wf.loading}
+            >
+              <StatTiles items={wf.items} range={wf.range} />
+              <RunsChart series={wf.series} range={wf.range} />
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {wf.items.map((w) => (
+                  <WorkflowCard
+                    key={w.id}
+                    w={w}
+                    busy={wf.busy === w.id}
+                    onToggle={() => void wf.toggle(w)}
+                    onDelete={() => setDeleting(w)}
+                  />
+                ))}
+              </div>
             </div>
           </>
         )}

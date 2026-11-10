@@ -1,7 +1,7 @@
 "use client";
 
 import { BotIcon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useBots } from "@/features/bots/hooks/use-bots";
+import { fieldSetter, useLocalStore } from "@/lib/store/local-store";
 import { getSharedBots, setSharedBots } from "../../api";
 import { useBuilder } from "../store";
 import { ShareBotRow } from "./share-bot-row";
@@ -22,9 +23,14 @@ import { ShareBotRow } from "./share-bot-row";
 export function ShareBotsDialog() {
   const id = useBuilder((s) => s.workflow?.id);
   const { bots } = useBots();
-  const [open, setOpen] = useState(false);
-  const [shared, setShared] = useState<string[] | null>(null);
-  const [query, setQuery] = useState("");
+  const [{ open, shared, query }, , store] = useLocalStore(() => ({
+    open: false,
+    shared: null as string[] | null,
+    query: "",
+  }));
+  const setOpen = fieldSetter(store, "open");
+  const setShared = fieldSetter(store, "shared");
+  const setQuery = fieldSetter(store, "query");
   const q = query.trim().toLowerCase();
   const shown = bots.filter((b) => !q || b.name.toLowerCase().includes(q));
 
@@ -35,7 +41,7 @@ export function ShareBotsDialog() {
       (r) => setShared(r.botIds),
       (e: Error) => toast.error(e.message),
     );
-  }, [open, id]);
+  }, [open, id, setShared]);
 
   async function toggle(botId: string) {
     if (!id || !shared) return;

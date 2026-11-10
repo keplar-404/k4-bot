@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { fieldSetter, useLocalStore } from "@/lib/store/local-store";
 
 const MAX_ROWS = 500;
 type Sheet = { name: string; rows: string[][] };
@@ -23,9 +24,14 @@ const shown = (v: unknown): string =>
 
 /** An Excel workbook as tables, one sheet at a time (exceljs, loaded only when a .xlsx opens). */
 export function XlsxView({ blob }: { blob: Blob }) {
-  const [sheets, setSheets] = useState<Sheet[] | null>(null);
-  const [active, setActive] = useState(0);
-  const [error, setError] = useState<string | null>(null);
+  const [{ sheets, active, error }, , store] = useLocalStore(() => ({
+    sheets: null as Sheet[] | null,
+    active: 0,
+    error: null as string | null,
+  }));
+  const setSheets = fieldSetter(store, "sheets");
+  const setActive = fieldSetter(store, "active");
+  const setError = fieldSetter(store, "error");
 
   useEffect(() => {
     let live = true;
@@ -55,7 +61,7 @@ export function XlsxView({ blob }: { blob: Blob }) {
     return () => {
       live = false;
     };
-  }, [blob]);
+  }, [blob, setError, setSheets]);
 
   if (error)
     return <p className="p-4 text-sm text-muted-foreground">{error}</p>;

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
+import { fieldSetter, useLocalStore } from "@/lib/store/local-store";
 import { appName } from "../block-label";
 import type { BlockBody } from "../blocks";
 import { ActionPicker } from "./action-picker";
@@ -24,16 +25,21 @@ export function AppSettings({
 }) {
   const { toolkit, tool } = block.config;
   const noAuth = useNoAuth(toolkit ?? "");
-  const [detail, setDetail] = useState<ToolDetail | null>(null);
-  const [picking, setPicking] = useState(!tool);
-  const [error, setError] = useState<string | null>(null);
+  const [{ detail, picking, error }, , store] = useLocalStore(() => ({
+    detail: null as ToolDetail | null,
+    picking: !tool,
+    error: null as string | null,
+  }));
+  const setDetail = fieldSetter(store, "detail");
+  const setPicking = fieldSetter(store, "picking");
+  const setError = fieldSetter(store, "error");
 
   useEffect(() => {
     setDetail(null);
     setError(null);
     if (tool)
       fetchTool(tool).then(setDetail, (e: Error) => setError(e.message));
-  }, [tool]);
+  }, [tool, setDetail, setError]);
 
   if (!toolkit) return <AppSettingsEmpty />;
   const name = appName(toolkit);

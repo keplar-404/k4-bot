@@ -1,18 +1,12 @@
 "use client";
 
 import { PlusIcon } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
-import { toast } from "sonner";
+import { useEffect } from "react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { useBots } from "@/features/bots/hooks/use-bots";
-import {
-  deleteTask,
-  listTasks,
-  runTaskNow,
-  type Task,
-  updateTask,
-} from "./api";
+import { deleteTask, runTaskNow, updateTask } from "./api";
+import { useTasksStore } from "./store";
 import { TaskDialog } from "./task-dialog";
 import { NoTasks, TaskRow } from "./task-row";
 
@@ -23,29 +17,13 @@ const INTRO =
 /** Scheduled tasks (like Grok's Tasks): a bot does something at set times and answers in its chat. */
 export function TasksPage() {
   const { bots } = useBots();
-  const [tasks, setTasks] = useState<Task[] | null>(null);
-  /** The task being edited, "new" while creating one, null while the dialog is closed. */
-  const [editing, setEditing] = useState<Task | "new" | null>(null);
-  const [busy, setBusy] = useState<string | null>(null);
-
-  const load = useCallback(
-    () => listTasks().then(setTasks, (e: Error) => toast.error(e.message)),
-    [],
-  );
+  const tasks = useTasksStore((s) => s.tasks);
+  const editing = useTasksStore((s) => s.editing);
+  const setEditing = useTasksStore((s) => s.setEditing);
+  const busy = useTasksStore((s) => s.busy);
+  const load = useTasksStore((s) => s.load);
+  const act = useTasksStore((s) => s.act);
   useEffect(() => void load(), [load]);
-
-  const act = async (id: string, fn: () => Promise<unknown>, done: string) => {
-    setBusy(id);
-    try {
-      await fn();
-      toast.success(done);
-      await load();
-    } catch (e) {
-      toast.error((e as Error).message);
-    } finally {
-      setBusy(null);
-    }
-  };
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">

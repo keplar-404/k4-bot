@@ -9,14 +9,31 @@ import { HttpHeaders } from "./http-headers";
 type CodeBlock = Extract<BlockBody, { kind: "action.code" }>;
 
 /** Code: JavaScript run in a fresh sandbox, with named inputs from earlier steps, stopped after the time limit. */
-export function CodeSettings({ block, update }: { block: CodeBlock; update: (b: CodeBlock) => void }) {
-  const set = (patch: Partial<CodeBlock["config"]>) => update({ ...block, config: { ...block.config, ...patch } });
+export function CodeSettings({
+  block,
+  update,
+}: {
+  block: CodeBlock;
+  update: (b: CodeBlock) => void;
+}) {
+  const set = (patch: Partial<CodeBlock["config"]>) =>
+    update({ ...block, config: { ...block.config, ...patch } });
   return (
     <>
       <HttpHeaders
         kind="input"
-        headers={block.config.inputs.map((i) => ({ name: i.key, value: i.value }))}
-        onChange={(rows) => set({ inputs: rows.map((r) => ({ key: r.name.replace(/[^A-Za-z0-9_]/g, "_").slice(0, 41), value: r.value })) })}
+        headers={block.config.inputs.map((i) => ({
+          name: i.key,
+          value: i.value,
+        }))}
+        onChange={(rows) =>
+          set({
+            inputs: rows.map((r) => ({
+              key: r.name.replace(/[^A-Za-z0-9_]/g, "_").slice(0, 41),
+              value: r.value,
+            })),
+          })
+        }
       />
       <SettingsSection title="JavaScript">
         <Field
@@ -36,7 +53,7 @@ export function CodeSettings({ block, update }: { block: CodeBlock; update: (b: 
         </Field>
         <Field
           id="code-timeout"
-          label="Stop after (seconds)"
+          label="Stop the code after (seconds)"
           hint="It runs in a new sandbox each time and is stopped at this limit. The seconds it runs count toward your daily sandbox time."
         >
           <Input
@@ -45,7 +62,14 @@ export function CodeSettings({ block, update }: { block: CodeBlock; update: (b: 
             min={1}
             max={120}
             value={block.config.timeoutSeconds}
-            onChange={(e) => set({ timeoutSeconds: Math.min(120, Math.max(1, Number.parseInt(e.target.value, 10) || 1)) })}
+            onChange={(e) =>
+              set({
+                timeoutSeconds: Math.min(
+                  120,
+                  Math.max(1, Number.parseInt(e.target.value, 10) || 1),
+                ),
+              })
+            }
           />
         </Field>
       </SettingsSection>

@@ -38,7 +38,7 @@ export function DecideSettings({
       <SettingsSection title="About this data">
         <Field
           id="decide-state"
-          label="State"
+          label="What to look at"
           required
           hint="What the questions are about: add the email, message or record from earlier steps with +. It is sent as data, so text inside it cannot change the questions."
         >
@@ -96,8 +96,8 @@ export function DecideSettings({
       <SettingsSection title="Model">
         <Field
           id="decide-model"
-          label="Model"
-          hint="TypeSafe model id. jev-latest follows new versions; pin one (e.g. jev-1.13.0) to keep thresholds stable."
+          label="Model version"
+          hint="Leave jev-latest. Only if you tuned the If numbers after this block, type that version (e.g. jev-1.13.0) so answers keep the same scale."
         >
           <Input
             id="decide-model"

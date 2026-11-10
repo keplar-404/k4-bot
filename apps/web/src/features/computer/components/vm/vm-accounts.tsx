@@ -1,7 +1,7 @@
 "use client";
 
-import { Trash2Icon, UserIcon } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { Loader2Icon, Trash2Icon, UserIcon } from "lucide-react";
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -10,10 +10,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { DeleteBotDialog } from "@/features/bots/components/delete-bot-dialog";
-import { useBots } from "@/features/bots/hooks/use-bots";
-import { useDeleteBot } from "@/features/bots/hooks/use-delete-bot";
-import { type ComputerAccount, listAccounts } from "@/features/computer/api";
+import { useBotsUiStore } from "@/features/bots/ui-store";
+import { useAccountsStore } from "@/features/computer/accounts-store";
 
 const size = (kb: number | null) =>
   kb === null
@@ -25,27 +23,22 @@ const size = (kb: number | null) =>
         : `${kb} KB`;
 
 /**
- * The accounts on the computer: one Linux user per bot, each with a private home folder only that bot can use.
- * Deleting an account deletes its bot (a bot cannot work without its account), so it asks first, loudly.
+ * The accounts on the computer: one Linux user per bot, each with its own home folder.
+ * Deleting an account deletes its bot (a bot cannot work without its account), so it asks first (the sidebar's
+ * shared delete dialog). The server removes the Linux user and its home, checks on the machine that both are gone,
+ * and the list reloads from the computer afterwards.
  */
 export function VmAccounts({ running }: { running: boolean }) {
-  const { bots, deleteBot } = useBots();
-  const [data, setData] = useState<{
-    running: boolean;
-    items: ComputerAccount[];
-    orphans: Array<{ user: string; kb: number }>;
-  } | null>(null);
-  const load = useCallback(
-    () => listAccounts().then(setData, () => setData(null)),
-    [],
+  const data = useAccountsStore((s) => s.data);
+  const load = useAccountsStore((s) => s.load);
+  const askDelete = useBotsUiStore((s) => s.askDelete);
+  const deletingId = useBotsUiStore((s) =>
+    s.deleting ? s.confirming?.id : undefined,
   );
+
   // Sizes are only known while the computer runs: reload when it wakes or sleeps.
   // biome-ignore lint/correctness/useExhaustiveDependencies: `running` is the reason to reload, not an input
   useEffect(() => void load(), [load, running]);
-  const del = useDeleteBot(bots, async (id) => {
-    await deleteBot(id);
-    await load();
-  });
 
   return (
     <Card>
@@ -54,7 +47,7 @@ export function VmAccounts({ running }: { running: boolean }) {
         <CardDescription>
           {data?.items.length ?? 0} bot account
           {data?.items.length === 1 ? "" : "s"} on this computer. Each bot has
-          its own Linux user and a private home folder.{" "}
+          its own Linux user and home folder.{" "}
           {data && !data.running && "Wake the computer to see folder sizes."}
         </CardDescription>
       </CardHeader>
@@ -79,10 +72,15 @@ export function VmAccounts({ running }: { running: boolean }) {
               size="sm"
               variant="ghost"
               className="text-destructive hover:text-destructive"
-              onClick={() => del.handleDelete(a.botId)}
+              disabled={deletingId === a.botId}
+              onClick={() => askDelete(a.botId)}
               aria-label={`Delete ${a.botName} and its account`}
             >
-              <Trash2Icon />
+              {deletingId === a.botId ? (
+                <Loader2Icon className="animate-spin" />
+              ) : (
+                <Trash2Icon />
+              )}
               Delete
             </Button>
           </div>
@@ -97,12 +95,6 @@ export function VmAccounts({ running }: { running: boolean }) {
           <p className="text-muted-foreground text-sm">No bots yet.</p>
         )}
       </CardContent>
-      <DeleteBotDialog
-        bot={del.confirming}
-        deleting={del.deleting}
-        onCancel={() => del.setConfirming(null)}
-        onConfirm={() => void del.confirmDelete()}
-      />
     </Card>
   );
 }

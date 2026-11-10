@@ -45,7 +45,14 @@ const composioRoutes = new Hono<AuthGuardEnv>()
       if (await isNoAuthToolkit(db, toolkit)) {
         return c.json({ error: "NO_LOGIN_NEEDED", message: "This app needs no login: there is nothing to connect." }, 400);
       }
-      const session = await userSession(db, composioFor(env), c.get("session").user.id);
+      const userId = c.get("session").user.id;
+      // One account per app: a working connection must be disconnected before another one is connected.
+      // (An expired or failed one can still be reconnected.)
+      const existing = (await listConnections(composioFor(env), userId)).find((x) => x.toolkit === toolkit && x.status === "ACTIVE");
+      if (existing) {
+        return c.json({ error: "ALREADY_CONNECTED", message: `${existing.account ?? "An account"} is already connected for this app. Disconnect it first to connect a different one.` }, 409);
+      }
+      const session = await userSession(db, composioFor(env), userId);
       const request = await session.authorize(toolkit, {
         callbackUrl: connectCallback(env.WEB_ORIGIN ?? env.BETTER_AUTH_URL, toolkit, returnTo),
       });

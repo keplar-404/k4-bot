@@ -1,9 +1,9 @@
 "use client";
 
 import { Loader2Icon, PlayIcon } from "lucide-react";
-import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { fieldSetter, useLocalStore } from "@/lib/store/local-store";
 import { runWorkflow, type WorkflowApiError } from "../../api";
 import { isActive, useRunView } from "../../live/run-view-store";
 import { refreshRuns } from "../../live/use-live-runs";
@@ -21,9 +21,14 @@ export function RunButton({ save }: { save: { state: SaveState } }) {
   const going = useRunView((s) =>
     isActive(s.detail?.status ?? s.runs[0]?.status),
   );
-  const [busy, setBusy] = useState(false);
-  const [sample, setSample] = useState<string | null>(null);
-  const [formOpen, setFormOpen] = useState(false);
+  const [{ busy, sample, formOpen }, , store] = useLocalStore(() => ({
+    busy: false,
+    sample: null as string | null,
+    formOpen: false,
+  }));
+  const setBusy = fieldSetter(store, "busy");
+  const setSample = fieldSetter(store, "sample");
+  const setFormOpen = fieldSetter(store, "formOpen");
   if (!w) return null;
   const webhook = w.graph.nodes.some((n) => n.kind === "trigger.webhook");
   // These test runs pretend to receive something: a webhook body, an app event's data.
@@ -32,6 +37,11 @@ export function RunButton({ save }: { save: { state: SaveState } }) {
     : w.graph.nodes.some((n) => n.kind === "trigger.app")
       ? ("app" as const)
       : null;
+  const appNode = w.graph.nodes.find((n) => n.kind === "trigger.app");
+  const appTrigger =
+    appNode?.kind === "trigger.app"
+      ? appNode.config.trigger || undefined
+      : undefined;
   const manual = w.graph.nodes.find((n) => n.kind === "trigger.manual");
   const fields = manual?.kind === "trigger.manual" ? manual.config.fields : [];
 
@@ -96,6 +106,7 @@ export function RunButton({ save }: { save: { state: SaveState } }) {
         <SampleDialog
           kind={sampleKind}
           workflowId={w.id}
+          triggerSlug={appTrigger}
           sample={sample}
           busy={busy}
           onChange={setSample}

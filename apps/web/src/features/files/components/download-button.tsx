@@ -1,10 +1,10 @@
 "use client";
 
 import { DownloadIcon, Loader2Icon } from "lucide-react";
-import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import type { FileRef } from "@/features/files/api";
+import { fieldSetter, useLocalStore } from "@/lib/store/local-store";
 import { downloadFile } from "../download";
 
 /** Saves the file to the device (no navigation away from the chat). */
@@ -17,7 +17,10 @@ export function DownloadButton({
   variant?: "outline" | "ghost";
   className?: string;
 }) {
-  const [busy, setBusy] = useState(false);
+  const [{ busy }, , store] = useLocalStore(() => ({
+    busy: false,
+  }));
+  const setBusy = fieldSetter(store, "busy");
   return (
     <Button
       type="button"

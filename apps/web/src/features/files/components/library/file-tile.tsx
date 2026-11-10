@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import {
   fileUrl,
   formatBytes,
@@ -8,6 +7,7 @@ import {
   type LibraryFile,
 } from "@/features/files/api";
 import { FileKindIcon } from "@/features/files/components/file-kind-icon";
+import { fieldSetter, useLocalStore } from "@/lib/store/local-store";
 import { TileActions } from "./tile-actions";
 
 const ORIGIN: Record<LibraryFile["source"], string> = {
@@ -24,7 +24,10 @@ export function FileTile({
   file: LibraryFile;
   onDelete: (file: LibraryFile) => void;
 }) {
-  const [broken, setBroken] = useState(false);
+  const [{ broken }, , store] = useLocalStore(() => ({
+    broken: false,
+  }));
+  const setBroken = fieldSetter(store, "broken");
   const date = new Date(file.createdAt).toLocaleDateString([], {
     dateStyle: "medium",
   });

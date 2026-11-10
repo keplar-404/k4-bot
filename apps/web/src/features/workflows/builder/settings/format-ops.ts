@@ -16,14 +16,20 @@ export const FORMAT_GROUPS: Array<{
         op: "replace",
         label: "Replace text",
         options: [
-          { key: "find", label: "Find" },
-          { key: "replace", label: "Replace with" },
+          { key: "find", label: "Find this text", placeholder: "e.g. Mr. " },
+          {
+            key: "replace",
+            label: "Replace with (empty removes it)",
+            placeholder: "Other text, or leave empty",
+          },
         ],
       },
       {
         op: "split",
         label: "Split into a list",
-        options: [{ key: "separator", label: "Separator", placeholder: "," }],
+        options: [
+          { key: "separator", label: "Separator", placeholder: ", (a comma)" },
+        ],
       },
       {
         op: "truncate",
@@ -43,30 +49,72 @@ export const FORMAT_GROUPS: Array<{
       {
         op: "round",
         label: "Round",
-        options: [{ key: "decimals", label: "Decimals", placeholder: "2" }],
+        options: [
+          {
+            key: "decimals",
+            label: "Digits after the point",
+            placeholder: "2",
+          },
+        ],
       },
-      { op: "add", label: "Add", options: [{ key: "value", label: "Number" }] },
+      {
+        op: "add",
+        label: "Add",
+        options: [
+          {
+            key: "value",
+            label: "Number",
+            placeholder: "e.g. 10, or data with +",
+          },
+        ],
+      },
       {
         op: "subtract",
         label: "Subtract",
-        options: [{ key: "value", label: "Number" }],
+        options: [
+          {
+            key: "value",
+            label: "Number",
+            placeholder: "e.g. 10, or data with +",
+          },
+        ],
       },
       {
         op: "multiply",
         label: "Multiply by",
-        options: [{ key: "value", label: "Number" }],
+        options: [
+          {
+            key: "value",
+            label: "Number",
+            placeholder: "e.g. 10, or data with +",
+          },
+        ],
       },
       {
         op: "divide",
         label: "Divide by",
-        options: [{ key: "value", label: "Number" }],
+        options: [
+          {
+            key: "value",
+            label: "Number",
+            placeholder: "e.g. 10, or data with +",
+          },
+        ],
       },
       {
         op: "format_number",
         label: "Format (1,234.50)",
         options: [
-          { key: "decimals", label: "Decimals", placeholder: "2" },
-          { key: "locale", label: "Locale", placeholder: "en-US" },
+          {
+            key: "decimals",
+            label: "Digits after the point",
+            placeholder: "2",
+          },
+          {
+            key: "locale",
+            label: "Language and region (e.g. en-US, bn-BD)",
+            placeholder: "en-US",
+          },
         ],
       },
     ],
@@ -84,7 +132,11 @@ export const FORMAT_GROUPS: Array<{
             label: "Style (short, medium, long, full)",
             placeholder: "medium",
           },
-          { key: "locale", label: "Locale", placeholder: "en-US" },
+          {
+            key: "locale",
+            label: "Language and region (e.g. en-US, bn-BD)",
+            placeholder: "en-US",
+          },
         ],
       },
       {

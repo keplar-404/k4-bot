@@ -1,8 +1,9 @@
 "use client";
 
 import { RefreshCwIcon } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { fieldSetter, useLocalStore } from "@/lib/store/local-store";
 import { request } from "../../../api";
 
 type Call = {
@@ -15,14 +16,17 @@ type Call = {
 
 /** The latest calls to this webhook: accepted or refused and why (a wrong token, a bad signature, a blocked IP…). */
 export function WebhookRequests({ workflowId }: { workflowId: string }) {
-  const [calls, setCalls] = useState<Call[] | null>(null);
+  const [{ calls }, , store] = useLocalStore(() => ({
+    calls: null as Call[] | null,
+  }));
+  const setCalls = fieldSetter(store, "calls");
   const load = useCallback(
     () =>
       request<{ items: Call[] }>(`/${workflowId}/hook-requests`).then(
         (r) => setCalls(r.items),
         () => setCalls([]),
       ),
-    [workflowId],
+    [workflowId, setCalls],
   );
   useEffect(() => void load(), [load]);
   return (

@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { toast } from "sonner";
+import { fieldSetter, useLocalStore } from "@/lib/store/local-store";
 import {
   type Attachment,
   MAX_ATTACHMENTS,
@@ -16,7 +17,10 @@ export type { Attachment } from "./attachment";
  * then carries only the stored files' ids. A failed upload is dropped with a toast saying why.
  */
 export function useAttachments(botId: string) {
-  const [items, setItems] = useState<Attachment[]>([]);
+  const [{ items }, , store] = useLocalStore(() => ({
+    items: [] as Attachment[],
+  }));
+  const setItems = fieldSetter(store, "items");
   const aborts = useRef(new Map<string, AbortController>());
 
   // The upload starts here, outside any state updater (React may run an updater twice).
@@ -24,20 +28,23 @@ export function useAttachments(botId: string) {
   countRef.current = items.length;
 
   /** Drops one attachment and frees its preview. */
-  const drop = useCallback((key: string) => {
-    setItems((list) => {
-      const gone = list.find((a) => a.key === key);
-      if (gone) revoke(gone);
-      return list.filter((a) => a.key !== key);
-    });
-  }, []);
+  const drop = useCallback(
+    (key: string) => {
+      setItems((list) => {
+        const gone = list.find((a) => a.key === key);
+        if (gone) revoke(gone);
+        return list.filter((a) => a.key !== key);
+      });
+    },
+    [setItems],
+  );
 
   const update = useCallback(
     (key: string, patch: Partial<Attachment>) =>
       setItems((list) =>
         list.map((a) => (a.key === key ? { ...a, ...patch } : a)),
       ),
-    [],
+    [setItems],
   );
 
   const add = useCallback(
@@ -56,7 +63,7 @@ export function useAttachments(botId: string) {
       countRef.current += fresh.length;
       setItems((current) => [...current, ...fresh]);
     },
-    [botId, update, drop],
+    [botId, update, drop, setItems],
   );
 
   const remove = useCallback(
@@ -73,7 +80,7 @@ export function useAttachments(botId: string) {
       for (const a of list) revoke(a);
       return [];
     });
-  }, []);
+  }, [setItems]);
 
   // Switching bots or leaving the page: stop uploads and free the previews.
   // biome-ignore lint/correctness/useExhaustiveDependencies: runs on bot change only

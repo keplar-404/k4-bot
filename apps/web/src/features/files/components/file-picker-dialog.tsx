@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { fieldSetter, useLocalStore } from "@/lib/store/local-store";
 import type { LibraryFile } from "../api/library";
 import { FilePickerList } from "./file-picker-list";
 import { useLibraryFiles } from "./use-library-files";
@@ -44,8 +45,12 @@ export function FilePickerDialog({
   accept?: (f: LibraryFile) => boolean;
 }) {
   const { files, cursor, loading, error, load } = useLibraryFiles();
-  const [query, setQuery] = useState("");
-  const [chosen, setChosen] = useState<string[]>(picked);
+  const [{ query, chosen }, , store] = useLocalStore(() => ({
+    query: "",
+    chosen: picked as string[],
+  }));
+  const setQuery = fieldSetter(store, "query");
+  const setChosen = fieldSetter(store, "chosen");
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: reload on open only
   useEffect(() => {

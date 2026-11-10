@@ -29,7 +29,12 @@ export function ConnectPage() {
       ? conns.connectedSlugs
       : null
     : null;
-  const catalog = useCatalog({ q: query, category, slugs });
+  const catalog = useCatalog({
+    q: query,
+    category,
+    slugs,
+    noAuth: status === "no-account",
+  });
   useConnectReturn(conns.reload);
 
   const error = catalog.error ?? conns.error;
@@ -53,7 +58,7 @@ export function ConnectPage() {
           loading={catalog.loading}
           query={query}
           onlyConnected={onlyConnected}
-          filtered={Boolean(query || category)}
+          filtered={Boolean(query || category || status === "no-account")}
           stateOf={conns.stateOf}
           busySlug={conns.busy}
           onConnect={(slug) => void conns.connect(slug)}

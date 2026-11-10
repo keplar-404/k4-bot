@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
 import { toast } from "sonner";
+import { fieldSetter, useLocalStore } from "@/lib/store/local-store";
 import { runWorkflow, type WorkflowApiError } from "../../api";
 import { useRunView } from "../../live/run-view-store";
 import { refreshRuns } from "../../live/use-live-runs";
@@ -25,7 +25,10 @@ function before(edges: Array<{ source: string; target: string }>, id: string) {
  * shown (and pinned outputs win), so apps before it are not called again when that data exists.
  */
 export function useTestStep(blockId: string) {
-  const [busy, setBusy] = useState(false);
+  const [{ busy }, , store] = useLocalStore(() => ({
+    busy: false,
+  }));
+  const setBusy = fieldSetter(store, "busy");
   async function test() {
     const { workflow, edges, saved } = useBuilder.getState();
     if (!workflow) return;

@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { fetchCatalog, fetchConnections } from "@/features/connect/api";
 import { listFiles } from "@/features/files/api/library";
 import { listWorkflows } from "@/features/workflows/api";
+import { fieldSetter, useLocalStore } from "@/lib/store/local-store";
 import { ATTACH, type Source } from "./data";
 
 const PER_SECTION = 6;
@@ -70,10 +71,13 @@ async function loadSources(): Promise<Source[]> {
 
 /** The "@" menu's entries, filtered by what was typed after "@" (a few per section, connected apps first). */
 export function useMentionSources(open: boolean, query: string): Source[] {
-  const [all, setAll] = useState<Source[] | null>(null);
+  const [{ all }, , store] = useLocalStore(() => ({
+    all: null as Source[] | null,
+  }));
+  const setAll = fieldSetter(store, "all");
   useEffect(() => {
     if (open && all === null) void loadSources().then(setAll);
-  }, [open, all]);
+  }, [open, all, setAll]);
   const q = query.toLowerCase();
   const matches = (all ?? [ATTACH]).filter(
     (s) => !q || `${s.name} ${s.desc}`.toLowerCase().includes(q),

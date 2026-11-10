@@ -1,10 +1,10 @@
 "use client";
 
 import { CheckIcon, KeyRoundIcon, Loader2Icon, PlusIcon } from "lucide-react";
-import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { type CatalogMcp, connectMcp } from "@/features/integrations/api";
+import { fieldSetter, useLocalStore } from "@/lib/store/local-store";
 
 /** Every MCP server you can connect. A card opens its page; + connects it (apps that need a token open their page). */
 export function ServerCatalog({
@@ -14,7 +14,10 @@ export function ServerCatalog({
   catalog: CatalogMcp[];
   onOpen: (serverId: string) => void;
 }) {
-  const [busy, setBusy] = useState<string | null>(null);
+  const [{ busy }, , store] = useLocalStore(() => ({
+    busy: null as string | null,
+  }));
+  const setBusy = fieldSetter(store, "busy");
   const add = async (s: CatalogMcp) => {
     // Apps that need a token open their page, where the form is.
     if (s.fields.length > 0) return onOpen(s.id);

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
+import { fieldSetter, useLocalStore } from "@/lib/store/local-store";
 import { saveWorkflow, type WorkflowApiError } from "../api";
 import { flowToGraph } from "./flow";
 import { useBuilder } from "./store";
@@ -16,10 +17,15 @@ const DELAY_MS = 900;
  */
 export function useAutosave() {
   const version = useBuilder((s) => s.version);
-  const [state, setState] = useState<SaveState>("saved");
-  const [message, setMessage] = useState<string | null>(null);
+  const [{ state, message, tick }, , store] = useLocalStore(() => ({
+    state: "saved" as SaveState,
+    message: null as string | null,
+    tick: 0,
+  }));
+  const setState = fieldSetter(store, "state");
+  const setMessage = fieldSetter(store, "message");
+  const setTick = fieldSetter(store, "tick");
   /** Re-runs the save after one finishes, for changes made while it was in flight. */
-  const [tick, setTick] = useState(0);
   const saving = useRef(false);
   const saved = useRef(0);
 

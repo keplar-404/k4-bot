@@ -55,12 +55,12 @@ export function ManualFormSettings({
         <div
           // biome-ignore lint/suspicious/noArrayIndexKey: fields are edited in place; the key text itself changes
           key={i}
-          className="flex flex-col gap-2 rounded-lg border p-2"
+          className="flex flex-col gap-2 border-l-2 py-0.5 pl-3"
         >
-          <div className="grid grid-cols-[1fr_auto_auto] items-center gap-2">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2">
             <Input
               aria-label="Field label"
-              placeholder="Customer email"
+              placeholder="Question to ask, e.g. Customer email"
               value={f.label}
               maxLength={80}
               onChange={(e) =>
@@ -93,6 +93,14 @@ export function ManualFormSettings({
               <Trash2Icon />
             </Button>
           </div>
+          <Input
+            aria-label="Help text"
+            placeholder="Help text (optional), e.g. Their work email"
+            value={f.help ?? ""}
+            maxLength={200}
+            className="h-8 text-xs"
+            onChange={(e) => edit(i, { help: e.target.value })}
+          />
           <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
             <code className="truncate">{`{{trigger.inputs.${f.key}}}`}</code>
             <label

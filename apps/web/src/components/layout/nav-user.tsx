@@ -5,7 +5,6 @@ import {
   LogOutIcon,
   SlidersHorizontalIcon,
 } from "lucide-react";
-import { useState } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,6 +23,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { signOut, useSession } from "@/features/auth/auth-client";
 import { MemoryDialog } from "@/features/memory/memory-dialog";
+import { fieldSetter, useLocalStore } from "@/lib/store/local-store";
 import { UserIdentity } from "./user-identity";
 
 export function NavUser() {
@@ -33,7 +33,10 @@ export function NavUser() {
   const name = user?.name ?? "";
   const email = user?.email ?? "";
   const avatar = (user as { image?: string | null } | undefined)?.image ?? "";
-  const [prefsOpen, setPrefsOpen] = useState(false);
+  const [{ prefsOpen }, , store] = useLocalStore(() => ({
+    prefsOpen: false,
+  }));
+  const setPrefsOpen = fieldSetter(store, "prefsOpen");
 
   async function handleSignOut() {
     await signOut();

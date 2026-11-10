@@ -41,8 +41,8 @@ export const logoOf = (slug: string) =>
 /** Success rate over the last 7 days as a whole percent, or null when nothing finished. */
 export function successRate(s: WorkflowStats | null): number | null {
   if (!s) return null;
-  const finished = s.succeeded7d + s.failed7d;
-  return finished ? Math.round((s.succeeded7d / finished) * 100) : null;
+  const finished = s.succeededInRange + s.failedInRange;
+  return finished ? Math.round((s.succeededInRange / finished) * 100) : null;
 }
 
 const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });

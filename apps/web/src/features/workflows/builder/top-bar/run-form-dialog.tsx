@@ -58,8 +58,16 @@ export function RunFormDialog({
             const label = `${f.label || f.key}${f.required ? " *" : ""}`;
             if (f.type === "yes_no")
               return (
-                <div key={f.key} className="flex items-center justify-between">
-                  <Label htmlFor={id}>{label}</Label>
+                <div
+                  key={f.key}
+                  className="flex items-center justify-between gap-3"
+                >
+                  <div className="flex flex-col gap-0.5">
+                    <Label htmlFor={id}>{label}</Label>
+                    {f.help && (
+                      <p className="text-muted-foreground text-xs">{f.help}</p>
+                    )}
+                  </div>
                   <Switch
                     id={id}
                     checked={values[f.key] === true}
@@ -72,11 +80,15 @@ export function RunFormDialog({
             return (
               <div key={f.key} className="flex flex-col gap-1.5">
                 <Label htmlFor={id}>{label}</Label>
+                {/* The help text the workflow's author wrote for this question, always shown (not only as a placeholder). */}
+                {f.help && (
+                  <p className="text-muted-foreground text-xs">{f.help}</p>
+                )}
                 <Input
                   id={id}
                   type={f.type === "number" ? "number" : "text"}
                   placeholder={
-                    f.type === "list" ? "Separate items with commas" : f.help
+                    f.type === "list" ? "Separate items with commas" : undefined
                   }
                   value={String(values[f.key] ?? "")}
                   onChange={(e) =>

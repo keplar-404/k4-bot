@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
+import { create } from "zustand";
 import type { RoleId } from "@/features/bots/roles";
 
 const BASE = process.env.NEXT_PUBLIC_AUTH_URL ?? "http://localhost:8787";
@@ -30,28 +31,33 @@ export const FALLBACK_DEFAULTS: DomainDefaults = {
   maxParallelTools: 5,
 };
 
-let cached: Promise<DomainInfo[]> | null = null;
+/** Per-role defaults from the server (modules/agent/domains), shared and fetched once per page load. */
+const useDomainsStore = create<{
+  domains: DomainInfo[];
+  loaded: boolean;
+  loading: boolean;
+  load: () => Promise<void>;
+}>()((set, get) => ({
+  domains: [],
+  loaded: false,
+  loading: false,
+  load: async () => {
+    if (get().loaded || get().loading) return;
+    set({ loading: true });
+    // A failure falls back quietly and is tried again on the next mount.
+    const domains = await fetch(`${BASE}/api/v1/bots/domains`, {
+      credentials: "include",
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((b) => (b as { domains?: DomainInfo[] } | null)?.domains ?? null)
+      .catch(() => null);
+    set({ loading: false, ...(domains ? { domains, loaded: true } : {}) });
+  },
+}));
 
-/** Per-role defaults from the server (modules/agent/domains), fetched once per page load. A failure falls back quietly. */
 export function useDomains(): DomainInfo[] {
-  const [domains, setDomains] = useState<DomainInfo[]>([]);
-  useEffect(() => {
-    cached ??= fetch(`${BASE}/api/v1/bots/domains`, { credentials: "include" })
-      .then((r) => {
-        if (r.ok) return r.json();
-        cached = null; // a failed reply must not stick for the whole page load
-        return { domains: [] };
-      })
-      .then((b) => (b as { domains?: DomainInfo[] }).domains ?? [])
-      .catch(() => {
-        cached = null;
-        return [];
-      });
-    let live = true;
-    void cached.then((d) => live && setDomains(d));
-    return () => {
-      live = false;
-    };
-  }, []);
+  const domains = useDomainsStore((s) => s.domains);
+  const load = useDomainsStore((s) => s.load);
+  useEffect(() => void load(), [load]);
   return domains;
 }

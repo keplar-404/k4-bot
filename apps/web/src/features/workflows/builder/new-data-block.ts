@@ -15,7 +15,11 @@ export function newDataBlock(
       return {
         ...base,
         kind,
-        config: { code: "// `input` holds the fields below. Return the result.\nreturn { total: (input.items ?? []).length };", inputs: [], timeoutSeconds: 30 },
+        config: {
+          code: "// `input` holds the fields below. Return the result.\nreturn { total: (input.items ?? []).length };",
+          inputs: [],
+          timeoutSeconds: 30,
+        },
         onError: "stop",
       };
     case "logic.format":

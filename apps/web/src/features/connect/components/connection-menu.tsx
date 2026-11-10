@@ -4,7 +4,6 @@ import {
   Loader2Icon,
   MonitorIcon,
   MoreHorizontalIcon,
-  PlusIcon,
   UnplugIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -21,18 +20,16 @@ import { useState } from "react";
 import type { Connection } from "../api";
 import { BotLoginDialog } from "./bot-login-dialog";
 
-/** The "…" menu of a connected app: add another account, or disconnect one of them. */
+/** The "…" menu of a connected app: log in on a bot's computer, or disconnect it (one account per app). */
 export function ConnectionMenu({
   appName,
   connections,
   busy,
-  onConnect,
   onDisconnect,
 }: {
   appName: string;
   connections: Connection[];
   busy: boolean;
-  onConnect: () => void;
   onDisconnect: (c: Connection) => void;
 }) {
   const [loginOpen, setLoginOpen] = useState(false);
@@ -60,10 +57,6 @@ export function ConnectionMenu({
       <DropdownMenuContent align="end" className="w-60">
         <DropdownMenuGroup>
           <DropdownMenuLabel>{appName}</DropdownMenuLabel>
-          <DropdownMenuItem onClick={onConnect}>
-            <PlusIcon />
-            Connect another account
-          </DropdownMenuItem>
           {hasActive && (
             <DropdownMenuItem onClick={() => setLoginOpen(true)}>
               <MonitorIcon />

@@ -34,8 +34,8 @@ export function LoopSettings({
       </Field>
       <Field
         id="loop-max"
-        label="At most"
-        hint="Items after this many are left out (up to 100)."
+        label="Go through at most (items)"
+        hint="Only the first this many items are used; the rest are left out (up to 100)."
       >
         <Input
           id="loop-max"

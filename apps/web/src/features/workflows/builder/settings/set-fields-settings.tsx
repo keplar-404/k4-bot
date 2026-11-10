@@ -48,65 +48,74 @@ export function SetFieldsSettings({
         <TemplateInput
           id="set-base"
           value={base}
-          placeholder="Pick an object with +"
+          placeholder="Optional: pick a record with +"
           onChange={(b) => set(fields, b)}
         />
       </Field>
-      {fields.map((f, i) => (
-        <div
-          // biome-ignore lint/suspicious/noArrayIndexKey: rows are ordered and have no identity of their own
-          key={i}
-          className="grid grid-cols-[1fr_1.6fr_auto_auto] items-center gap-2"
-        >
-          <Input
-            aria-label="Field name"
-            placeholder="name"
-            value={f.key}
-            onChange={(e) =>
-              edit(i, { key: e.target.value.replace(/[^A-Za-z0-9_]/g, "") })
-            }
-          />
-          <TemplateInput
-            aria-label="Value"
-            placeholder={
-              f.type === "list"
-                ? "a, b, c"
-                : f.type === "object"
-                  ? '{"a": 1}'
-                  : "Text, or data with +"
-            }
-            value={f.value}
-            onChange={(value) => edit(i, { value })}
-          />
-          <Select
-            value={f.type ?? "text"}
-            onValueChange={(v) => v && edit(i, { type: v as SetField["type"] })}
+      <div className="@container flex flex-col gap-3">
+        {fields.map((f, i) => (
+          <div
+            // biome-ignore lint/suspicious/noArrayIndexKey: rows are ordered and have no identity of their own
+            key={i}
+            className="grid grid-cols-[minmax(0,1fr)_7rem_auto] items-center gap-x-2 gap-y-1.5 border-l-2 pl-2.5 @xl:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)_7rem_auto] @xl:border-l-0 @xl:pl-0"
           >
-            <SelectTrigger aria-label="Type" className="w-24">
-              <SelectValue>{TYPES[f.type ?? "text"]}</SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {Object.entries(TYPES).map(([t, label]) => (
-                <SelectItem key={t} value={t}>
-                  {label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button
-            size="icon-sm"
-            variant="ghost"
-            aria-label={`Remove ${f.key || "field"}`}
-            onClick={() => set(fields.filter((_, j) => j !== i))}
-          >
-            <Trash2Icon />
-          </Button>
-        </div>
-      ))}
+            <Input
+              aria-label="Field name"
+              placeholder="Field name, e.g. full_name"
+              className="font-mono text-xs"
+              value={f.key}
+              onChange={(e) =>
+                edit(i, { key: e.target.value.replace(/[^A-Za-z0-9_]/g, "") })
+              }
+            />
+            <div className="col-span-3 row-start-2 min-w-0 @xl:col-span-1 @xl:row-start-auto">
+              <TemplateInput
+                aria-label={`Value of ${f.key || "this field"}`}
+                placeholder={
+                  f.type === "list"
+                    ? "Items with commas: red, green, blue"
+                    : f.type === "object"
+                      ? '{"city": "Dhaka"}'
+                      : "A value, or data with +"
+                }
+                value={f.value}
+                onChange={(value) => edit(i, { value })}
+              />
+            </div>
+            <Select
+              value={f.type ?? "text"}
+              onValueChange={(v) =>
+                v && edit(i, { type: v as SetField["type"] })
+              }
+            >
+              <SelectTrigger aria-label="Type" className="w-full">
+                <SelectValue>{TYPES[f.type ?? "text"]}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(TYPES).map(([t, label]) => (
+                  <SelectItem key={t} value={t}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              size="icon-sm"
+              variant="ghost"
+              className="text-muted-foreground hover:text-destructive"
+              aria-label={`Remove ${f.key || "field"}`}
+              onClick={() => set(fields.filter((_, j) => j !== i))}
+            >
+              <Trash2Icon />
+            </Button>
+          </div>
+        ))}
+      </div>
       {fields.length < 20 && (
         <Button
           size="sm"
-          variant="outline"
+          variant="ghost"
+          className="self-start text-muted-foreground"
           onClick={() =>
             set([
               ...fields,

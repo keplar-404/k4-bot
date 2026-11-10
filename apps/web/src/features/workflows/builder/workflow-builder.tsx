@@ -3,9 +3,10 @@
 import { ReactFlowProvider } from "@xyflow/react";
 import { Loader2Icon } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { fieldSetter, useLocalStore } from "@/lib/store/local-store";
 import { getWorkflow } from "../api";
 import { RunBanner } from "../live/run-banner";
 import { RunsDrawer } from "../live/runs-drawer";
@@ -29,15 +30,19 @@ import { ShortcutKeys } from "./use-shortcuts";
 export function WorkflowBuilder({ id }: { id: string }) {
   const load = useBuilder((s) => s.load);
   const loaded = useBuilder((s) => s.workflow?.id === id);
-  const [error, setError] = useState<string | null>(null);
-  const [runsOpen, setRunsOpen] = useState(false);
+  const [{ error, runsOpen }, , store] = useLocalStore(() => ({
+    error: null as string | null,
+    runsOpen: false,
+  }));
+  const setError = fieldSetter(store, "error");
+  const setRunsOpen = fieldSetter(store, "runsOpen");
   const save = useAutosave();
   useLiveRuns(id);
 
   useEffect(() => {
     setError(null);
     getWorkflow(id).then(load, (e: Error) => setError(e.message));
-  }, [id, load]);
+  }, [id, load, setError]);
 
   // Back from connecting an app (Composio returns here with ?connected=<app>): say so, then drop the parameter.
   useEffect(() => {

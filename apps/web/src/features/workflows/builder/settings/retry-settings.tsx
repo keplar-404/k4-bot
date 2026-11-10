@@ -41,7 +41,11 @@ export function RetrySettings({
   return (
     <SettingsSection title="If it fails">
       <div className="grid grid-cols-2 gap-3">
-        <Field id="retry-attempts" label="Tries" hint="1 = no retry, up to 5.">
+        <Field
+          id="retry-attempts"
+          label="Tries in total"
+          hint="1 means no retry, up to 5. Only errors that may pass (a busy service, a timeout) are tried again."
+        >
           <Input
             id="retry-attempts"
             type="number"
@@ -55,8 +59,8 @@ export function RetrySettings({
         </Field>
         <Field
           id="retry-delay"
-          label="Wait (seconds)"
-          hint="Before the 2nd try."
+          label="Wait before trying again (seconds)"
+          hint="The pause before the 2nd try."
         >
           <Input
             id="retry-delay"
@@ -74,7 +78,11 @@ export function RetrySettings({
           />
         </Field>
       </div>
-      <Field id="retry-backoff" label="Between tries">
+      <Field
+        id="retry-backoff"
+        label="Later waits"
+        hint="Keep the same wait, or double it each time (gentler on a busy service)."
+      >
         <Select
           value={retry.backoff}
           disabled={retry.maxAttempts === 1}

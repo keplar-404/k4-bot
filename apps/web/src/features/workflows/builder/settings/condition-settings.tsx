@@ -10,8 +10,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { BlockBody } from "../blocks";
-import type { Cond } from "./condition-ops";
 import { ConditionGroup } from "./condition-group";
+import type { Cond } from "./condition-ops";
 import { ConditionRow } from "./condition-row";
 import { SettingsSection } from "./field";
 
@@ -28,7 +28,10 @@ export function ConditionSettings({
   const { conditions, combine } = block.config;
   const groups = block.config.groups ?? [];
   const set = (next: Cond[], c = combine, g = groups) =>
-    update({ ...block, config: { combine: c, conditions: next, groups: g } } as CondBlock);
+    update({
+      ...block,
+      config: { combine: c, conditions: next, groups: g },
+    } as CondBlock);
   const edit = (i: number, patch: Partial<Cond>) =>
     set(conditions.map((c, j) => (j === i ? { ...c, ...patch } : c)));
   return (
@@ -72,8 +75,20 @@ export function ConditionSettings({
           key={i}
           group={g}
           index={i}
-          onChange={(next) => set(conditions, combine, groups.map((x, j) => (j === i ? next : x)))}
-          onRemove={() => set(conditions, combine, groups.filter((_, j) => j !== i))}
+          onChange={(next) =>
+            set(
+              conditions,
+              combine,
+              groups.map((x, j) => (j === i ? next : x)),
+            )
+          }
+          onRemove={() =>
+            set(
+              conditions,
+              combine,
+              groups.filter((_, j) => j !== i),
+            )
+          }
         />
       ))}
       <div className="flex flex-wrap gap-2">
@@ -95,7 +110,13 @@ export function ConditionSettings({
             variant="ghost"
             title="A group counts as one condition with its own all / any, e.g. A and (B or C)"
             onClick={() =>
-              set(conditions, combine, [...groups, { combine: "any", conditions: [{ left: "", op: "equals", right: "" }] }])
+              set(conditions, combine, [
+                ...groups,
+                {
+                  combine: "any",
+                  conditions: [{ left: "", op: "equals", right: "" }],
+                },
+              ])
             }
           >
             <PlusIcon />

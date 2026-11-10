@@ -1,26 +1,17 @@
 "use client";
 
-import { type Dispatch, type SetStateAction, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { ChatHttpError } from "@/features/chat/lib/client";
 import { backoffMs } from "@/features/chat/lib/outbox";
-import {
-  type ActivityEvent,
-  type ComputerStatus,
-  getStatus,
-  mintSocketToken,
-  socketUrl,
-} from "@/features/computer/api";
+import { getStatus, mintSocketToken, socketUrl } from "@/features/computer/api";
+import { useComputerStore } from "@/features/computer/store";
 
-const MAX_ACTIVITY = 50;
-
-/** Status and activity over one WebSocket to the user's Durable Object, reconnecting with backoff. */
-export function useComputerSocket(
-  applyStatus: (s: ComputerStatus) => void,
-  setActivity: Dispatch<SetStateAction<ActivityEvent[]>>,
-) {
+/** Status and activity over one WebSocket to the user's Durable Object, written into the shared store; reconnects with backoff. */
+export function useComputerSocket() {
   const attempts = useRef(0);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: refs and setters are stable; deps preserved from original
   useEffect(() => {
+    const { applyStatus, pushActivity, setActivity } =
+      useComputerStore.getState();
     let closed = false;
     let ws: WebSocket | null = null;
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -37,11 +28,7 @@ export function useComputerSocket(
           try {
             const frame = JSON.parse(String(event.data));
             if (frame.type === "status") applyStatus(frame.status);
-            else if (frame.type === "activity")
-              setActivity((a) => [
-                ...a.slice(-(MAX_ACTIVITY - 1)),
-                frame.event,
-              ]);
+            else if (frame.type === "activity") pushActivity(frame.event);
             else if (frame.type === "activity-batch") setActivity(frame.events);
           } catch {
             // ignore a malformed frame
@@ -79,5 +66,5 @@ export function useComputerSocket(
       clearTimeout(timer);
       ws?.close();
     };
-  }, [applyStatus]);
+  }, []);
 }

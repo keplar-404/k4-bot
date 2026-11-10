@@ -18,6 +18,7 @@ const toRow = (t: RawToolkit, rank: number) => ({
   toolsCount: t.meta?.tools_count ?? 0,
   triggersCount: t.meta?.triggers_count ?? 0,
   noAuth: Boolean(t.no_auth),
+  authSchemes: (t.auth_schemes ?? []).filter((s) => typeof s === "string").slice(0, 10),
   rank,
   syncedAt: new Date(),
 });
@@ -52,6 +53,7 @@ export async function syncCatalog(db: Db, composio: Composio): Promise<number> {
           toolsCount: sql`excluded.tools_count`,
           triggersCount: sql`excluded.triggers_count`,
           noAuth: sql`excluded.no_auth`,
+          authSchemes: sql`excluded.auth_schemes`,
           rank: sql`excluded.rank`,
           syncedAt: sql`excluded.synced_at`,
         },

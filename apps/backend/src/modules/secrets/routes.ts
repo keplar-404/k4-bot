@@ -5,12 +5,16 @@ import { userLimit } from "../../middleware/rate-limit";
 import { getRequestContext } from "../../shared/context";
 import { secretHint, SecretsUnavailableError } from "../../shared/secrets";
 import { validate } from "../../shared/validate";
+import { TOOLKIT_SLUG } from "../composio/client";
+import { secretUsage } from "./usage";
 import { deleteSecret, listSecrets, MAX_SECRETS, SECRET_NAME, saveSecret, workflowsUsingSecret } from "./store";
 
 const nameParam = z.object({ name: z.string().regex(SECRET_NAME) });
 const putBody = z.object({
   value: z.string().min(1).max(4096),
   label: z.string().max(120).default(""),
+  /** The app it is for (a Composio toolkit slug), picked from the Secrets page list. */
+  app: z.string().regex(TOOLKIT_SLUG).nullable().default(null),
 });
 
 /** The user's secrets vault (/api/v1/secrets). Values go in encrypted and never come back: only names and a hint. */
@@ -18,19 +22,21 @@ const secrets = new Hono<AuthGuardEnv>()
   .use("*", authGuard)
   .get("/", async (c) => {
     const { db } = getRequestContext(c);
-    const items = await listSecrets(db, c.get("session").user.id);
+    const userId = c.get("session").user.id;
+    const [items, usage] = await Promise.all([listSecrets(db, userId), secretUsage(db, userId)]);
     c.header("Cache-Control", "no-store");
-    return c.json({ items });
+    // Each secret with where it is used (which workflow, and for which app or site there).
+    return c.json({ items: items.map((s) => ({ ...s, usedBy: usage.get(s.name) ?? [] })) });
   })
 
   .put("/:name", userLimit, validate("param", nameParam), validate("json", putBody), async (c) => {
     const { db, env } = getRequestContext(c);
     const { name } = c.req.valid("param");
-    const { value, label } = c.req.valid("json");
+    const { value, label, app } = c.req.valid("json");
 
     let saved: Awaited<ReturnType<typeof saveSecret>>;
     try {
-      saved = await saveSecret(env, db, c.get("session").user.id, { name, label, value });
+      saved = await saveSecret(env, db, c.get("session").user.id, { name, label, value, app });
     } catch (error) {
       if (error instanceof SecretsUnavailableError) {
         return c.json({ error: "NOT_CONFIGURED", message: "Secrets are not set up on this server." }, 503);

@@ -1,4 +1,5 @@
 import {
+  CodeIcon,
   FilterIcon,
   GitBranchIcon,
   GlobeIcon,
@@ -13,7 +14,6 @@ import {
   SparklesIcon,
   SplitIcon,
   WandIcon,
-  CodeIcon,
 } from "lucide-react";
 import { TRIGGER_BLOCKS } from "./block-catalog-triggers";
 import type { BlockKind } from "./blocks";

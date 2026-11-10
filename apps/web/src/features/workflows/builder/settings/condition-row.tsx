@@ -36,10 +36,10 @@ export function ConditionRow({
   onRemove: () => void;
 }) {
   return (
-    <div className="flex flex-col gap-2 rounded-lg border p-2.5">
+    <div className="flex flex-col gap-2 border-l-2 py-0.5 pl-3">
       <TemplateInput
         aria-label="Value to check"
-        placeholder="Value to check: pick one with +"
+        placeholder="What to check: pick data with +, e.g. the email subject"
         value={cond.left}
         onChange={(left) => onChange({ left })}
       />
@@ -66,7 +66,10 @@ export function ConditionRow({
       {!UNARY.has(cond.op) && (
         <TemplateInput
           aria-label="Compare with"
-          placeholder={RIGHT_PLACEHOLDER[cond.op] ?? "e.g. paid"}
+          placeholder={
+            RIGHT_PLACEHOLDER[cond.op] ??
+            "Compare with: a value like paid, or data with +"
+          }
           value={cond.right ?? ""}
           onChange={(right) => onChange({ right })}
         />

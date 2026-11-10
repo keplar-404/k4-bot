@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
+import { fieldSetter, useLocalStore } from "@/lib/store/local-store";
 import { openEditor, socketUrl } from "./api";
 
 /** What the sandbox tells an open editor. */
@@ -23,10 +24,12 @@ export function useSandboxSocket(
   botId: string,
   onEvent: (e: SandboxEvent) => void,
 ) {
-  const [state, setState] = useState<"connecting" | "open" | "error">(
-    "connecting",
-  );
-  const [error, setError] = useState<string | null>(null);
+  const [{ state, error }, , store] = useLocalStore(() => ({
+    state: "connecting" as "connecting" | "open" | "error",
+    error: null as string | null,
+  }));
+  const setState = fieldSetter(store, "state");
+  const setError = fieldSetter(store, "error");
   const handler = useRef(onEvent);
   handler.current = onEvent;
 
@@ -75,7 +78,7 @@ export function useSandboxSocket(
       clearTimeout(timer);
       ws?.close();
     };
-  }, [botId]);
+  }, [botId, setError, setState]);
 
   return { state, error };
 }

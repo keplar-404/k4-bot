@@ -94,14 +94,20 @@ export function HttpPagination({
                 type="number"
                 min={0}
                 value={value.start}
-                onChange={(e) => set({ start: num(e.target.value, 0, 1_000_000) })}
+                onChange={(e) =>
+                  set({ start: num(e.target.value, 0, 1_000_000) })
+                }
               />
             </Field>
           )}
           {value.mode !== "page" && (
             <Field
               id="http-next"
-              label={value.mode === "cursor" ? "Where the next cursor is" : "Where the next URL is"}
+              label={
+                value.mode === "cursor"
+                  ? "Where the next cursor is"
+                  : "Where the next URL is"
+              }
               hint="The path in each response, e.g. next_cursor or links.next."
             >
               <Input

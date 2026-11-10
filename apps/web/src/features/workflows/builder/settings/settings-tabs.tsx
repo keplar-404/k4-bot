@@ -32,7 +32,7 @@ export function SettingsTabs({
   const tabs: Array<[Tab, string]> = [
     ["setup", "Setup"],
     ...(!isTrigger ? [["data", "Data"] as [Tab, string]] : []),
-    ["run", "Output"],
+    ["run", "Test"],
     ...(hasOptions(block) ? [["options", "Options"] as [Tab, string]] : []),
   ];
   const [tab, setTab] = useState<Tab>("setup");

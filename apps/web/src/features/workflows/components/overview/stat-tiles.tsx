@@ -5,7 +5,15 @@ import {
   WorkflowIcon,
 } from "lucide-react";
 import type { ReactNode } from "react";
-import type { WorkflowListItem } from "../../api";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import type { RunRange, WorkflowListItem } from "../../api";
+import { RANGE_INFO } from "./range";
 
 function Tile({
   label,
@@ -19,27 +27,38 @@ function Tile({
   icon: ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-1 rounded-xl border bg-card p-4">
-      <span className="flex items-center gap-2 text-muted-foreground text-xs [&_svg]:size-3.5">
-        {icon}
-        {label}
-      </span>
-      <span className="font-semibold text-2xl tabular-nums tracking-tight">
-        {value}
-      </span>
-      <span className="text-muted-foreground text-xs">{hint}</span>
-    </div>
+    <Card size="sm">
+      <CardHeader>
+        <CardDescription className="flex items-center gap-2 [&_svg]:size-3.5">
+          {icon}
+          {label}
+        </CardDescription>
+        <CardTitle className="font-semibold text-2xl tabular-nums tracking-tight">
+          {value}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="text-muted-foreground text-xs">
+        {hint}
+      </CardContent>
+    </Card>
   );
 }
 
-/** Four numbers that say how the user's automation is doing this week. */
-export function StatTiles({ items }: { items: WorkflowListItem[] }) {
+/** Four numbers that say how the user's automation is doing in the chosen period. */
+export function StatTiles({
+  items,
+  range,
+}: {
+  items: WorkflowListItem[];
+  range: RunRange;
+}) {
+  const period = RANGE_INFO[range].period;
   const active = items.filter((w) => w.status === "active").length;
-  const sum = (key: "runs7d" | "succeeded7d" | "failed7d") =>
+  const sum = (key: "runsInRange" | "succeededInRange" | "failedInRange") =>
     items.reduce((n, w) => n + (w.stats?.[key] ?? 0), 0);
-  const runs = sum("runs7d");
-  const ok = sum("succeeded7d");
-  const failed = sum("failed7d");
+  const runs = sum("runsInRange");
+  const ok = sum("succeededInRange");
+  const failed = sum("failedInRange");
   const rate = ok + failed ? `${Math.round((ok / (ok + failed)) * 100)}%` : "—";
   return (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -53,19 +72,19 @@ export function StatTiles({ items }: { items: WorkflowListItem[] }) {
         icon={<ActivityIcon />}
         label="Runs"
         value={runs.toLocaleString()}
-        hint="Last 7 days"
+        hint={period}
       />
       <Tile
         icon={<CircleCheckIcon />}
         label="Success rate"
         value={rate}
-        hint={`${ok.toLocaleString()} succeeded`}
+        hint={`${ok.toLocaleString()} succeeded · ${period.toLowerCase()}`}
       />
       <Tile
         icon={<CircleAlertIcon />}
         label="Failed runs"
         value={failed.toLocaleString()}
-        hint="Last 7 days"
+        hint={period}
       />
     </div>
   );

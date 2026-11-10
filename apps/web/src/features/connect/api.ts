@@ -52,6 +52,7 @@ export function fetchCatalog(
     category?: string;
     slugs?: string[];
     withTriggers?: boolean;
+    noAuth?: boolean;
     offset: number;
     limit: number;
   },
@@ -65,6 +66,7 @@ export function fetchCatalog(
   if (query.category) params.set("category", query.category);
   if (query.slugs) params.set("slugs", query.slugs.join(","));
   if (query.withTriggers) params.set("withTriggers", "1");
+  if (query.noAuth) params.set("noAuth", "1");
   return request<{ items: CatalogApp[]; total: number }>(`/catalog?${params}`, {
     signal,
   });
@@ -90,3 +92,12 @@ export const disconnectApp = (id: string) =>
   request<{ ok: true }>(`/connections/${encodeURIComponent(id)}`, {
     method: "DELETE",
   });
+
+/** An app a secret can be for: it signs in with an API key, token or basic login (Composio's auth schemes). */
+export type SecretApp = { slug: string; name: string; logo: string | null };
+
+export const fetchSecretApps = (q: string, signal?: AbortSignal, limit = 40) =>
+  request<{ items: SecretApp[] }>(
+    `/secret-apps?${new URLSearchParams({ ...(q ? { q } : {}), limit: String(limit) })}`,
+    { signal },
+  ).then((r) => r.items);

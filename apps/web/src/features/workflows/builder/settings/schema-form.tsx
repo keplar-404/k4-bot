@@ -1,6 +1,7 @@
 "use client";
 
 import { ChevronRightIcon } from "lucide-react";
+import { useRef } from "react";
 import {
   Collapsible,
   CollapsibleContent,
@@ -43,17 +44,18 @@ export function SchemaForm({
   );
   const must = props.filter(([k]) => required.has(k));
   const optional = props.filter(([k]) => !required.has(k));
+  // Decided once, when the form first shows: open if there is nothing required or an optional field is already
+  // filled in. Base UI warns if an uncontrolled Collapsible's defaultOpen changes later (e.g. while typing).
+  const startOpen = useRef<boolean | null>(null);
+  startOpen.current ??=
+    must.length === 0 || optional.some(([k]) => value[k] !== undefined);
   if (props.length === 0)
     return <p className="text-muted-foreground text-sm">{emptyText}</p>;
   return (
     <div className="flex flex-col gap-4">
       {must.map(field)}
       {optional.length > 0 && (
-        <Collapsible
-          defaultOpen={
-            must.length === 0 || optional.some(([k]) => value[k] !== undefined)
-          }
-        >
+        <Collapsible defaultOpen={startOpen.current}>
           <CollapsibleTrigger className="group flex w-full items-center gap-1 font-medium text-muted-foreground text-xs hover:text-foreground">
             <ChevronRightIcon className="size-3.5 transition-transform group-data-panel-open:rotate-90" />
             Optional fields ({optional.length})

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Markdown } from "@/components/markdown";
 import {
   Table,
@@ -10,7 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-
+import { fieldSetter, useLocalStore } from "@/lib/store/local-store";
 import { parseCsv } from "./csv";
 
 const MAX_ROWS = 500;
@@ -25,10 +25,13 @@ export function TextView({
   mimeType: string;
   name: string;
 }) {
-  const [text, setText] = useState<string | null>(null);
+  const [{ text }, , store] = useLocalStore(() => ({
+    text: null as string | null,
+  }));
+  const setText = fieldSetter(store, "text");
   useEffect(() => {
     void blob.text().then(setText);
-  }, [blob]);
+  }, [blob, setText]);
   if (text === null) return null;
 
   if (mimeType === "text/markdown" || name.endsWith(".md")) {

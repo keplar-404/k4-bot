@@ -34,10 +34,12 @@ export function QuestionRow({
 }) {
   const field = TYPES.find(([t]) => t === q.type)?.[2] ?? "noul";
   return (
-    <div className="flex flex-col gap-2 rounded-lg border p-2.5">
-      <div className="grid grid-cols-[1fr_1.2fr_auto] gap-2">
+    <div className="flex flex-col gap-2 border-l-2 py-0.5 pl-3">
+      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_auto] gap-2">
         <Input
           aria-label="Answer name"
+          title="A short name for this answer; later blocks read it by this name"
+          placeholder="Answer name, e.g. urgent"
           value={q.id}
           maxLength={40}
           onChange={(e) =>

@@ -16,10 +16,10 @@ import { SecretPicker } from "./webhook/secret-picker";
 type Auth = Extract<BlockBody, { kind: "action.http" }>["config"]["auth"];
 
 const TYPES: Record<Auth["type"], string> = {
-  none: "None",
-  bearer: "Bearer token",
-  basic: "Username and password (Basic)",
-  api_key: "API key in a header",
+  none: "No sign-in (public API)",
+  bearer: "Token (Authorization: Bearer …)",
+  basic: "Username and password",
+  api_key: "API key in a header (e.g. x-api-key)",
 };
 const SECRET_REF = /^\{\{\s*secrets\.([A-Za-z0-9_]+)\s*\}\}$/;
 
@@ -35,7 +35,11 @@ export function HttpAuth({
   const secret = SECRET_REF.exec(auth.token)?.[1];
   return (
     <SettingsSection title="Sign in">
-      <Field id="http-auth" label="Type">
+      <Field
+        id="http-auth"
+        label="How the API signs you in"
+        hint="The API’s docs say which one; most use a token or an API key. The key itself is kept on the Secrets page."
+      >
         <Select
           value={auth.type}
           onValueChange={(v) => v && set({ type: v as Auth["type"] })}
@@ -53,7 +57,11 @@ export function HttpAuth({
         </Select>
       </Field>
       {auth.type === "basic" && (
-        <Field id="http-user" label="Username">
+        <Field
+          id="http-user"
+          label="Username"
+          hint="Your account name or email for this service (the password comes from Secrets below)."
+        >
           <TemplateInput
             id="http-user"
             value={auth.username}
@@ -65,12 +73,13 @@ export function HttpAuth({
         <Field
           id="http-key-header"
           label="Header name"
-          hint="The header the service reads the key from."
+          hint="The header name from the API’s docs, e.g. x-api-key or X-Auth-Token."
         >
           <Input
             id="http-key-header"
             value={auth.headerName}
             maxLength={64}
+            placeholder="x-api-key"
             onChange={(e) =>
               set({ headerName: e.target.value.replace(/[^A-Za-z0-9-]/g, "") })
             }

@@ -1,9 +1,9 @@
 "use client";
 
 import { CheckIcon, XIcon } from "lucide-react";
-import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { fieldSetter, useLocalStore } from "@/lib/store/local-store";
 import { type RunDetail, request } from "../api";
 import { refreshDetail } from "./live-events";
 
@@ -34,7 +34,10 @@ export function ApprovalAnswer({
   step: Step;
   compact?: boolean;
 }) {
-  const [busy, setBusy] = useState(false);
+  const [{ busy }, , store] = useLocalStore(() => ({
+    busy: false,
+  }));
+  const setBusy = fieldSetter(store, "busy");
   const answer = async (approved: boolean) => {
     setBusy(true);
     try {

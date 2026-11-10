@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowLeftIcon, ExternalLinkIcon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Markdown } from "@/components/markdown";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -10,6 +10,7 @@ import {
   getSkillDetails,
   type SkillDetails,
 } from "@/features/integrations/api";
+import { fieldSetter, useLocalStore } from "@/lib/store/local-store";
 import { InstallButton } from "./install-button";
 import { publisher, RoleBadge } from "./role-badge";
 import { SkillFiles } from "./skill-files";
@@ -25,8 +26,12 @@ export function SkillDetailsView({
   skill: CatalogSkill;
   onBack: () => void;
 }) {
-  const [details, setDetails] = useState<SkillDetails | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [{ details, error }, , store] = useLocalStore(() => ({
+    details: null as SkillDetails | null,
+    error: null as string | null,
+  }));
+  const setDetails = fieldSetter(store, "details");
+  const setError = fieldSetter(store, "error");
   useEffect(() => {
     let live = true;
     getSkillDetails(skill.id)
@@ -35,7 +40,7 @@ export function SkillDetailsView({
     return () => {
       live = false;
     };
-  }, [skill.id]);
+  }, [skill.id, setDetails, setError]);
 
   return (
     <div className="flex min-h-0 flex-col gap-4">

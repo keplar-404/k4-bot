@@ -2,7 +2,7 @@
 
 import { Loader2Icon } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/select";
 import { useBots } from "@/features/bots/hooks/use-bots";
 import { request } from "@/features/chat/lib/client/http";
+import { fieldSetter, useLocalStore } from "@/lib/store/local-store";
 import type { Connection } from "../api";
 
 /**
@@ -43,18 +44,24 @@ export function BotLoginDialog({
 }) {
   const router = useRouter();
   const { bots } = useBots();
-  const [botId, setBotId] = useState("");
-  const [accountId, setAccountId] = useState("");
-  const [url, setUrl] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [{ botId, accountId, url, busy }, , store] = useLocalStore(() => ({
+    botId: "",
+    accountId: "",
+    url: "",
+    busy: false,
+  }));
+  const setBotId = fieldSetter(store, "botId");
+  const setAccountId = fieldSetter(store, "accountId");
+  const setUrl = fieldSetter(store, "url");
+  const setBusy = fieldSetter(store, "busy");
   const active = connections.filter((c) => c.status === "ACTIVE");
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset only when the dialog opens
   useEffect(() => {
     if (!open) return;
     setBotId(bots[0]?.id ?? "");
     setAccountId(active[0]?.id ?? "");
     setUrl(`https://www.${active[0]?.toolkit ?? "example"}.com`);
-    // biome-ignore lint/correctness/useExhaustiveDependencies: reset only when the dialog opens
-  }, [open]);
+  }, [open, setAccountId, setBotId, setUrl]);
 
   async function openIt() {
     setBusy(true);
@@ -78,11 +85,13 @@ export function BotLoginDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Log in to {appName} on a bot&apos;s computer</DialogTitle>
+          <DialogTitle>
+            Log in to {appName} on a bot&apos;s computer
+          </DialogTitle>
           <DialogDescription>
             The bot&apos;s browser opens the site in this account&apos;s own
-            profile. Take control on the computer page and sign in once; the
-            bot then stays signed in. Disconnecting the app deletes that login.
+            profile. Take control on the computer page and sign in once; the bot
+            then stays signed in. Disconnecting the app deletes that login.
             Turning the computer on uses your computer time.
           </DialogDescription>
         </DialogHeader>
@@ -91,7 +100,9 @@ export function BotLoginDialog({
             <Label htmlFor="login-bot">Bot</Label>
             <Select value={botId} onValueChange={(v) => setBotId(v ?? "")}>
               <SelectTrigger id="login-bot" className="w-full">
-                <SelectValue placeholder="Choose a bot">{bots.find((b) => b.id === botId)?.name}</SelectValue>
+                <SelectValue placeholder="Choose a bot">
+                  {bots.find((b) => b.id === botId)?.name}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {bots.map((b) => (
@@ -105,9 +116,16 @@ export function BotLoginDialog({
           {active.length > 1 && (
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="login-account">Account</Label>
-              <Select value={accountId} onValueChange={(v) => setAccountId(v ?? "")}>
+              <Select
+                value={accountId}
+                onValueChange={(v) => setAccountId(v ?? "")}
+              >
                 <SelectTrigger id="login-account" className="w-full">
-                  <SelectValue>{label(active.find((c) => c.id === accountId) ?? active[0]!)}</SelectValue>
+                  <SelectValue>
+                    {label(
+                      active.find((c) => c.id === accountId) ?? active[0]!,
+                    )}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {active.map((c) => (
@@ -121,11 +139,19 @@ export function BotLoginDialog({
           )}
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="login-url">Website</Label>
-            <Input id="login-url" type="url" value={url} onChange={(e) => setUrl(e.target.value)} />
+            <Input
+              id="login-url"
+              type="url"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+            />
           </div>
         </div>
         <DialogFooter>
-          <Button disabled={busy || !botId || !accountId || !/^https:\/\//.test(url)} onClick={() => void openIt()}>
+          <Button
+            disabled={busy || !botId || !accountId || !/^https:\/\//.test(url)}
+            onClick={() => void openIt()}
+          >
             {busy && <Loader2Icon className="animate-spin" />}
             Open on the computer
           </Button>

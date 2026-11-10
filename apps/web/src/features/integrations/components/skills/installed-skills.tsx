@@ -1,13 +1,13 @@
 "use client";
 
 import { Loader2Icon, Trash2Icon } from "lucide-react";
-import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   type InstalledSkill,
   uninstallSkill,
 } from "@/features/integrations/api";
+import { fieldSetter, useLocalStore } from "@/lib/store/local-store";
 import { RoleBadge } from "./role-badge";
 
 /** The user's installed skills, each with Remove (which also takes it off their bots). */
@@ -16,7 +16,10 @@ export function InstalledSkills({
 }: {
   installed: InstalledSkill[];
 }) {
-  const [removing, setRemoving] = useState<string | null>(null);
+  const [{ removing }, , store] = useLocalStore(() => ({
+    removing: null as string | null,
+  }));
+  const setRemoving = fieldSetter(store, "removing");
   const remove = async (id: string, name: string) => {
     setRemoving(id);
     try {

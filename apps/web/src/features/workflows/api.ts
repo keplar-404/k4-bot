@@ -3,9 +3,10 @@ import type { GraphIssue } from "@backend/modules/workflows/graph/validate";
 import { redirectToSignIn } from "@/features/auth/auth-redirect";
 import { BASE } from "@/features/files/api/library";
 import type {
-  DailyRuns,
   RunDetail,
+  RunRange,
   RunSummary,
+  RunsBucket,
   Workflow,
   WorkflowListItem,
 } from "./types";
@@ -56,8 +57,10 @@ export async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return body as T;
 }
 
-export const listWorkflows = () =>
-  request<{ items: WorkflowListItem[]; daily: DailyRuns[] }>("");
+export const listWorkflows = (range: RunRange = "day") =>
+  request<{ items: WorkflowListItem[]; series: RunsBucket[]; range: RunRange }>(
+    `?range=${range}`,
+  );
 export const getWorkflow = (id: string) => request<Workflow>(`/${id}`);
 export const createWorkflow = (name?: string) =>
   request<Workflow>("", { method: "POST", body: JSON.stringify({ name }) });

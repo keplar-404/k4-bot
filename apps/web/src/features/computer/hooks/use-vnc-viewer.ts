@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { BASE, viewerUrl } from "@/features/computer/api";
+import { fieldSetter, useLocalStore } from "@/lib/store/local-store";
 
 /** Shown if the viewer never reports its state (it always should): never hide a working screen for longer. */
 const REVEAL_FALLBACK_MS = 10_000;
@@ -13,8 +14,12 @@ export type VncState = "connecting" | "reconnecting" | "connected";
  * the viewer page posts back.
  */
 export function useVncViewer(enabled: boolean, mode: "watch" | "control") {
-  const [src, setSrc] = useState<string | null>(null);
-  const [state, setState] = useState<VncState>("connecting");
+  const [{ src, state }, , store] = useLocalStore(() => ({
+    src: null as string | null,
+    state: "connecting" as VncState,
+  }));
+  const setSrc = fieldSetter(store, "src");
+  const setState = fieldSetter(store, "state");
   const frameRef = useRef<HTMLIFrameElement>(null);
   /** The viewer page has reported its state at least once (then the fallback below never overrides it). */
   const reportedRef = useRef(false);
@@ -39,7 +44,7 @@ export function useVncViewer(enabled: boolean, mode: "watch" | "control") {
       cancelled = true;
       clearTimeout(retry);
     };
-  }, [enabled, mode]);
+  }, [enabled, mode, setSrc]);
 
   // A new viewer (new session or mode) starts connecting again.
   // biome-ignore lint/correctness/useExhaustiveDependencies: reset whenever the viewer URL changes
@@ -69,7 +74,7 @@ export function useVncViewer(enabled: boolean, mode: "watch" | "control") {
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, []);
+  }, [setState]);
 
   return { src, state, frameRef };
 }

@@ -80,7 +80,8 @@ export function ConnectToolbar(p: Props) {
             {label ? categoryLabel(label) : "All categories"}
           </SelectValue>
         </SelectTrigger>
-        <SelectContent className="max-h-80">
+        {/* Tall enough to see many categories at once (up to most of the screen). */}
+        <SelectContent className="max-h-[min(36rem,calc(100svh-8rem))]">
           <SelectItem value={ALL}>All categories</SelectItem>
           {p.categories.map((c) => (
             <SelectItem key={c.slug} value={c.slug}>

@@ -37,6 +37,7 @@ export type RawToolkit = {
   slug: string;
   name: string;
   no_auth?: boolean;
+  auth_schemes?: string[];
   meta?: {
     description?: string;
     logo?: string;

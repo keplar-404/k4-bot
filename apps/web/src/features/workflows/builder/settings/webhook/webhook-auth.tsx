@@ -33,7 +33,7 @@ export function WebhookAuth({
     <>
       <Field
         id="hook-auth"
-        label="Check"
+        label="Extra check (optional)"
         hint="The URL is secret either way. A header or signature means a leaked URL alone is not enough."
       >
         <Select
@@ -61,7 +61,11 @@ export function WebhookAuth({
             onChange={(secretName) => set({ secretName })}
           />
           {config.auth === "header" ? (
-            <Field id="hook-header" label="Header name">
+            <Field
+              id="hook-header"
+              label="Header name"
+              hint="The header the sender puts the secret in, e.g. x-webhook-secret. Use the same name in the sending service."
+            >
               <Input
                 id="hook-header"
                 value={config.headerName}
@@ -71,7 +75,11 @@ export function WebhookAuth({
             </Field>
           ) : (
             <div className="grid grid-cols-[1.4fr_1fr] gap-3">
-              <Field id="hook-sig" label="Signature header">
+              <Field
+                id="hook-sig"
+                label="Signature header"
+                hint="Where the sender puts its signature, from its docs (Stripe: Stripe-Signature, GitHub: X-Hub-Signature-256)."
+              >
                 <Input
                   id="hook-sig"
                   value={config.signatureHeader}
@@ -79,7 +87,11 @@ export function WebhookAuth({
                   onChange={(e) => set({ signatureHeader: e.target.value })}
                 />
               </Field>
-              <Field id="hook-prefix" label="Prefix">
+              <Field
+                id="hook-prefix"
+                label="Text before the signature (optional)"
+                hint="Some senders add one, e.g. GitHub sends sha256=… Leave empty if not."
+              >
                 <Input
                   id="hook-prefix"
                   value={config.signaturePrefix}

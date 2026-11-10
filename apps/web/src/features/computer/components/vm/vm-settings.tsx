@@ -1,7 +1,7 @@
 "use client";
 
 import { Loader2Icon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -18,14 +18,22 @@ import {
   getSettings,
   saveSettings,
 } from "@/features/computer/api";
+import { fieldSetter, useLocalStore } from "@/lib/store/local-store";
 
 /** The user's own limits. Each can only be shorter than the server's, so the inputs stop at its ceiling. */
 export function VmSettings() {
-  const [saved, setSaved] = useState<ComputerSettings | null>(null);
-  const [idle, setIdle] = useState("");
-  const [session, setSession] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
+  const [{ saved, idle, session, busy, note }, , store] = useLocalStore(() => ({
+    saved: null as ComputerSettings | null,
+    idle: "",
+    session: "",
+    busy: false,
+    note: null as { ok: boolean; text: string } | null,
+  }));
+  const setSaved = fieldSetter(store, "saved");
+  const setIdle = fieldSetter(store, "idle");
+  const setSession = fieldSetter(store, "session");
+  const setBusy = fieldSetter(store, "busy");
+  const setNote = fieldSetter(store, "note");
 
   useEffect(() => {
     getSettings()
@@ -37,7 +45,7 @@ export function VmSettings() {
       .catch(() =>
         setNote({ ok: false, text: "Could not load the settings." }),
       );
-  }, []);
+  }, [setIdle, setNote, setSaved, setSession]);
 
   const idleN = Number(idle);
   const sessionN = Number(session);

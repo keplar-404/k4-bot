@@ -1,42 +1,33 @@
 "use client";
 
 import { PlusIcon, ShieldIcon } from "lucide-react";
-import { useRouter } from "next/navigation";
-import * as React from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { SidebarGroup, SidebarGroupLabel } from "@/components/ui/sidebar";
-import type { Bot } from "@/features/bots/api";
 import { AvatarCreateDialog } from "@/features/bots/components/avatar-create-dialog";
 import { BotList, BotListSkeleton } from "@/features/bots/components/bot-list";
 import { BotSearchDialog } from "@/features/bots/components/bot-search-dialog";
 import { DeleteBotDialog } from "@/features/bots/components/delete-bot-dialog";
 import { useBots } from "@/features/bots/hooks/use-bots";
-import { useDeleteBot } from "@/features/bots/hooks/use-delete-bot";
+import { useBotsUiStore } from "@/features/bots/ui-store";
 
 export function NavProjects() {
   const router = useRouter();
-  const [dialogOpen, setDialogOpen] = React.useState(false);
-  const [editingBot, setEditingBot] = React.useState<Bot | null>(null);
-  const { bots, isInitialLoading, createBot, updateBot, deleteBot, addAdminBot } = useBots();
-
-  const openEdit = React.useCallback((bot: Bot) => {
-    setEditingBot(bot);
-    setDialogOpen(true);
-  }, []);
-
-  const openCreate = React.useCallback(() => {
-    setEditingBot(null);
-    setDialogOpen(true);
-  }, []);
-
-  const handleDialogOpenChange = React.useCallback((next: boolean) => {
-    setDialogOpen(next);
-    if (!next) setEditingBot(null);
-  }, []);
-
-  const { confirming, setConfirming, deleting, handleDelete, confirmDelete } =
-    useDeleteBot(bots, deleteBot);
+  const pathname = usePathname();
+  const { bots, isInitialLoading, createBot, updateBot, addAdminBot } =
+    useBots();
+  // The section's UI state lives in a shared store (the VM page asks to delete through it too).
+  const dialogOpen = useBotsUiStore((s) => s.dialogOpen);
+  const editingBot = useBotsUiStore((s) => s.editingBot);
+  const confirming = useBotsUiStore((s) => s.confirming);
+  const deleting = useBotsUiStore((s) => s.deleting);
+  const openCreate = useBotsUiStore((s) => s.openCreate);
+  const openEdit = useBotsUiStore((s) => s.openEdit);
+  const setDialogOpen = useBotsUiStore((s) => s.setDialogOpen);
+  const handleDelete = useBotsUiStore((s) => s.askDelete);
+  const cancelDelete = useBotsUiStore((s) => s.cancelDelete);
+  const confirmDelete = useBotsUiStore((s) => s.confirmDelete);
 
   return (
     <SidebarGroup>
@@ -81,12 +72,18 @@ export function NavProjects() {
       <DeleteBotDialog
         bot={confirming}
         deleting={deleting}
-        onCancel={() => setConfirming(null)}
-        onConfirm={() => void confirmDelete()}
+        onCancel={cancelDelete}
+        onConfirm={() =>
+          void confirmDelete((bot) => {
+            // Leave the deleted bot's page if it was open.
+            if (pathname === `/dashboard/bot/${bot.id}`)
+              router.replace("/dashboard");
+          })
+        }
       />
       <AvatarCreateDialog
         open={dialogOpen}
-        onOpenChange={handleDialogOpenChange}
+        onOpenChange={setDialogOpen}
         bot={editingBot ?? undefined}
         onSubmit={async (input) => {
           if (editingBot) return updateBot(editingBot.id, input);

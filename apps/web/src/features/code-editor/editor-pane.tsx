@@ -5,8 +5,9 @@ import { oneDark } from "@codemirror/theme-one-dark";
 import CodeMirror from "@uiw/react-codemirror";
 import { SaveIcon } from "lucide-react";
 import { useTheme } from "next-themes";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
+import { fieldSetter, useLocalStore } from "@/lib/store/local-store";
 import { languageFor } from "./languages";
 import { saveKeymap } from "./save-keymap";
 import { StaleBanner } from "./stale-banner";
@@ -34,14 +35,17 @@ export function EditorPane({
   onOverwrite,
 }: Props) {
   const { resolvedTheme } = useTheme();
-  const [lang, setLang] = useState<Extension[]>([]);
+  const [{ lang }, , store] = useLocalStore(() => ({
+    lang: [] as Extension[],
+  }));
+  const setLang = fieldSetter(store, "lang");
   const save = useRef(onSave);
   save.current = onSave;
   const path = doc?.path;
 
   useEffect(() => {
     if (path) void languageFor(path).then(setLang);
-  }, [path]);
+  }, [path, setLang]);
   const extensions = useMemo(
     () => [...lang, saveKeymap(() => save.current())],
     [lang],

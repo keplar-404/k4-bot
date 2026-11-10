@@ -1,11 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { fetchCatalog } from "@/features/connect/api";
+import { fieldSetter, useLocalStore } from "@/lib/store/local-store";
 
 /** Whether this app needs no login (from the catalog), so the block can skip the Connect box. */
 export function useNoAuth(toolkit: string) {
-  const [noAuth, setNoAuth] = useState(false);
+  const [{ noAuth }, , store] = useLocalStore(() => ({
+    noAuth: false,
+  }));
+  const setNoAuth = fieldSetter(store, "noAuth");
   useEffect(() => {
     let cancelled = false;
     setNoAuth(false);
@@ -19,6 +23,6 @@ export function useNoAuth(toolkit: string) {
     return () => {
       cancelled = true;
     };
-  }, [toolkit]);
+  }, [toolkit, setNoAuth]);
   return noAuth;
 }

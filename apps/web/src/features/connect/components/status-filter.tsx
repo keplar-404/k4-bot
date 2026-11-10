@@ -2,9 +2,9 @@
 
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-export type StatusFilter = "all" | "connected";
+export type StatusFilter = "all" | "connected" | "no-account";
 
-/** All / Connected tabs with a connected count badge. */
+/** All / Connected / No account needed tabs, with a connected count badge. */
 export function StatusFilter({
   status,
   connectedCount,
@@ -24,6 +24,7 @@ export function StatusFilter({
             {connectedCount}
           </span>
         </TabsTrigger>
+        <TabsTrigger value="no-account">No account needed</TabsTrigger>
       </TabsList>
     </Tabs>
   );

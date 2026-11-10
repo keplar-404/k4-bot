@@ -1,73 +1,110 @@
 "use client";
 
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import type { DailyRuns } from "../../api";
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  type ChartConfig,
+  ChartContainer,
+  ChartLegend,
+  ChartLegendContent,
+  ChartTooltip,
+  ChartTooltipContent,
+} from "@/components/ui/chart";
+import type { RunRange, RunsBucket } from "../../api";
+import { bucketLabel, RANGE_INFO } from "./range";
 
-const dayLabel = (iso: string) =>
-  new Date(`${iso}T00:00:00Z`).toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    timeZone: "UTC",
-  });
+const chartConfig = {
+  succeeded: { label: "Succeeded", color: "var(--chart-2)" },
+  failed: { label: "Failed", color: "var(--destructive)" },
+  other: { label: "Other", color: "var(--muted-foreground)" },
+} satisfies ChartConfig;
 
 /**
- * Runs per day for the last 14 days, all workflows together. One series, so no legend: the title names it. Thin
- * bars anchored to the baseline with a 2px gap; each day has a hover tooltip (whole column as the hit target).
+ * Runs over time, all workflows together (shadcn chart): one stacked bar per day, week, month or year, split into
+ * succeeded, failed and other (running, cancelled, waiting). The period follows the overview's range toggle.
  */
-export function RunsChart({ daily }: { daily: DailyRuns[] }) {
-  const max = Math.max(1, ...daily.map((d) => d.total));
-  const total = daily.reduce((n, d) => n + d.total, 0);
+export function RunsChart({
+  series,
+  range,
+}: {
+  series: RunsBucket[];
+  range: RunRange;
+}) {
+  const info = RANGE_INFO[range];
+  const data = series.map((b) => ({
+    start: b.start,
+    succeeded: b.succeeded,
+    failed: b.failed,
+    other: Math.max(0, b.total - b.succeeded - b.failed),
+  }));
+  const total = series.reduce((n, b) => n + b.total, 0);
   return (
-    <section
-      className="flex flex-col gap-3 rounded-xl border bg-card p-4"
-      aria-label="Runs per day, last 14 days"
-    >
-      <div className="flex items-baseline justify-between gap-2">
-        <h2 className="font-medium text-sm">Runs per day</h2>
-        <span className="text-muted-foreground text-xs tabular-nums">
-          {total.toLocaleString()} in 14 days
-        </span>
-      </div>
-      <div className="flex h-28 items-end gap-0.5 border-border border-b">
-        {daily.map((d) => (
-          <Tooltip key={d.day}>
-            <TooltipTrigger
-              render={
-                <button
-                  type="button"
-                  className="group flex h-full flex-1 cursor-default items-end justify-center outline-none"
-                  aria-label={`${dayLabel(d.day)}: ${d.total} runs, ${d.failed} failed`}
+    <Card>
+      <CardHeader>
+        <CardTitle>{info.title}</CardTitle>
+        <CardDescription>
+          {total.toLocaleString()} run{total === 1 ? "" : "s"} ·{" "}
+          {info.period.toLowerCase()}
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <ChartContainer
+          config={chartConfig}
+          className="aspect-auto h-60 w-full"
+        >
+          <BarChart
+            accessibilityLayer
+            data={data}
+            margin={{ left: -16, right: 4 }}
+          >
+            <CartesianGrid vertical={false} />
+            <XAxis
+              dataKey="start"
+              tickLine={false}
+              axisLine={false}
+              tickMargin={8}
+              minTickGap={16}
+              tickFormatter={(v: string) => bucketLabel(v, range)}
+            />
+            <YAxis
+              tickLine={false}
+              axisLine={false}
+              allowDecimals={false}
+              width={40}
+            />
+            <ChartTooltip
+              cursor={{ fill: "var(--muted)", opacity: 0.5 }}
+              content={
+                <ChartTooltipContent
+                  labelFormatter={(_, payload) =>
+                    payload?.[0]
+                      ? bucketLabel(
+                          String(payload[0].payload.start),
+                          range,
+                          true,
+                        )
+                      : ""
+                  }
                 />
               }
-            >
-              <span
-                className="w-full max-w-6 rounded-t-[4px] bg-chart-2 transition-opacity group-hover:opacity-80 group-focus-visible:ring-2 group-focus-visible:ring-ring"
-                style={{
-                  height: d.total
-                    ? `${Math.max(4, (d.total / max) * 100)}%`
-                    : "2px",
-                  opacity: d.total ? 1 : 0.35,
-                }}
-              />
-            </TooltipTrigger>
-            <TooltipContent>
-              <p className="font-medium">{dayLabel(d.day)}</p>
-              <p className="tabular-nums">
-                {d.total} run{d.total === 1 ? "" : "s"} · {d.succeeded}{" "}
-                succeeded · {d.failed} failed
-              </p>
-            </TooltipContent>
-          </Tooltip>
-        ))}
-      </div>
-      <div className="flex justify-between text-muted-foreground text-xs tabular-nums">
-        <span>{daily[0] ? dayLabel(daily[0].day) : ""}</span>
-        <span>Today</span>
-      </div>
-    </section>
+            />
+            <ChartLegend content={<ChartLegendContent />} />
+            <Bar
+              dataKey="succeeded"
+              stackId="runs"
+              fill="var(--color-succeeded)"
+            />
+            <Bar dataKey="failed" stackId="runs" fill="var(--color-failed)" />
+            <Bar dataKey="other" stackId="runs" fill="var(--color-other)" />
+          </BarChart>
+        </ChartContainer>
+      </CardContent>
+    </Card>
   );
 }

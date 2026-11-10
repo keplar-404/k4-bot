@@ -1,15 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { type Category, fetchCategories } from "./api";
+import { useEffect } from "react";
+import type { Category } from "./api";
+import { useConnectStore } from "./store";
 
-/** The category filter's options (an empty list when they cannot load: the filter just offers "All"). */
+const NONE: Category[] = [];
+
+/** The category filter's options, loaded once and shared (an empty list when they cannot load). */
 export function useCategories(): Category[] {
-  const [categories, setCategories] = useState<Category[]>([]);
-  useEffect(() => {
-    fetchCategories()
-      .then(setCategories)
-      .catch(() => setCategories([]));
-  }, []);
-  return categories;
+  const categories = useConnectStore((s) => s.categories);
+  const load = useConnectStore((s) => s.loadCategories);
+  useEffect(() => void load(), [load]);
+  return categories ?? NONE;
 }

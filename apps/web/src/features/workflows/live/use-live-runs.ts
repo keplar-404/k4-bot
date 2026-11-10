@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { listRuns } from "../api";
 import { applyLiveEvent, refreshDetail, refreshRuns } from "./live-events";
 
 export { refreshRuns } from "./live-events";
 
+import { fieldSetter, useLocalStore } from "@/lib/store/local-store";
 import { type StepState, useRunOverlay } from "../builder/node-overlay";
 import { useBuilder } from "../builder/store";
 import { connectLive } from "./live-socket";
@@ -22,7 +23,10 @@ export function useLiveRuns(workflowId: string) {
   const viewedId = useRunView((s) => s.viewedId);
   const detail = useRunView((s) => s.detail);
   const setOverlay = useRunOverlay((s) => s.set);
-  const [socketDown, setSocketDown] = useState(false);
+  const [{ socketDown }, , store] = useLocalStore(() => ({
+    socketDown: false,
+  }));
+  const setSocketDown = fieldSetter(store, "socketDown");
   const selectedFailure = useRef<string | null>(null);
 
   useEffect(() => {
@@ -51,7 +55,7 @@ export function useLiveRuns(workflowId: string) {
       useRunView.getState().reset();
       setOverlay({});
     };
-  }, [workflowId, setOverlay]);
+  }, [workflowId, setOverlay, setSocketDown]);
 
   // A run picked in the drawer (or followed) is loaded once; the socket keeps it current after that.
   useEffect(() => {

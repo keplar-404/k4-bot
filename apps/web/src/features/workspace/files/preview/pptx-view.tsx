@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
+import { fieldSetter, useLocalStore } from "@/lib/store/local-store";
 
 /**
  * PowerPoint slides rendered in the browser by @aiden0z/pptx-renderer (loaded only when a .pptx opens).
@@ -8,7 +9,10 @@ import { useEffect, useRef, useState } from "react";
  */
 export function PptxView({ blob }: { blob: Blob }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [{ error }, , store] = useLocalStore(() => ({
+    error: null as string | null,
+  }));
+  const setError = fieldSetter(store, "error");
 
   useEffect(() => {
     const el = ref.current;
@@ -35,7 +39,7 @@ export function PptxView({ blob }: { blob: Blob }) {
       live = false;
       viewer?.destroy();
     };
-  }, [blob]);
+  }, [blob, setError]);
 
   if (error)
     return <p className="p-4 text-sm text-muted-foreground">{error}</p>;

@@ -7,6 +7,8 @@ export type CatalogQuery = {
   category?: string;
   slugs?: string[];
   withTriggers?: boolean;
+  /** Only apps that need no account (nothing to connect). */
+  noAuth?: boolean;
   offset: number;
   limit: number;
 };
@@ -25,6 +27,7 @@ function where(q: CatalogQuery): SQL | undefined {
   }
   // jsonb containment: the toolkit lists this category among its own.
   if (q.category) parts.push(sql`${composioToolkit.categories} @> ${JSON.stringify([{ slug: q.category }])}::jsonb`);
+  if (q.noAuth) parts.push(sql`${composioToolkit.noAuth} = true`);
   if (q.withTriggers) parts.push(sql`${composioToolkit.triggersCount} > 0`);
   if (q.slugs) parts.push(q.slugs.length ? inArray(composioToolkit.slug, q.slugs) : sql`false`);
   return parts.length ? and(...parts) : undefined;
@@ -77,4 +80,23 @@ export async function isNoAuthToolkit(db: Db, slug: string): Promise<boolean> {
     .from(composioToolkit)
     .where(inArray(composioToolkit.slug, [slug]));
   return Boolean(row?.noAuth);
+}
+
+/** Sign-in methods where the user holds a key, token or password: what a saved secret can be used for. */
+export const KEY_SCHEMES = ["API_KEY", "BEARER_TOKEN", "BASIC", "BASIC_WITH_JWT", "GOOGLE_SERVICE_ACCOUNT", "SERVICE_ACCOUNT"];
+
+/** Apps a secret can be for (they sign in with a key or token), searched by name, most used first. */
+export async function secretApps(db: Db, q: string | undefined, limit: number) {
+  const text = q?.trim();
+  return db
+    .select({ slug: composioToolkit.slug, name: composioToolkit.name, logo: composioToolkit.logo })
+    .from(composioToolkit)
+    .where(
+      and(
+        sql`${composioToolkit.authSchemes} ?| ${sql.raw(`array[${KEY_SCHEMES.map((k) => `'${k}'`).join(",")}]`)}`,
+        text ? or(ilike(composioToolkit.name, like(text)), ilike(composioToolkit.slug, like(text))) : undefined,
+      ),
+    )
+    .orderBy(asc(composioToolkit.rank))
+    .limit(limit);
 }

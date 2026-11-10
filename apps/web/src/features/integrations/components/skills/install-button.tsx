@@ -1,10 +1,10 @@
 "use client";
 
 import { CheckIcon, Loader2Icon, PlusIcon } from "lucide-react";
-import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { type CatalogSkill, installSkill } from "@/features/integrations/api";
+import { fieldSetter, useLocalStore } from "@/lib/store/local-store";
 
 /** + to install, a check once installed, a spinner while it runs. */
 export function InstallButton({
@@ -14,7 +14,10 @@ export function InstallButton({
   skill: CatalogSkill;
   size?: "icon-sm" | "sm";
 }) {
-  const [busy, setBusy] = useState(false);
+  const [{ busy }, , store] = useLocalStore(() => ({
+    busy: false,
+  }));
+  const setBusy = fieldSetter(store, "busy");
   const installed = Boolean(skill.installedId);
   const install = async () => {
     setBusy(true);
