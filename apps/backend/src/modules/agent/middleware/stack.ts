@@ -9,9 +9,9 @@ import type { GroupHub } from "../tools/subagents";
 import { createViewMiddleware } from "../view-middleware";
 import { createFreeVisionMiddleware } from "./free-vision";
 import { createGroupGuardMiddleware, createHideToolsMiddleware } from "./hide-tools";
+import { createPlanMiddleware } from "./plan";
 import { createParallelToolsMiddleware } from "./parallel-tools";
 import { createSummarizeMiddleware } from "./summarize";
-import { createTodoGuardMiddleware } from "./todo-guard";
 import { createToolErrorsMiddleware } from "./tool-errors";
 import { createToolRetryMiddleware } from "./tool-retry";
 
@@ -42,8 +42,26 @@ export function botMiddleware(options: {
     createHideToolsMiddleware(["task"]),
     // At most this many tool calls of one step run at the same time; the rest wait their turn.
     createParallelToolsMiddleware(options.maxParallelTools),
-    // A run that stops with unfinished todos is sent back once or twice; a long one verifies before answering.
-    createTodoGuardMiddleware(),
+    // The plan the model must close before answering. Replaces Deep Agents' todoListMiddleware, which is
+    // opt-in (and absent for OpenRouter models) and neither orders steps nor blocks a final answer with open ones.
+    createPlanMiddleware({
+      researchTools: [
+        "tavily_search",
+        "tavily_extract",
+        "tavily_research",
+        "read_document",
+        "read_file",
+        "ls",
+        "glob",
+        "grep",
+        "app_find_actions",
+        "app_action_details",
+        "app_find_events",
+        "get_event_details",
+        "list_my_workflows",
+        "get_workflow",
+      ],
+    }),
     // While a sub-agent group runs, nothing may pause the run (an approval or a question would end the step and the
     // group with it), and only one group runs at a time.
     ...(options.pausing ? [createGroupGuardMiddleware(options.pausing.hub, options.pausing.names)] : []),

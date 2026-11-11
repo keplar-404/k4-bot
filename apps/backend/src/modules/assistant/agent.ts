@@ -1,12 +1,12 @@
 import { and, eq, inArray } from "drizzle-orm";
-import { createAgent, piiMiddleware, todoListMiddleware, toolCallLimitMiddleware } from "langchain";
+import { createAgent, piiMiddleware, toolCallLimitMiddleware } from "langchain";
 import type { Env } from "../../config/env";
 import type { Db } from "../../db";
 import { chatFile } from "../../db/schema";
 import { assistantPrompt } from "../../prompts/assistant";
 import { chatModelFor } from "../agent/chat-model";
 import { NeonHttpCheckpointer } from "../agent/checkpointer/neon-http-checkpointer";
-import { createTodoGuardMiddleware } from "../agent/middleware/todo-guard";
+import { createPlanMiddleware } from "../agent/middleware/plan";
 import { MAX_MODEL_RETRIES } from "../chat/run/types";
 import { createToolErrorsMiddleware } from "../agent/middleware/tool-errors";
 import { createToolRetryMiddleware } from "../agent/middleware/tool-retry";
@@ -46,9 +46,9 @@ const TEXT_TYPES = /^(text\/|application\/(json|csv|xml|x-yaml|yaml))/;
 export type AssistantRunParams = { runId: string; threadId: string; userId: string; workflowId: string; modelId?: string };
 
 /**
- * The assistant for one slice of a run: LangChain's agent with the to-do list middleware (write_todos: the plan the
- * chat shows), its workflow tools, and the Postgres checkpointer so a later slice, or a confirmation days later,
- * resumes where it stopped.
+ * The assistant for one slice of a run: LangChain's agent with the ordered plan middleware (create_plan /
+ * update_plan: the plan the chat shows), its workflow tools, and the Postgres checkpointer so a later slice, or a
+ * confirmation days later, resumes where it stopped.
  */
 export async function buildAssistant(env: Env, db: Db, p: AssistantRunParams) {
   if (!env.OPENROUTER_API_KEY) throw new Error("OPENROUTER_API_KEY is not configured.");
@@ -64,10 +64,23 @@ export async function buildAssistant(env: Env, db: Db, p: AssistantRunParams) {
       createToolErrorsMiddleware(),
       // Up to 10 tries on a network hiccup (a bot chat uses 2); the model call itself is retried up to 10 times by the run.
       createToolRetryMiddleware(READ_ONLY_TOOLS, MAX_TOOL_RETRIES),
-      // The plan the chat shows (write_todos), and the chat's todo guard: a model that stops with steps still open
-      // is sent back to them (twice at most), and after a long piece of work it verifies the result before answering.
-      todoListMiddleware(),
-      createTodoGuardMiddleware(),
+      // The plan the chat shows: ordered, researched first, and it must be closed before the final answer.
+      createPlanMiddleware({
+        researchTools: [
+          "get_workflow",
+          "list_block_kinds",
+          "get_block_guide",
+          "find_tools",
+          "find_apps",
+          "find_app_actions",
+          "get_action_details",
+          "find_app_events",
+          "get_event_details",
+          "get_run_report",
+          "list_bots",
+          "export_workflow_json",
+        ],
+      }),
       // A confused model cannot loop through paid calls.
       toolCallLimitMiddleware({ runLimit: MAX_TOOL_CALLS_PER_SLICE, exitBehavior: "continue" }),
       // Like a bot chat: the model never sees card numbers or key-shaped secrets (from the user, files or app data).

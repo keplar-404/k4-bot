@@ -6,18 +6,33 @@ import { cn } from "@/lib/utils";
 
 type Todo = {
   content: string;
-  status: "pending" | "in_progress" | "completed";
+  status: "pending" | "in_progress" | "completed" | "cancelled";
 };
 
-/** The plan from a write_todos call (the agent rewrites the whole list each time). Null when it cannot be read. */
+/** Tools that carry the plan: the built-in write_todos and the harness's own ordered plan. */
+export const PLAN_TOOL_NAMES = ["write_todos", "create_plan", "update_plan", "finish_plan"];
+export const isPlanTool = (name: string) => PLAN_TOOL_NAMES.includes(name);
+
+/**
+ * The plan from a plan tool call (the agent rewrites the whole list each time). Accepts both
+ * shapes: {todos:[{content,status}]} and {steps:[{title,status,evidence}]}. Null when unreadable.
+ */
 export function todosOf(
   part: Extract<MessagePart, { type: "tool" }>,
 ): Todo[] | null {
   try {
-    const todos = (JSON.parse(part.input) as { todos?: Todo[] }).todos;
-    return Array.isArray(todos)
-      ? todos.filter((t) => typeof t?.content === "string")
-      : null;
+    const args = JSON.parse(part.input) as {
+      todos?: Array<{ content?: string; status?: Todo["status"] }>;
+      steps?: Array<{ title?: string; status?: Todo["status"] }>;
+    };
+    const list = Array.isArray(args.steps) ? args.steps : args.todos;
+    if (!Array.isArray(list)) return null;
+    return list
+      .map((t) => ({
+        content: String(("title" in t ? t.title : (t as { content?: string }).content) ?? ""),
+        status: (t.status ?? "pending") as Todo["status"],
+      }))
+      .filter((t) => t.content.length > 0);
   } catch {
     // The input was clipped on the server: the text form in the step's details still shows it.
     return null;

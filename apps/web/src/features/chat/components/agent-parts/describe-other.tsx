@@ -41,9 +41,20 @@ export function describeOther(part: ToolPart, done: boolean): ToolDesc | null {
         title: done ? "Looked at an image" : "Looking at an image",
       };
     case "write_todos":
+    case "update_plan":
       return {
         icon: <ListChecksIcon />,
         title: done ? "Updated the plan" : "Updating the plan",
+      };
+    case "create_plan":
+      return {
+        icon: <ListChecksIcon />,
+        title: done ? "Planned the work" : "Planning the work",
+      };
+    case "finish_plan":
+      return {
+        icon: <ListChecksIcon />,
+        title: done ? "Closed the plan" : "Closing the plan",
       };
     default: {
       const app = Object.entries(APP_NAMES).find(([prefix]) =>

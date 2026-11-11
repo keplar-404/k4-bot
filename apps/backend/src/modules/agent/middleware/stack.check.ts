@@ -12,7 +12,8 @@ const all = names(true);
 assert.equal(all.filter((n) => n === "SummarizationMiddleware").length, 1, "the summarizer runs exactly once (it replaces Deep Agents' default)");
 assert.ok(all.includes("FreeVisionMiddleware"), "free-vision is on with the free router");
 assert.ok(!names(false).includes("FreeVisionMiddleware"));
-assert.ok(all.includes("TodoGuardMiddleware"));
+assert.ok(all.includes("PlanMiddleware"), "the ordered plan gate is installed");
+assert.ok(!all.includes("TodoGuardMiddleware"), "the built-in todo guard was replaced by PlanMiddleware");
 assert.ok(all.indexOf("FreeVisionMiddleware") === all.length - 1, "free-vision is innermost (it sees the pictures)");
 
 // Side-effecting tools are never retried: a second try would click, run or write twice.

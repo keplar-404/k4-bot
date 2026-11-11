@@ -8,6 +8,9 @@ import type { ChatMode } from "../chat/modes";
 const PLAN_ALLOWED = new Set([
   // Deep Agents' own planning and read-only file tools
   "write_todos",
+  "create_plan",
+  "update_plan",
+  "finish_plan",
   "ls",
   "read_file",
   "glob",

@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/collapsible";
 import type { ChatMessageView } from "@/features/chat/lib/protocol";
 import { cn } from "@/lib/utils";
-import { todosOf } from "../agent-parts/todo-list";
+import { isPlanTool, todosOf } from "../agent-parts/todo-list";
 
 /** The latest plan (write_todos) of the last answer, or null when it has none. */
 function latestTodos(messages: ChatMessageView[]) {
@@ -23,7 +23,7 @@ function latestTodos(messages: ChatMessageView[]) {
   if (last?.role !== "assistant" || !last.parts) return null;
   const plan = [...last.parts]
     .reverse()
-    .find((p) => p.type === "tool" && p.name === "write_todos");
+    .find((p) => p.type === "tool" && isPlanTool(p.name));
   return plan?.type === "tool" ? todosOf(plan) : null;
 }
 

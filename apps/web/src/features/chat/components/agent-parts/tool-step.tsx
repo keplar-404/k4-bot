@@ -15,7 +15,7 @@ import { describe } from "./describe";
 import { Output } from "./output";
 import { prettyInput } from "./pretty-input";
 import { SubagentList } from "./subagent-list";
-import { TodoList, todosOf } from "./todo-list";
+import { isPlanTool, TodoList, todosOf } from "./todo-list";
 
 type ToolPart = Extract<MessagePart, { type: "tool" }>;
 
@@ -32,7 +32,7 @@ export function ToolStep({
   const { icon, title } = describe(part, !running);
   const hasDetail = Boolean(part.input || part.output);
   // Files are shown with the final answer; the sub-agent list stays here (live, then as saved at the end).
-  const todos = part.name === "write_todos" ? todosOf(part) : null;
+  const todos = isPlanTool(part.name) ? todosOf(part) : null;
   const files = part.agents?.length ? (
     <SubagentList agents={part.agents} />
   ) : todos ? (

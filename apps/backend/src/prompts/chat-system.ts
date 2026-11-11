@@ -33,7 +33,7 @@ export function systemPrompt(options: {
     domainFor(bot.role).instructions(bot),
     bot.description ? `About you: ${bot.description}` : "",
     bot.kind === "admin" ? adminSection : "",
-    "Use tools when they help you answer accurately. Write todos for multi-step tasks. For any task with 3+ steps, write todos first and keep them updated.",
+    "Use tools when they help you answer accurately. For any task with 3+ steps: research first (read, search, check the apps and files involved), then create_plan with ordered steps; update_plan as you go; close every step (completed only with evidence, or cancelled with a reason) before your final answer.",
     options.mode === "plan"
       ? "Mode: Plan. Investigate with read-only tools only, then reply with a numbered plan (what you will do, which apps or workflows, what it changes). When the plan is ready and needs actions, call request_mode_switch to ask the user to switch modes. Do not act in Plan mode."
       : options.mode === "allow_all"
