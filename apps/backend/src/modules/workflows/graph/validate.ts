@@ -3,7 +3,8 @@ import { NEEDS_FIELD } from "./list-blocks";
 import { scheduleIssue } from "../../schedules/issues";
 import { isTrigger, LIMITS, type WorkflowGraph, type WorkflowNode } from "./schema";
 import { decideIssue } from "./decide-issues";
-import { loopIssues, loopOf } from "./loop-rules";
+import { modelError } from "../../agent/models";
+import { ancestors, loopIssues, loopOf } from "./loop-rules";
 import { type GraphIssue, structureIssues } from "./structure";
 
 // Save-time rules live in structure.ts; most callers import everything from here.
@@ -12,6 +13,15 @@ export { type GraphIssue, structureIssues, topoOrder } from "./structure";
 const DELAY_SECONDS = { seconds: 1, minutes: 60, hours: 3600, days: 86400 } as const;
 
 /** Everything a workflow needs before it can be turned on (or test-run): one trigger, every block wired and filled in. */
+/**
+ * What stops a run from starting. "Test this step" (`stopAfter`) runs only that block and those before it, so an
+ * unfinished block further on does not count.
+ */
+export function runIssue(g: WorkflowGraph): GraphIssue | undefined {
+  const needed = g.stopAfter ? new Set([g.stopAfter, ...ancestors(g, g.stopAfter)]) : null;
+  return publishIssues(g).find((i) => !needed || !i.nodeId || needed.has(i.nodeId));
+}
+
 export function publishIssues(g: WorkflowGraph): GraphIssue[] {
   const issues = [...structureIssues(g), ...loopIssues(g)];
   const trigger = g.nodes.find(isTrigger);
@@ -54,8 +64,7 @@ function blockIssue(node: WorkflowNode): string | null {
     case "action.http":
       return node.config.url ? null : "Enter a URL.";
     case "ai.bot":
-      if (!node.config.botId) return "Choose the bot that does this step.";
-      return node.config.prompt.trim() ? null : "Say what the bot should do.";
+      return aiIssue(node.config);
     case "trigger.app":
       return node.config.toolkit && node.config.trigger
         ? null
@@ -123,4 +132,22 @@ function reachableFrom(g: WorkflowGraph, start: string): Set<string> {
     }
   }
   return seen;
+}
+
+type AiConfig = Extract<WorkflowNode, { kind: "ai.bot" }>["config"];
+
+/** What an Ask a bot block still needs: who answers (a bot, or a known model), the task, and a usable answer shape. */
+function aiIssue(c: AiConfig): string | null {
+  // Anything but "normal" is a bot block (graphs saved before "normal" existed have no `agent`).
+  if (c.agent !== "normal" && !c.botId) return "Choose the bot that does this step.";
+  if (c.agent === "normal" && (!c.modelId || modelError(c.modelId, c.reasoningEffort))) {
+    return "Choose the model that does this step.";
+  }
+  if (!c.prompt.trim()) return "Say what the bot should do.";
+  if (c.output === "structured") {
+    if (c.schema.length === 0) return "Add at least one answer field.";
+    const enumWithoutChoices = c.schema.find((f) => f.type === "enum" && f.choices.filter((x) => x.trim()).length < 2);
+    if (enumWithoutChoices) return `Give “${enumWithoutChoices.name}” at least two choices.`;
+  }
+  return null;
 }

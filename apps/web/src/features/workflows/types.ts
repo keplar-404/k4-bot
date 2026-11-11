@@ -29,6 +29,8 @@ export type Workflow = {
   publishedVersion: number;
   triggerKind: string | null;
   hasWebhook: boolean;
+  /** The workflow assistant run editing it now (the builder is read-only meanwhile), or null. */
+  assistantRunId: string | null;
   nextRunAt: string | null;
   /** Set when the system turned it off (an app connection expired, it kept starting itself). */
   pausedReason: string | null;

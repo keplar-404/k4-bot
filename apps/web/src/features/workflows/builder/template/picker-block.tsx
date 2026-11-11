@@ -41,6 +41,10 @@ function BlockFields({
     { path: prefix, name: "All of it", type: "object" },
     ...(schema ? fieldsOf(schema, prefix) : []),
   ];
+  const unknown =
+    !loading &&
+    block.kind.endsWith(".app") &&
+    !Object.keys(schema?.properties ?? {}).length;
   return (
     <FieldList
       title={blockTitle(block)}
@@ -48,6 +52,11 @@ function BlockFields({
       query={query}
       onPick={onPick}
       loading={loading}
+      hint={
+        unknown
+          ? "Fields not described: test this step or pin a sample to list them."
+          : undefined
+      }
     />
   );
 }
@@ -58,6 +67,7 @@ function FieldList(p: {
   query: string;
   onPick: (path: string) => void;
   loading?: boolean;
+  hint?: string;
 }) {
   const shown = p.fields.filter(
     (f) =>
@@ -76,6 +86,9 @@ function FieldList(p: {
         <p className="px-2 text-muted-foreground text-xs">
           Loading its fields…
         </p>
+      )}
+      {p.hint && !p.query && (
+        <p className="px-2 pb-1 text-muted-foreground text-xs">{p.hint}</p>
       )}
       {shown.map((f) => (
         <button

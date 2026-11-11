@@ -48,6 +48,9 @@ export function structureIssues(g: WorkflowGraph): GraphIssue[] {
     if (e.source === e.target) {
       issues.push({ nodeId: e.source, message: "A block cannot connect to itself." });
     }
+    if (kinds.get(e.source) === "logic.return") {
+      issues.push({ nodeId: e.source, message: "Return ends the workflow: nothing comes after it." });
+    }
     if (kinds.get(e.target)?.startsWith("trigger.")) {
       issues.push({ nodeId: e.target, message: "A trigger starts the workflow: nothing can lead into it." });
     }

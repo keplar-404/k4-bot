@@ -3,7 +3,7 @@ import type { Db } from "../../../db";
 import type { Env } from "../../../config/env";
 import { workflowRun } from "../../../db/schema";
 import { graphSchema } from "../graph/schema";
-import { publishIssues } from "../graph/validate";
+import { runIssue } from "../graph/validate";
 import { createRun, type RunTrigger } from "../store/runs";
 import { getWorkflow } from "../store/workflows";
 import { checkCaps, RUN_LIMITS } from "./caps";
@@ -38,7 +38,7 @@ export async function startRun(env: Env, db: Db, args: StartArgs) {
 
   const parsed = graphSchema.safeParse(args.graph);
   if (!parsed.success) throw new RunStartError("NOT_READY", "The workflow is not valid.");
-  const issue = publishIssues(parsed.data)[0];
+  const issue = runIssue(parsed.data);
   if (issue) throw new RunStartError("NOT_READY", issue.message);
 
   await checkCaps(db, args.userId, args.botId);

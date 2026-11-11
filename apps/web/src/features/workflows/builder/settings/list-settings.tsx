@@ -76,6 +76,7 @@ export function ListSettings({
           hint="For example email or price; a dot reaches inside (address.city). Empty uses the item itself."
         >
           <Input
+            placeholder={"e.g. price"}
             id="list-field"
             value={field}
             maxLength={100}

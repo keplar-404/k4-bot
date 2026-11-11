@@ -14,7 +14,7 @@ import type { BlockBody } from "../blocks";
 import { TemplateInput } from "../template/template-input";
 import { Field, SettingsSection } from "./field";
 
-type SetBlock = Extract<BlockBody, { kind: "logic.set" }>;
+type SetBlock = Extract<BlockBody, { kind: "logic.set" | "logic.return" }>;
 type SetField = SetBlock["config"]["fields"][number];
 
 const TYPES: Record<SetField["type"], string> = {

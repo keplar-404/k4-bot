@@ -25,6 +25,12 @@ type State = {
   saved: boolean;
   /** Bumped by every change that must be saved (not by selection or measuring). */
   version: number;
+  /** The assistant run editing this workflow: the canvas is read-only and nothing is autosaved meanwhile. */
+  lockedBy: string | null;
+  /** Blocks the assistant just added: highlighted for a moment and brought into view (assistant/follow.tsx). */
+  fresh: string[];
+  /** The draft as the server has it now (the assistant changed it): keeps the selection when the block still exists. */
+  reload: (w: Workflow) => void;
   load: (w: Workflow) => void;
   setWorkflow: (w: Workflow) => void;
   onNodesChange: (changes: NodeChange<FlowNode>[]) => void;
@@ -54,6 +60,8 @@ export const useBuilder = create<State>((set, get) => ({
   pins: {},
   saved: true,
   version: 0,
+  lockedBy: null,
+  fresh: [],
   load: (w) =>
     set({
       workflow: w,
@@ -61,6 +69,23 @@ export const useBuilder = create<State>((set, get) => ({
       pins: w.graph.pins ?? {},
       selectedId: null,
       version: 0,
+      lockedBy: w.assistantRunId ?? null,
+    }),
+  reload: (w) =>
+    set((s) => {
+      const flow = graphToFlow(w.graph);
+      const keep = flow.nodes.some((n) => n.id === s.selectedId)
+        ? s.selectedId
+        : null;
+      const known = new Set(s.nodes.map((n) => n.id));
+      return {
+        workflow: w,
+        ...flow,
+        fresh: flow.nodes.filter((n) => !known.has(n.id)).map((n) => n.id),
+        nodes: flow.nodes.map((n) => ({ ...n, selected: n.id === keep })),
+        pins: w.graph.pins ?? {},
+        selectedId: keep,
+      };
     }),
   setPin: (id, output) =>
     set((s) => {
@@ -81,24 +106,34 @@ export const useBuilder = create<State>((set, get) => ({
       edges: applyEdgeChanges(changes, s.edges),
       version: changes.some(saves) ? s.version + 1 : s.version,
     })),
-  onConnect: (c) => connect(get, set, c),
+  onConnect: (c) => !get().lockedBy && connect(get, set, c),
   select: (id) => set({ selectedId: id }),
-  addBlock: (kind, opts = {}) => addBlockTo(get, set, kind, opts),
+  addBlock: (kind, opts = {}) => {
+    if (!get().lockedBy) addBlockTo(get, set, kind, opts);
+  },
   updateBlock: (id, patch) =>
-    set((s) => ({
-      nodes: s.nodes.map((n) =>
-        n.id === id ? { ...n, data: { block: patch(n.data.block) } } : n,
-      ),
-      version: s.version + 1,
-    })),
+    set((s) =>
+      s.lockedBy
+        ? {}
+        : {
+            nodes: s.nodes.map((n) =>
+              n.id === id ? { ...n, data: { block: patch(n.data.block) } } : n,
+            ),
+            version: s.version + 1,
+          },
+    ),
   removeBlock: (id) =>
-    set((s) => ({
-      nodes: s.nodes.filter((n) => n.id !== id),
-      edges: s.edges.filter((e) => e.source !== id && e.target !== id),
-      pins: Object.fromEntries(
-        Object.entries(s.pins).filter(([k]) => k !== id),
-      ),
-      selectedId: s.selectedId === id ? null : s.selectedId,
-      version: s.version + 1,
-    })),
+    set((s) =>
+      s.lockedBy
+        ? {}
+        : {
+            nodes: s.nodes.filter((n) => n.id !== id),
+            edges: s.edges.filter((e) => e.source !== id && e.target !== id),
+            pins: Object.fromEntries(
+              Object.entries(s.pins).filter(([k]) => k !== id),
+            ),
+            selectedId: s.selectedId === id ? null : s.selectedId,
+            version: s.version + 1,
+          },
+    ),
 }));

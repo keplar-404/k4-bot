@@ -31,6 +31,7 @@ export function SettingsPanel() {
     (s) => s.workflow?.issues.find((i) => i.nodeId === selectedId)?.message,
   );
   const node = nodes.find((n) => n.id === selectedId);
+  const locked = useBuilder((s) => s.lockedBy !== null);
 
   if (!open) {
     return (
@@ -85,6 +86,7 @@ export function SettingsPanel() {
           variant="ghost"
           size="sm"
           className="w-full text-destructive hover:text-destructive"
+          disabled={locked}
           onClick={() => removeBlock(b.id)}
         >
           <Trash2Icon />

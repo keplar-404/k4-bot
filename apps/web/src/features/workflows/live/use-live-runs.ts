@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { listRuns } from "../api";
+import { getWorkflow, listRuns } from "../api";
 import { applyLiveEvent, refreshDetail, refreshRuns } from "./live-events";
 
 export { refreshRuns } from "./live-events";
@@ -45,6 +45,15 @@ export function useLiveRuns(workflowId: string) {
       onEvent: (event) => applyLiveEvent(workflowId, event),
       onOpen: () => {
         void refreshRuns(workflowId);
+        // The assistant may have changed the draft, or finished, while this tab was away.
+        void getWorkflow(workflowId).then(
+          (w) => {
+            if (useBuilder.getState().workflow?.id !== workflowId) return;
+            useBuilder.getState().reload(w);
+            useBuilder.setState({ lockedBy: w.assistantRunId ?? null });
+          },
+          () => undefined,
+        );
         const watched = useRunView.getState().viewedId;
         if (watched) void refreshDetail(watched);
       },

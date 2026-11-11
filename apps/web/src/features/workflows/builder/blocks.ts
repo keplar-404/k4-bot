@@ -21,6 +21,7 @@ const short: Record<BlockKind, string> = {
   "logic.filter": "filter",
   "logic.delay": "delay",
   "logic.set": "set",
+  "logic.return": "return",
   "ai.bot": "ai",
   "logic.loop": "each",
   "logic.approval": "ask",

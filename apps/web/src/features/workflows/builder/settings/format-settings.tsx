@@ -70,7 +70,7 @@ export function FormatSettings({
           multiline
           value={input}
           onChange={(v) => set({ input: v })}
-          placeholder="The value to change"
+          placeholder="e.g. {{loop.item.sender}}"
         />
       </Field>
       {op?.options?.map((field) => (

@@ -36,6 +36,8 @@ export function outputsOf(b: BlockBody): Array<{ id: string; label: string }> {
 
 /** The source handles: the named outputs spread along the bottom with their labels, or one plain handle. */
 export function BlockHandles({ block }: { block: BlockBody }) {
+  // Return is the workflow's answer: it ends the path, so it has nothing to connect from.
+  if (block.kind === "logic.return") return null;
   const outputs = outputsOf(block);
   if (outputs.length === 0)
     return (

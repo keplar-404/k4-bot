@@ -32,6 +32,8 @@ export const workflow = pgTable(
     /** Why the system turned it off (an app connection expired, it kept starting itself), shown until it is on again. */
     pausedReason: text("paused_reason"),
     lastRunAt: timestamp("last_run_at"),
+    /** The workflow assistant run editing this workflow right now: the canvas is read-only for the user meanwhile. */
+    assistantRunId: text("assistant_run_id"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },

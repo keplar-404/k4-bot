@@ -134,6 +134,7 @@ export function MergeSettings({
           hint="For example id or email (a dot reaches inside: customer.id)."
         >
           <Input
+            placeholder={"e.g. email"}
             id="merge-key"
             value={key}
             maxLength={100}

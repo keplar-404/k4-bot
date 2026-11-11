@@ -91,7 +91,7 @@ export function QuestionRow({
       />
       <QuestionCriteria question={q} onChange={onChange} />
       <code
-        className="truncate text-[11px] text-muted-foreground"
+        className="break-all rounded bg-muted px-1.5 py-1 text-[11px] text-muted-foreground"
         title="Read the answer in later blocks"
       >
         {`{{steps.${blockId}.output.answers.${q.id}.${field}}}`}

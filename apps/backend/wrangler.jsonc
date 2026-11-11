@@ -31,7 +31,8 @@
   "workflows": [
     { "name": "chat-run", "binding": "CHAT_RUN", "class_name": "ChatRunWorkflow" },
     { "name": "async-task", "binding": "ASYNC_TASK", "class_name": "AsyncTaskWorkflow" },
-    { "name": "workflow-run", "binding": "WORKFLOW_RUN", "class_name": "WorkflowRunner" }
+    { "name": "workflow-run", "binding": "WORKFLOW_RUN", "class_name": "WorkflowRunner" },
+    { "name": "assistant-run", "binding": "ASSISTANT_RUN", "class_name": "AssistantRunWorkflow" }
   ],
   "ratelimits": [
     // Every API request, per client IP.
@@ -43,7 +44,9 @@
     // Public webhook calls (per workflow), Composio actions run by bots/workflows (per user), HTTP blocks (per user).
     { "name": "RL_WF_HOOK", "namespace_id": "1005", "simple": { "limit": 60, "period": 60 } },
     { "name": "RL_APP_EXEC", "namespace_id": "1006", "simple": { "limit": 30, "period": 60 } },
-    { "name": "RL_HTTP", "namespace_id": "1007", "simple": { "limit": 30, "period": 60 } }
+    { "name": "RL_HTTP", "namespace_id": "1007", "simple": { "limit": 30, "period": 60 } },
+    // Messages to the workflow assistant, per user.
+    { "name": "RL_ASSISTANT_MSG", "namespace_id": "1008", "simple": { "limit": 10, "period": 60 } }
   ],
   "triggers": { "crons": ["0 3 * * *", "* * * * *"] },
   "vars": {

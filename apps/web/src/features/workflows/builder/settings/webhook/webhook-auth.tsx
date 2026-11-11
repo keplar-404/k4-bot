@@ -67,6 +67,7 @@ export function WebhookAuth({
               hint="The header the sender puts the secret in, e.g. x-webhook-secret. Use the same name in the sending service."
             >
               <Input
+                placeholder={"x-webhook-secret"}
                 id="hook-header"
                 value={config.headerName}
                 maxLength={64}
@@ -81,6 +82,7 @@ export function WebhookAuth({
                 hint="Where the sender puts its signature, from its docs (Stripe: Stripe-Signature, GitHub: X-Hub-Signature-256)."
               >
                 <Input
+                  placeholder={"x-hub-signature-256"}
                   id="hook-sig"
                   value={config.signatureHeader}
                   maxLength={64}
@@ -93,6 +95,7 @@ export function WebhookAuth({
                 hint="Some senders add one, e.g. GitHub sends sha256=… Leave empty if not."
               >
                 <Input
+                  placeholder={"sha256="}
                   id="hook-prefix"
                   value={config.signaturePrefix}
                   maxLength={20}
@@ -109,6 +112,7 @@ export function WebhookAuth({
         hint="One address or IPv4 range per line, e.g. 203.0.113.0/24. Empty allows any sender."
       >
         <Textarea
+          placeholder={"One per line, e.g.\n203.0.113.7\n198.51.100.0/24"}
           id="hook-ips"
           rows={2}
           className="font-mono text-xs"

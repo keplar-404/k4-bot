@@ -34,6 +34,8 @@ export function Canvas() {
     addBlock,
   } = useBuilder();
   const { screenToFlowPosition } = useReactFlow();
+  // The assistant is editing: the user can look around and select, not change anything.
+  const locked = useBuilder((s) => s.lockedBy !== null);
   // Handles keep a ~20px grab area on screen however far the canvas is zoomed out (block-handles.tsx).
   const zoom = useStore((s) => s.transform[2]);
   const handleHit = `${Math.max(20, 20 / zoom)}px`;
@@ -68,8 +70,10 @@ export function Canvas() {
         e.preventDefault();
         e.dataTransfer.dropEffect = "copy";
       }}
-      onDrop={onDrop}
-      deleteKeyCode={["Backspace", "Delete"]}
+      onDrop={locked ? undefined : onDrop}
+      nodesDraggable={!locked}
+      nodesConnectable={!locked}
+      deleteKeyCode={locked ? null : ["Backspace", "Delete"]}
       colorMode={mounted && resolvedTheme === "dark" ? "dark" : "light"}
       style={{ ...flowTheme, "--handle-hit": handleHit } as React.CSSProperties}
       connectionRadius={30}

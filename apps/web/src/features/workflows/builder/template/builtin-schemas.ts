@@ -20,6 +20,15 @@ const SET_TYPES: Record<string, string> = {
   object: "object",
 };
 
+/** An Ask a bot answer field's type as JSON Schema. */
+const ANSWER_TYPES: Record<string, string> = {
+  text: "string",
+  number: "number",
+  boolean: "boolean",
+  list: "array",
+  enum: "string",
+};
+
 /** A Decide block's outputs, from its own questions: one field per answer (and its confidence). */
 function decideSchema(
   block: Extract<BlockBody, { kind: "ai.decide" }>,
@@ -53,6 +62,7 @@ function decideSchema(
 export function builtinSchema(block: BlockBody): JsonSchema | null {
   switch (block.kind) {
     case "logic.set":
+    case "logic.return":
       return obj(
         Object.fromEntries(
           block.config.fields
@@ -89,6 +99,21 @@ export function builtinSchema(block: BlockBody): JsonSchema | null {
         headers: prop("object", "Response headers (content-type, length)"),
       });
     case "ai.bot":
+      // Structured: the fields the user built are known now, so the picker lists them before any test.
+      if (block.config.output === "structured")
+        return obj({
+          json: obj(
+            Object.fromEntries(
+              block.config.schema
+                .filter((f) => f.name)
+                .map((f) => [
+                  f.name,
+                  prop(ANSWER_TYPES[f.type] ?? "string", f.description),
+                ]),
+            ),
+          ),
+          used: prop("array", "Tools it used"),
+        });
       return obj(
         block.config.output === "json"
           ? {

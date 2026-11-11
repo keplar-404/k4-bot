@@ -84,6 +84,8 @@ export type Env = z.infer<typeof envSchema> & {
   ASYNC_TASK: Workflow;
   /** Workflow runs, and the live socket each workflow's open builders listen on. */
   WORKFLOW_RUN: Workflow;
+  /** The workflow builder assistant: one Workflow instance per turn. */
+  ASSISTANT_RUN: Workflow;
   WORKFLOW_LIVE: DurableObjectNamespace<import("../modules/workflows/live/relay").WorkflowRunRelay>;
   ASYNC_TASKS: DurableObjectNamespace<import("../modules/async-tasks/registry").AsyncTaskRegistry>;
   /** Per-IP limiter for every API request. */
@@ -100,6 +102,8 @@ export type Env = z.infer<typeof envSchema> & {
   RL_APP_EXEC: RateLimit;
   /** Workflow HTTP request blocks, per user. */
   RL_HTTP: RateLimit;
+  /** Messages to the workflow assistant, per user. */
+  RL_ASSISTANT_MSG: RateLimit;
   /** One computer per user: addressed by user id. */
   USER_COMPUTER: DurableObjectNamespace<import("../modules/computer/user-computer").UserComputerDurableObject>;
   /** One sandbox per bot: addressed by bot id. */

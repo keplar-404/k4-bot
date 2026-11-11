@@ -73,6 +73,16 @@ export const saveWorkflow = (
 ) =>
   request<Workflow>(`/${id}`, { method: "PUT", body: JSON.stringify(patch) });
 
+/** Replaces the draft with an imported k4-workflow file (the server strips and validates it again). */
+export const importWorkflow = (
+  id: string,
+  body: { document: unknown; expectedUpdatedAt?: string },
+) =>
+  request<Workflow>(`/${id}/import`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
 export const publishWorkflow = (id: string) =>
   request<Workflow & { webhookToken: string | null }>(`/${id}/publish`, {
     method: "POST",

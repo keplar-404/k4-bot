@@ -46,6 +46,7 @@ export function BlockSettings({ block, update }: Props) {
     case "logic.delay":
       return <DelaySettings block={block} update={update} />;
     case "logic.set":
+    case "logic.return":
       return <SetFieldsSettings block={block} update={update} />;
     case "ai.bot":
       return <AiSettings block={block} update={update} />;

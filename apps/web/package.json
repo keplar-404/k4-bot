@@ -9,6 +9,7 @@
     "lint": "biome check",
     "format": "biome format --write",
     "check-types": "tsc --noEmit",
+    "check:workflows": "bun run src/features/workflows/builder/template/shape.check.ts",
     "check:chat": "bun run src/lib/store/stores.check.ts && bun run src/features/chat/lib/outbox.check.ts && bun run src/features/chat/lib/stream-basic.check.ts && bun run src/features/chat/lib/stream-done.check.ts && bun run src/features/chat/lib/stream-resume.check.ts && bun run src/features/chat/lib/stream-failed.check.ts && bun run src/features/chat/lib/stream-provider.check.ts && bun run src/components/markdown.check.tsx && bun run src/features/workspace/browser/normalize-url.check.ts && bun run src/features/workspace/files/preview/csv.check.ts && bun run src/features/workspace/workspace-state.check.ts && bun run src/features/code-editor/tree-model.check.ts"
   },
   "dependencies": {

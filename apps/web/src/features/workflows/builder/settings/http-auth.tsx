@@ -63,6 +63,7 @@ export function HttpAuth({
           hint="Your account name or email for this service (the password comes from Secrets below)."
         >
           <TemplateInput
+            placeholder={"e.g. api_user or {{secrets.API_USER}}"}
             id="http-user"
             value={auth.username}
             onChange={(username) => set({ username })}

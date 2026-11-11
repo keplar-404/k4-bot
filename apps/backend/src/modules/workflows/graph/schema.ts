@@ -48,6 +48,8 @@ export const nodeSchema = z.discriminatedUnion("kind", [
   z.object({ ...base, kind: z.literal("logic.filter"), config: conditionsConfig }),
   z.object({ ...base, kind: z.literal("logic.delay"), config: delayConfig }),
   z.object({ ...base, kind: z.literal("logic.set"), config: setConfig }),
+  /** The workflow's answer: what a bot that ran it gets back (run_workflow's `result`). Same settings as Set fields. */
+  z.object({ ...base, kind: z.literal("logic.return"), config: setConfig }),
   z.object({ ...base, kind: z.literal("ai.bot"), config: aiConfig, ...outside }),
   z.object({ ...base, kind: z.literal("ai.decide"), config: decideConfig, ...outside }),
   z.object({ ...base, kind: z.literal("logic.switch"), config: switchConfig }),

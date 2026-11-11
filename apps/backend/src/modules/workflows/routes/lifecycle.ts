@@ -1,3 +1,4 @@
+import { lockedResponse } from "../store/lock";
 import { Hono } from "hono";
 import { z } from "zod";
 import type { AuthGuardEnv } from "../../../middleware/auth-guard";
@@ -22,6 +23,9 @@ const lifecycle = new Hono<AuthGuardEnv>()
     const userId = c.get("session").user.id;
     const w = await getWorkflow(db, userId, c.req.valid("param").id);
     if (!w) return c.json(notFound, 404);
+    // A half-built draft must not go live while the assistant is still working on it.
+    const locked = await lockedResponse(db, userId, w.id);
+    if (locked) return c.json(locked, 423);
     const r = await publishWorkflow(env, db, userId, w);
     if (!r.ok) return c.json({ error: r.error, message: r.message, issues: r.issues }, r.status);
     return c.json({ ...workflowDto(r.row), webhookToken: r.webhookToken });

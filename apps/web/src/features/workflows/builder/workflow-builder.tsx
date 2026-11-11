@@ -8,6 +8,10 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { fieldSetter, useLocalStore } from "@/lib/store/local-store";
 import { getWorkflow } from "../api";
+import { AssistantButton } from "../assistant/assistant-button";
+import { AssistantPanel } from "../assistant/assistant-panel";
+import { AssistantFollow } from "../assistant/follow";
+import { LockBanner } from "../assistant/lock-banner";
 import { RunBanner } from "../live/run-banner";
 import { RunsDrawer } from "../live/runs-drawer";
 import { useLiveRuns } from "../live/use-live-runs";
@@ -16,6 +20,7 @@ import { LibraryPanel } from "./library/library-panel";
 import { PausedNotice } from "./paused-notice";
 import { SettingsPanel } from "./settings/settings-panel";
 import { useBuilder } from "./store";
+import { JsonSheet } from "./top-bar/json-sheet";
 import { RunButton } from "./top-bar/run-button";
 import { ShareBotsDialog } from "./top-bar/share-bots-dialog";
 import { ShortcutsDialog } from "./top-bar/shortcuts-dialog";
@@ -82,6 +87,8 @@ export function WorkflowBuilder({ id }: { id: string }) {
         <TopBar save={save}>
           <ShortcutsDialog />
           <ShareBotsDialog />
+          <JsonSheet />
+          <AssistantButton />
           <Button size="sm" variant="outline" onClick={() => setRunsOpen(true)}>
             Runs
           </Button>
@@ -94,9 +101,12 @@ export function WorkflowBuilder({ id }: { id: string }) {
           <LibraryPanel />
           <SettingsPanel />
           <RunBanner />
+          <LockBanner />
+          <AssistantFollow />
         </main>
       </div>
       <RunsDrawer open={runsOpen} onOpenChange={setRunsOpen} />
+      <AssistantPanel workflowId={id} />
     </ReactFlowProvider>
   );
 }

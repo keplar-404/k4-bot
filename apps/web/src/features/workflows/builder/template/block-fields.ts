@@ -1,14 +1,17 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { fieldSetter, useLocalStore } from "@/lib/store/local-store";
+import { useRunView } from "../../live/run-view-store";
 import type { BlockBody } from "../blocks";
 import {
   fetchTool,
   fetchTrigger,
   type JsonSchema,
 } from "../settings/tools-api";
+import { useBuilder } from "../store";
 import { builtinSchema } from "./builtin-schemas";
+import { mergeShape, shapeOf, unwrapComposio } from "./shape";
 
 /** The MIME type a dragged field carries: its reference path (dropped into a template field). */
 export const REF_DRAG_TYPE = "application/x-k4-ref";
@@ -59,12 +62,12 @@ export function typeWords(schema: JsonSchema): string {
     : schema.type;
   if (type === "integer" || type === "number") return "number";
   if (type === "boolean") return "yes / no";
-  if (type === "array") return "list";
-  if (type === "object") return "object";
+  if (type === "array" || (!type && schema.items)) return "list";
+  if (type === "object" || (!type && schema.properties)) return "object";
   return "text";
 }
 
-/** Every field of a schema as a reference, one level into nested objects ("data.subject"). */
+/** Every field of a schema as a reference, into nested objects ("preview.body"), at most 4 levels deep. */
 export function fieldsOf(
   schema: JsonSchema,
   prefix: string,
@@ -79,7 +82,7 @@ export function fieldsOf(
       description: field.description,
     };
     const nested =
-      depth < 1 && field.properties ? fieldsOf(field, path, depth + 1) : [];
+      depth < 3 && field.properties ? fieldsOf(field, path, depth + 1) : [];
     return [own, ...nested.map((f) => ({ ...f, name: `${key}.${f.name}` }))];
   });
 }
@@ -103,13 +106,26 @@ export function useBlockSchema(block: BlockBody): {
     const load =
       from === "event"
         ? fetchTrigger(slug).then((t) => t.payload)
-        : fetchTool(slug).then((t) => t.output);
+        : fetchTool(slug).then((t) => unwrapComposio(t.output));
     load.then(setSchema, () => setSchema({}));
   }, [from, slug, setSchema]);
+  // What the block really gave (its pinned sample, or the shown run's output) fills in what the schema left vague.
+  const real = useRealShape(block.id);
   // Built-in blocks describe their output from their own settings (Set fields, form questions…), live as they change.
+  const described = slug ? schema : (builtinSchema(block) ?? {});
   return {
     prefix,
-    schema: slug ? schema : (builtinSchema(block) ?? {}),
-    loading: Boolean(slug) && !schema,
+    schema: described ? mergeShape(described, real) : real,
+    loading: Boolean(slug) && !schema && !real,
   };
+}
+
+/** The shape of the block's pinned sample, or of its output in the run on screen; null when there is neither. */
+function useRealShape(id: string): JsonSchema | null {
+  const pin = useBuilder((s) => s.pins[id]);
+  const ran = useRunView(
+    (s) => s.detail?.steps.find((x) => x.nodeId === id)?.output,
+  );
+  const value = pin ?? ran;
+  return useMemo(() => (value == null ? null : shapeOf(value)), [value]);
 }

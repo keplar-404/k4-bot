@@ -71,6 +71,7 @@ function runLogic(node: Exclude<WorkflowNode, ActionNode | AiNode>, ctx: RunCont
       return { output: { passed }, passed };
     }
     case "logic.set":
+    case "logic.return":
       return { output: limitOutput(runSet(node.config, ctx)) };
     case "logic.loop":
       // Not cut by limitOutput: the walk reads the items back from this output (resolve caps them at 100 KB).

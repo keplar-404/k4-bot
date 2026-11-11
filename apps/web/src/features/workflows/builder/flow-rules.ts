@@ -28,6 +28,8 @@ export function connectionProblem(
   const target = nodes.find((n) => n.id === c.target);
   if (target?.data.block.kind.startsWith("trigger."))
     return "Nothing can lead into a trigger.";
+  if (nodes.find((n) => n.id === c.source)?.data.block.kind === "logic.return")
+    return "Return ends the workflow: nothing comes after it.";
   if (
     edges.some(
       (e) =>

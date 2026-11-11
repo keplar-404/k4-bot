@@ -60,6 +60,8 @@ export function blockTitle(b: BlockBody): string {
       return "Continue only if…";
     case "logic.set":
       return `Set ${b.config.fields.length} field${b.config.fields.length === 1 ? "" : "s"}`;
+    case "logic.return":
+      return "The workflow's answer";
     case "action.http":
       return hostOf(b.config.url) ?? "HTTP request";
     case "ai.bot":

@@ -45,7 +45,14 @@ export function newBlock(
       return {
         ...base,
         kind,
-        config: { prompt: "", output: "text", useApps: false, files: [] },
+        config: {
+          agent: "normal",
+          prompt: "",
+          output: "text",
+          schema: [],
+          useApps: false,
+          files: [],
+        },
         onError: "stop",
       };
     case "action.app":
@@ -142,6 +149,15 @@ export function newBlock(
         kind,
         config: {
           fields: [{ key: "value", value: "", type: "text" }],
+          base: "",
+        },
+      };
+    case "logic.return":
+      return {
+        ...base,
+        kind,
+        config: {
+          fields: [{ key: "answer", value: "", type: "text" }],
           base: "",
         },
       };

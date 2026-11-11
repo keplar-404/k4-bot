@@ -11,6 +11,7 @@ import { BlockHandles, handle } from "./block-handles";
 import { blockKindLabel, blockTitle } from "./block-label";
 import type { FlowNode } from "./flow";
 import { useNodeOverlay } from "./node-overlay";
+import { useBuilder } from "./store";
 
 /**
  * One block on the canvas: icon (or the app's logo), kind, title. A trigger has no input; an If block has two
@@ -19,6 +20,8 @@ import { useNodeOverlay } from "./node-overlay";
 function BlockNodeView({ data, selected }: NodeProps<FlowNode>) {
   const b = data.block;
   const overlay = useNodeOverlay(b.id);
+  // Just added by the assistant: a short highlight so the user sees what changed.
+  const fresh = useBuilder((s) => s.fresh.includes(b.id));
   const Icon = infoOf(b.kind)?.icon;
   const isTrigger = b.kind.startsWith("trigger.");
   const retries =
@@ -30,6 +33,7 @@ function BlockNodeView({ data, selected }: NodeProps<FlowNode>) {
       className={cn(
         "relative flex w-60 items-center gap-3 rounded-xl border bg-card p-2.5 pr-3 text-card-foreground shadow-xs transition-shadow",
         selected && "ring-2 ring-ring",
+        fresh && "animate-pulse ring-2 ring-primary",
         overlay.ring,
       )}
     >

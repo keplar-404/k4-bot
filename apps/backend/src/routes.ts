@@ -7,6 +7,7 @@ import files from "./modules/files/routes";
 import integrations from "./modules/integrations/routes";
 import composio from "./modules/composio/routes";
 import composioEvents from "./modules/composio/events-route";
+import assistant from "./modules/assistant/routes";
 import workflows from "./modules/workflows/routes";
 import sandbox from "./modules/sandbox/routes";
 import sandboxEditor from "./modules/sandbox/editor-routes";
@@ -31,6 +32,7 @@ const routes = new Hono<{ Bindings: Env }>()
   .route("/composio/events", composioEvents)
   .route("/composio", composio)
   .route("/workflows", workflows)
+  .route("/assistant", assistant)
   // The editor first: its token-gated socket must answer before the main routes' sign-in check.
   .route("/sandbox", sandboxEditor)
   .route("/sandbox", sandbox)

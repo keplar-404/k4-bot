@@ -47,7 +47,7 @@ export function DecideSettings({
             multiline
             value={block.config.state}
             onChange={(state) => set({ state })}
-            placeholder="The ticket text, an email, a record…"
+            placeholder="e.g. {{loop.item.subject}} {{loop.item.preview.body}}"
           />
         </Field>
       </SettingsSection>
@@ -100,6 +100,7 @@ export function DecideSettings({
           hint="Leave jev-latest. Only if you tuned the If numbers after this block, type that version (e.g. jev-1.13.0) so answers keep the same scale."
         >
           <Input
+            placeholder={"jev-latest"}
             id="decide-model"
             value={block.config.model}
             maxLength={60}

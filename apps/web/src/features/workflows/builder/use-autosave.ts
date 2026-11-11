@@ -32,6 +32,8 @@ export function useAutosave() {
   // biome-ignore lint/correctness/useExhaustiveDependencies: `tick` only re-runs the save
   useEffect(() => {
     if (version === saved.current) return;
+    // The assistant holds the workflow: the server refuses edits meanwhile, and the canvas shows its draft.
+    if (useBuilder.getState().lockedBy) return;
     setState("unsaved");
     const t = setTimeout(async () => {
       if (saving.current) return;

@@ -15,6 +15,8 @@ export function workflowDto(w: WorkflowRow) {
     publishedVersion: w.publishedVersion,
     triggerKind: w.triggerKind,
     hasWebhook: Boolean(w.webhookTokenHash),
+    /** The assistant run editing it now (the builder is read-only meanwhile), or null. */
+    assistantRunId: w.assistantRunId,
     nextRunAt: w.nextRunAt,
     pausedReason: w.pausedReason,
     lastRunAt: w.lastRunAt,

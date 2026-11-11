@@ -1,5 +1,6 @@
 import {
   CodeIcon,
+  CornerDownLeftIcon,
   FilterIcon,
   GitBranchIcon,
   GlobeIcon,
@@ -83,6 +84,13 @@ export const BUILT_IN: BlockInfo[] = [
     title: "Set fields",
     hint: "Shape data for later steps",
     icon: PencilLineIcon,
+    group: "Logic",
+  },
+  {
+    kind: "logic.return",
+    title: "Return",
+    hint: "The workflow's answer: what a bot running it gets back",
+    icon: CornerDownLeftIcon,
     group: "Logic",
   },
   {

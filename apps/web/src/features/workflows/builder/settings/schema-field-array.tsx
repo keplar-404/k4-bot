@@ -34,6 +34,9 @@ export function SchemaFieldArray({
       hint={`${hint ?? ""} One per line.`.trim()}
     >
       <Textarea
+        placeholder={
+          "One per line, e.g.\nanna@example.com\n{{loop.item.sender}}"
+        }
         id={id}
         rows={2}
         value={lines}

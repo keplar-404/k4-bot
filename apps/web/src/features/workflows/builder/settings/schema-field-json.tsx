@@ -35,6 +35,7 @@ export function SchemaFieldJson({
       hint={`${hint ?? ""} JSON.`.trim()}
     >
       <Textarea
+        placeholder={'e.g. { "label": "urgent" }'}
         id={id}
         rows={3}
         className="font-mono text-xs"

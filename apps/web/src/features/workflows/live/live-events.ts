@@ -1,6 +1,8 @@
 "use client";
 
-import { getRun, type LiveEvent, listRuns } from "../api";
+import { getRun, getWorkflow, type LiveEvent, listRuns } from "../api";
+import { useAssistant } from "../assistant/store";
+import { useBuilder } from "../builder/store";
 import { isActive, useRunView } from "./run-view-store";
 
 /** Reloads the run list (after starting a run, and when a run starts or ends). */
@@ -23,7 +25,33 @@ export async function refreshDetail(runId: string) {
   }
 }
 
+let reloadTimer: ReturnType<typeof setTimeout> | undefined;
+
+/** The assistant changed the draft: load it (several quick edits become one fetch). */
+function reloadDraft(workflowId: string) {
+  clearTimeout(reloadTimer);
+  reloadTimer = setTimeout(async () => {
+    try {
+      const w = await getWorkflow(workflowId);
+      if (useBuilder.getState().workflow?.id === workflowId)
+        useBuilder.getState().reload(w);
+    } catch {
+      // The next change or the lock's end reloads again.
+    }
+  }, 150);
+}
+
 export function applyLiveEvent(workflowId: string, event: LiveEvent) {
+  if (event.type === "draft.updated") return reloadDraft(workflowId);
+  if (event.type === "assistant.lock") {
+    useBuilder.setState({ lockedBy: event.locked ? event.runId : null });
+    if (!event.locked) reloadDraft(workflowId);
+    return;
+  }
+  if (event.type === "assistant.parts")
+    return useAssistant.getState().applyParts(event as never);
+  if (event.type === "assistant.progress")
+    return useAssistant.getState().applyProgress(event);
   const view = useRunView.getState();
   if (event.type === "run.started") {
     void refreshRuns(workflowId);

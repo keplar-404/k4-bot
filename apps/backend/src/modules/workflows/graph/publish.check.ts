@@ -22,7 +22,7 @@ const twoDelays = (days: number) =>
         id,
         kind: "logic.delay",
         position: { x: 0, y: 0 },
-        config: { amount: days, unit: "days" },
+        config: { mode: "for", amount: days, unit: "days" },
       })),
     ],
     edges: [

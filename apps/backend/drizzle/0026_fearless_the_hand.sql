@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "assistant_run_one_active" ON "assistant_run" USING btree ("user_id") WHERE "assistant_run"."status" in ('queued', 'running', 'waiting');

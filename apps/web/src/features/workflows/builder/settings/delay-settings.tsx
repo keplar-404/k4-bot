@@ -152,6 +152,7 @@ export function DelaySettings({
           <div className="grid grid-cols-2 gap-3">
             <Field id="delay-at" label="At (time)">
               <Input
+                placeholder={"09:00"}
                 id="delay-at"
                 type="time"
                 value={c.at}

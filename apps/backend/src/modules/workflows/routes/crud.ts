@@ -6,6 +6,7 @@ import { getRequestContext } from "../../../shared/context";
 import { validate } from "../../../shared/validate";
 import { graphSchema } from "../graph/schema";
 import { structureIssues } from "../graph/validate";
+import { lockedResponse } from "../store/lock";
 import { removeWorkflow } from "../store/remove";
 import { RANGES, type RunRange, runsOverTime, statsByWorkflow } from "../store/runs";
 import * as store from "../store/workflows";
@@ -69,6 +70,8 @@ const crud = new Hono<AuthGuardEnv>()
     const userId = c.get("session").user.id;
     const { id } = c.req.valid("param");
     const { expectedUpdatedAt, ...patch } = c.req.valid("json");
+    const locked = await lockedResponse(db, userId, id);
+    if (locked) return c.json(locked, 423);
 
     if (patch.graph) {
       const issues = structureIssues(patch.graph);

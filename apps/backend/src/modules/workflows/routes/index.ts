@@ -6,6 +6,7 @@ import { validate } from "../../../shared/validate";
 import { getRun, listRuns } from "../store/runs";
 import answer from "./answer";
 import crud from "./crud";
+import importRoute from "./import";
 import lifecycle from "./lifecycle";
 import { liveSocket, liveToken } from "./live";
 import runs from "./runs";
@@ -32,6 +33,7 @@ const workflows = new Hono<AuthGuardEnv>()
   .route("/", answer)
   .route("/", share)
   .route("/", lifecycle)
+  .route("/", importRoute)
   .route("/", crud);
 
 export default workflows;

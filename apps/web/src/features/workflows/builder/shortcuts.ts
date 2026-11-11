@@ -9,6 +9,7 @@ export const SHORTCUTS: Array<{
       { keys: ["Mod", "K"], what: "Show these shortcuts" },
       { keys: ["["], what: "Show or hide the blocks" },
       { keys: ["]"], what: "Show or hide the settings" },
+      { keys: ["Mod", "I"], what: "Open or close the assistant" },
       { keys: ["Esc"], what: "Deselect the block" },
     ],
   },

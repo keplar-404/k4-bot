@@ -43,6 +43,7 @@ export function CodeSettings({
           hint="The body of an async function: read input.<name>, use await, console.log for notes, and return the result. Node.js, no secrets. Read it later as {{steps.<id>.output.result}}."
         >
           <Textarea
+            placeholder={"return { total: input.orders.length };"}
             id="code-body"
             spellCheck={false}
             className="min-h-48 font-mono text-xs"

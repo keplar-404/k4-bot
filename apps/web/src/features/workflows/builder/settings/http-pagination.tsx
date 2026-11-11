@@ -111,6 +111,7 @@ export function HttpPagination({
               hint="The path in each response, e.g. next_cursor or links.next."
             >
               <Input
+                placeholder={"e.g. meta.next_cursor"}
                 id="http-next"
                 value={value.nextPath}
                 onChange={(e) => set({ nextPath: e.target.value })}

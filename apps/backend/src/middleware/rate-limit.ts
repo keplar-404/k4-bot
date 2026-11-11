@@ -3,7 +3,7 @@ import type { Context, Env as HonoEnv } from "hono";
 import type { Env } from "../config/env";
 import type { AuthGuardEnv } from "./auth-guard";
 
-type Binding = "RL" | "RL_WRITE" | "RL_WF_SAVE" | "RL_WF_RUN" | "RL_WF_HOOK" | "RL_APP_EXEC" | "RL_HTTP";
+type Binding = "RL" | "RL_WRITE" | "RL_WF_SAVE" | "RL_WF_RUN" | "RL_WF_HOOK" | "RL_APP_EXEC" | "RL_HTTP" | "RL_ASSISTANT_MSG";
 const warned = new Set<string>();
 
 /**
@@ -42,3 +42,6 @@ export const workflowHookLimit = limiter<{ Bindings: Env }>("RL_WF_HOOK", (c) =>
 
 /** Mutating and expensive routes, per signed-in user. Mount after authGuard. */
 export const userLimit = limiter<AuthGuardEnv>("RL_WRITE", (c) => c.get("session").user.id);
+
+/** Messages to the workflow assistant (10/min), per signed-in user: each one starts a paid model run. */
+export const assistantMessageLimit = limiter<AuthGuardEnv>("RL_ASSISTANT_MSG", (c) => c.get("session").user.id);

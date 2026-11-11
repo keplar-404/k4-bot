@@ -24,11 +24,13 @@ export async function waitForRun(db: Db, userId: string, runId: string) {
     }
     if (run.status === "running") continue;
 
-    const lastOutputs = run.steps
-      .filter((s) => s.status === "succeeded")
-      .slice(-3)
-      .map((s) => ({ nodeId: s.nodeId, output: s.output }));
-    return asText({ runId, status: run.status, error: run.error, failedNodeId: run.failedNodeId, lastOutputs }, 8_000);
+    const done = run.steps.filter((s) => s.status === "succeeded");
+    // A Return block is the workflow's answer; without one, the last outputs are the best guess.
+    const returned = done.findLast((s) => s.nodeKind === "logic.return");
+    const answer = returned
+      ? { result: returned.output }
+      : { lastOutputs: done.slice(-3).map((s) => ({ nodeId: s.nodeId, output: s.output })) };
+    return asText({ runId, status: run.status, error: run.error, failedNodeId: run.failedNodeId, ...answer }, 8_000);
   }
   return asText({ runId, status: "running", note: "Still going. Check later with workflow_run_status." });
 }

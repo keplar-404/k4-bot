@@ -15,3 +15,4 @@ export * from "./bot-workflow";
 export * from "./task";
 export * from "./webhook";
 export * from "./group";
+export * from "./assistant";
