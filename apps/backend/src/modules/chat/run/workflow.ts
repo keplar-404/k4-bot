@@ -1,5 +1,6 @@
 import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from "cloudflare:workers";
 import { createDb } from "../../../db";
+import { runTrace } from "../../../db/schema";
 import { parseEnv, type Env } from "../../../config/env";
 import { startNextTurn } from "../../groups/chain";
 import { groupTurn } from "../../groups/brief";
@@ -66,6 +67,28 @@ export class ChatRunWorkflow extends WorkflowEntrypoint<Env, ChatRunParams> {
         { retries: { limit: 0, delay: 1 }, timeout: "25 minutes" },
         () => runSlice(env, runParams, botRow, attached, slice, resume, group ?? undefined),
       );
+      // One row per slice: model, status, retry count and why. A failed run is now diagnosable.
+      await step.do(`trace-${slice}`, async () => {
+        const db = createDb(env.DATABASE_URL);
+        await db
+          .insert(runTrace)
+          .values({
+            id: crypto.randomUUID(),
+            kind: "chat_slice",
+            runId: params.runId,
+            threadId: params.threadId,
+            userId: params.userId,
+            modelId: params.modelId ?? null,
+            status: result.status,
+            slices: slice + 1,
+            retries,
+            stopReason: result.status === "retry" ? result.reason : null,
+            error: "error" in result ? String(result.error).slice(0, 500) : null,
+            finishedAt: new Date(),
+          })
+          .catch((e: unknown) => console.error("[trace] not written", e));
+      });
+
       if (result.status === "retry") {
         // `resume` is kept: an answer or approval the failed slice was carrying is delivered by the retry.
         retries++;

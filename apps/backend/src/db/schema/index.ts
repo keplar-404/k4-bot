@@ -16,3 +16,4 @@ export * from "./task";
 export * from "./webhook";
 export * from "./group";
 export * from "./assistant";
+export * from "./trace";

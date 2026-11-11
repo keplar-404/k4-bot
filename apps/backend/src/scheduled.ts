@@ -34,12 +34,6 @@ export async function pruneEvents(db: Db, olderThan: Date): Promise<number> {
 export const scheduled: ExportedHandlerScheduledHandler<Env> = async (controller, env, ctx) => {
   const cfg = parseEnv(env);
   const db = createDb(cfg.DATABASE_URL);
-  if (controller.cron === "* * * * *") {
-    // Per-minute: fire due scheduled workflows and bot tasks.
-    ctx.waitUntil(runDueSchedules(cfg, db).catch((e) => console.error("[schedule] failed", e)));
-    ctx.waitUntil(runDueTasks(cfg, db).catch((e) => console.error("[tasks] failed", e)));
-    return;
-  }
   // Daily (0 3 * * *): retention, catalog refresh, stale sandboxes, stuck-run sweep.
   const cutoff = new Date(Date.now() - EVENT_RETENTION_DAYS * 86_400_000);
   ctx.waitUntil(pauseStaleSandboxes(env));

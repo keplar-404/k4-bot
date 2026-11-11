@@ -32,7 +32,9 @@
     { "name": "chat-run", "binding": "CHAT_RUN", "class_name": "ChatRunWorkflow" },
     { "name": "async-task", "binding": "ASYNC_TASK", "class_name": "AsyncTaskWorkflow" },
     { "name": "workflow-run", "binding": "WORKFLOW_RUN", "class_name": "WorkflowRunner" },
-    { "name": "assistant-run", "binding": "ASSISTANT_RUN", "class_name": "AssistantRunWorkflow" }
+    { "name": "assistant-run", "binding": "ASSISTANT_RUN", "class_name": "AssistantRunWorkflow" },
+    // The per-minute due-tick, as a native Workflow schedule (one instance per firing).
+    { "name": "schedule-tick", "binding": "SCHEDULE_TICK", "class_name": "ScheduleTickWorkflow", "schedules": ["* * * * *"] }
   ],
   "ratelimits": [
     // Every API request, per client IP.
@@ -48,7 +50,8 @@
     // Messages to the workflow assistant, per user.
     { "name": "RL_ASSISTANT_MSG", "namespace_id": "1008", "simple": { "limit": 10, "period": 60 } }
   ],
-  "triggers": { "crons": ["0 3 * * *", "* * * * *"] },
+  // Only cleanup stays on a Worker cron; the per-minute due-tick is the schedule-tick Workflow.
+  "triggers": { "crons": ["0 3 * * *"] },
   "vars": {
     "BETTER_AUTH_URL": "http://localhost:8787",
     "WEB_ORIGIN": "http://localhost:3000"

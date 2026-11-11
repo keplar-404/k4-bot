@@ -1,6 +1,7 @@
 import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from "cloudflare:workers";
 import { parseEnv, type Env } from "../../config/env";
 import { createDb } from "../../db";
+import { runTrace } from "../../db/schema";
 import type { AssistantTodo } from "../../db/schema";
 import { MAX_MODEL_RETRIES, retryDelayMs } from "../chat/run/types";
 import { setLock } from "../workflows/store/lock";
@@ -107,6 +108,22 @@ export class AssistantRunWorkflow extends WorkflowEntrypoint<Env, AssistantWorkf
       const closed = last?.type === "text" && last.text.trim() === content.trim();
       await addMessage(db, { threadId: p.threadId, userId: p.userId, role: "assistant", content, todos, parts: closed ? parts : [...parts, { type: "text", text: content }], runId: p.runId });
       await setRun(db, p.runId, { status: outcome.status, error: outcome.error ?? null, question: null, todos, finishedAt: new Date() });
+      await db
+        .insert(runTrace)
+        .values({
+          id: crypto.randomUUID(),
+          kind: "assistant",
+          runId: p.runId,
+          threadId: p.threadId,
+          userId: p.userId,
+          modelId: p.modelId ?? null,
+          status: outcome.status,
+          retries: 0,
+          stopReason: outcome.status === "failed" ? "error" : outcome.status,
+          error: outcome.error ? String(outcome.error).slice(0, 500) : null,
+          finishedAt: new Date(),
+        })
+        .catch((e: unknown) => console.error("[assistant] trace not written", e));
       await setLock(db, p.userId, p.workflowId, null, p.runId);
       const live = liveAssistant(env, p.workflowId);
       await live.lock(p.runId, false);
