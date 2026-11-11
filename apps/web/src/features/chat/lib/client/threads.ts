@@ -30,6 +30,11 @@ export function createThread(
   });
 }
 
+/** Continue a run that stopped: the server resumes the checkpoint without a new user message. */
+export function continueRun(threadId: string): Promise<{ runId: string }> {
+  return request(`/api/v1/chat/threads/${threadId}/resume`, { method: "POST" });
+}
+
 /** The latest chat of a bot (its own, not its group chats), or of a group. */
 export function listThreads(
   botId: string,

@@ -79,5 +79,7 @@ export function useChat(botId: string, groupId?: string) {
     dismissError: actions.dismissError,
     approve: actions.approve,
     reject: actions.reject,
+    /** The open thread id (a ref, so it is read on demand). */
+    getThreadId: () => state.threadRef.current,
   };
 }

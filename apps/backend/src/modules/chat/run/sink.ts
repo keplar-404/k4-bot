@@ -45,7 +45,8 @@ export function createSink(
  */
 export function agentInput(params: ChatRunParams, attached: FileRef[], slice: number, resume: unknown) {
   if (resume !== undefined) return new Command({ resume });
-  if (slice > 0) return null;
+  // A resumed run continues from the checkpoint: no message is added again.
+  if (slice > 0 || params.continueRun) return null;
   // The summarizer has already run when the model sees this (see middleware/stack.ts), so it only confirms.
   if (params.compact) {
     const confirm = COMPACT_CONFIRM;

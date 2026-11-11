@@ -22,6 +22,8 @@ export interface ChatRunParams {
   hops?: number;
   /** Group chats: this run was started by another bot, not by a new user message (nothing to save or learn). */
   chained?: boolean;
+  /** The user pressed Continue on a failed run: resume the checkpoint, save no new message. */
+  continueRun?: boolean;
 }
 
 /** One queued group turn: which bot, and what it was asked by whom (a mention of the user's message has no task). */

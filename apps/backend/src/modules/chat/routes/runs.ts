@@ -7,7 +7,7 @@ import { sendMessageSchema } from "../schemas";
 import { userLimit } from "../../../middleware/rate-limit";
 import type { AuthGuardEnv } from "../../../middleware/auth-guard";
 import { DEFAULT_MODEL_ID, isFreeModel, modelError } from "../../agent/models";
-import { chatThread } from "../../../db/schema";
+import { chatMessage, chatThread } from "../../../db/schema";
 import type { ChatRunParams } from "../run/workflow";
 import { threadBusy } from "../run-busy";
 import { deepResearchQuestion } from "../commands";
@@ -16,6 +16,27 @@ import { getOwnedGroup, groupMembers, leadOf } from "../../groups/store";
 import type { Db } from "../../../db";
 
 const runs = new Hono<AuthGuardEnv>()
+  // Continue a run that stopped (a dead slice, a provider outage): the checkpoint is intact,
+  // so no new user message is written and the agent picks up where it left off.
+  .post("/threads/:id/resume", userLimit, async (c) => {
+    const { db, env } = getRequestContext(c);
+    const userId = c.get("session").user.id;
+    const threadId = c.req.param("id");
+    if (!(await getOwnedThread(db, threadId, userId))) return c.json({ error: "NOT_FOUND" }, 404);
+    if (await threadBusy(env, db, threadId)) {
+      return c.json({ error: "RUN_ACTIVE", message: "The bot is still working on your last message." }, 409);
+    }
+    const [any] = await db.select({ id: chatMessage.id }).from(chatMessage).where(eq(chatMessage.threadId, threadId)).limit(1);
+    if (!any) return c.json({ error: "NOTHING_TO_RESUME", message: "That chat has no earlier work to continue." }, 409);
+    const quota = await quotaExceeded(db, env, userId);
+    if (quota) return c.json({ error: "QUOTA_EXCEEDED", message: quota }, 402);
+    const runId = crypto.randomUUID();
+    await env.CHAT_RUN.create({
+      id: runId,
+      params: { runId, threadId, userId, userMessageId: runId, content: "", continueRun: true } satisfies ChatRunParams,
+    });
+    return c.json({ runId }, 202);
+  })
   // Start a run. Returns 202 immediately; the answer streams over the socket.
   .post(
     "/threads/:id/messages",

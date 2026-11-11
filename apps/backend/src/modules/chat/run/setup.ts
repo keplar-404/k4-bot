@@ -53,8 +53,8 @@ export async function saveUserMessage(db: Db, params: ChatRunParams, botId: stri
       .set({ threadId: params.threadId, botId })
       .where(and(eq(chatFile.userId, params.userId), inArray(chatFile.id, files.map((f) => f.id)), isNull(chatFile.threadId)));
   }
-  // A group turn started by another bot has no new user message.
-  if (params.chained) return files;
+  // A group turn started by another bot, and a run resumed from the checkpoint, have no new user message.
+  if (params.chained || params.continueRun) return files;
   await db
     .insert(chatMessage)
     .values({

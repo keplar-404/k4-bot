@@ -6,7 +6,10 @@ import {
   MessageScrollerProvider,
   MessageScrollerViewport,
 } from "@/components/ui/message-scroller";
+import { Button } from "@/components/ui/button";
 import { useBots } from "@/features/bots/hooks/use-bots";
+import { continueRun as resumeThread } from "@/features/chat/lib/client/threads";
+import { toast } from "sonner";
 import type { Source } from "@/features/chat/components/prompt-bar/data";
 import { useAttachments } from "@/features/chat/hooks/use-attachments";
 import { useChat } from "@/features/chat/hooks/use-chat";
@@ -55,6 +58,7 @@ export function ChatView({
     usage,
     answer,
     stop,
+    getThreadId,
     connection,
     error,
     isLoading,
@@ -96,6 +100,24 @@ export function ChatView({
           <MessageScrollerButton />
         </MessageScroller>
       </MessageScrollerProvider>
+      {run === "failed" && (
+        <div className="flex justify-center pb-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              const id = getThreadId();
+              if (!id) return;
+              void resumeThread(id).then(
+                () => window.location.reload(),
+                (e: Error) => toast.error(e.message),
+              );
+            }}
+          >
+            Continue from where it stopped
+          </Button>
+        </div>
+      )}
       <Prompts
         usage={usage}
         run={run}
