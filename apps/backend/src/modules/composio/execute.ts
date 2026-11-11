@@ -3,7 +3,7 @@ import { allow } from "../../middleware/rate-limit";
 import { createDb } from "../../db";
 import { fitArguments } from "./arguments";
 import { isNoAuthToolkit } from "./catalog-query";
-import { composioFor } from "./client";
+import { composioFor, sessionFor } from "./client";
 import { listConnections } from "./connections";
 import { getTool } from "./tools";
 
@@ -54,6 +54,25 @@ export async function executeAction(env: Env, args: ActionArgs): Promise<ActionR
 
     const fitted = fitArguments(tool.input, args.arguments);
     if ("missing" in fitted) return failed(`Fill in: ${fitted.missing.join(", ")}.`);
+
+    // Sessions are the current Composio surface: they scope tools, auth and execution to the user.
+    // Opt-in per deployment (COMPOSIO_SESSIONS=true) until verified against its connected accounts.
+    if (env.COMPOSIO_SESSIONS === "true") {
+      try {
+        const session = (await sessionFor(env, args.userId)) as {
+          execute: (slug: string, a: Record<string, unknown>) => Promise<{ successful?: boolean; data?: unknown; error?: string }>;
+        };
+        const res = await session.execute(args.slug, fitted.args);
+        if (res.successful === false) {
+          const error = res.error ?? "The action failed.";
+          return failed(error.slice(0, 500), FATAL_ERROR_TEXT.test(error));
+        }
+        return { ok: true, data: clip(res.data, args.maxChars) };
+      } catch (error) {
+        console.error("[composio] session execute failed", args.slug, (error as Error)?.message);
+        return failed("The app did not answer. Try again.", false);
+      }
+    }
 
     const account = await pickAccount(env, args);
     if ("error" in account) return failed(account.error);

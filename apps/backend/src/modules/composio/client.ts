@@ -17,6 +17,23 @@ export function composioFor(env: { COMPOSIO_API_KEY?: string }): Composio {
   return client;
 }
 
+/**
+ * One Composio session per user (cached per isolate): sessions scope tools, auth and execution to a
+ * user. Enabled with COMPOSIO_SESSIONS=true; the direct path stays the default until a deployment
+ * verifies session executes against its connected accounts.
+ */
+const sessions = new Map<string, Promise<unknown>>();
+export function sessionFor(env: { COMPOSIO_API_KEY?: string; COMPOSIO_SESSIONS?: string }, userId: string): Promise<unknown> {
+  if (env.COMPOSIO_SESSIONS !== "true") return Promise.reject(new Error("COMPOSIO_SESSIONS is off"));
+  let session = sessions.get(userId);
+  if (!session) {
+    session = composioFor(env).create(userId);
+    sessions.set(userId, session);
+    session.catch(() => sessions.delete(userId));
+  }
+  return session;
+}
+
 /** The SDK's typed client drops list cursors; the raw API client (`composio.client`) keeps them. */
 type RawList<T> = { items: T[]; next_cursor?: string | null };
 type RawClient = {
