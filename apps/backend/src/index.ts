@@ -43,7 +43,15 @@ const app = new Hono<{ Bindings: Env }>()
   .use("/api/v1/*", (c, next) =>
     c.req.path.startsWith("/api/v1/auth/") || isStream(c.req.path) || isComposioEvents(c.req.path) ? next() : ipLimit(c, next),
   )
-  .route("/api/v1", routes);
+  .route("/api/v1", routes)
+  .notFound((c) => c.json({ error: "NOT_FOUND", message: "No such endpoint." }, 404))
+  .onError((error, c) => {
+    const requestId = c.req.header("x-request-id") ?? crypto.randomUUID();
+    // One line with the request id: the client sees the id, support can find the log.
+    console.error("[api]", requestId, c.req.method, c.req.path, error instanceof Error ? error.message : error);
+    c.header("x-request-id", requestId);
+    return c.json({ error: "INTERNAL", message: "Something went wrong. Try again.", requestId }, 500);
+  });
 
 export type AppType = typeof app;
 

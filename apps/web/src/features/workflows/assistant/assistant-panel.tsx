@@ -56,12 +56,15 @@ export function AssistantPanel({ workflowId }: { workflowId: string }) {
   }, [open, thread, workflowId]);
 
   useEffect(() => {
-    if (!open || !working) return;
+    // The page's socket already streams this workflow's run; polling is only the fallback for a run on
+    // another workflow (its events go to that workflow's channel).
+    const elsewhere = working && run?.workflowId && run.workflowId !== workflowId;
+    if (!open || !elsewhere) return;
     const timer = setInterval(() => {
       if (!document.hidden) void useAssistant.getState().refresh();
     }, POLL_MS);
     return () => clearInterval(timer);
-  }, [open, working]);
+  }, [open, working, run?.workflowId, workflowId]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: scroll on new content only
   useEffect(() => {

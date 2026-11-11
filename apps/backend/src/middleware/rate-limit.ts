@@ -11,13 +11,17 @@ const warned = new Set<string>();
  * counters live at the edge. A limiter outage must not take the API down: it is logged and the call is allowed.
  * Also used outside routes (bot tools, the workflow engine), where there is no request to answer with a 429.
  */
+const FAIL_CLOSED: ReadonlySet<Binding> = new Set(["RL_WRITE", "RL_WF_SAVE", "RL_WF_RUN", "RL_ASSISTANT_MSG", "RL_APP_EXEC", "RL_HTTP"]);
+
 export async function allow(env: Pick<Env, Binding>, binding: Binding, key: string): Promise<boolean> {
   const outcome = await env[binding].limit({ key }).catch((error: unknown) => {
     if (!warned.has(binding)) {
       warned.add(binding);
       console.error(`[rate-limit] ${binding} unavailable, allowing requests`, error);
     }
-    return { success: true };
+    // Reads stay available if the limiter is down; writes and paid calls do not, so an outage
+    // cannot become an open door (or an unbounded bill).
+    return { success: !FAIL_CLOSED.has(binding) };
   });
   return outcome.success;
 }
