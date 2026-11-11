@@ -33,7 +33,12 @@ const app = new Hono<{ Bindings: Env }>()
   .use("*", corsMiddleware)
   // The stream route sets its own framing headers (secureHeaders would forbid the iframe).
   .use("*", (c, next) => (isStream(c.req.path) ? next() : secureHeaders(isFileBytes(c.req.path) ? { crossOriginResourcePolicy: "cross-origin" } : undefined)(c, next)))
-  .use("*", bodyLimit({ maxSize: 1024 * 1024 }))
+  // Uploads are the one route allowed past 1 MiB: the file route enforces its own 25 MiB cap.
+  .use("*", (c, next) =>
+    c.req.path === "/api/v1/files" || c.req.path === "/api/v1/files/"
+      ? next()
+      : bodyLimit({ maxSize: 1024 * 1024 })(c, next),
+  )
   // /auth/* is rate limited by Better Auth itself (database-backed rules).
   .use("/api/v1/*", (c, next) =>
     c.req.path.startsWith("/api/v1/auth/") || isStream(c.req.path) || isComposioEvents(c.req.path) ? next() : ipLimit(c, next),

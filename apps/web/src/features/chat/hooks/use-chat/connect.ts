@@ -47,9 +47,17 @@ export async function connectImpl(
         const payload = (
           ev.payload && typeof ev.payload === "object" ? ev.payload : {}
         ) as Record<string, unknown>;
-        // Mode changes are thread-level, not part of the stream state.
+        // Mode changes are thread-level, not part of the stream state, but they still own a
+        // sequence number: the cursor must advance or the next event looks like a gap and
+        // forces a full history resync.
         if (ev.type === "thread.mode" && typeof payload.mode === "string") {
           ctx.setMode(payload.mode as "allow_all" | "plan" | "ask");
+          const current = ctx.streamRef.current;
+          if (ev.seq === current.cursor + 1) {
+            ctx.streamRef.current = { ...current, cursor: ev.seq };
+          } else if (ev.seq > current.cursor + 1) {
+            void ctx.reload();
+          }
           return;
         }
         const result = reduceEvent(ctx.streamRef.current, ev);

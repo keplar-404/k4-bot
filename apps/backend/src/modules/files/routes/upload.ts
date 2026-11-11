@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import { and, eq } from "drizzle-orm";
 import { getRequestContext } from "../../../shared/context";
 import type { AuthGuardEnv } from "../../../middleware/auth-guard";
@@ -10,7 +11,8 @@ const tooLarge = { error: "TOO_LARGE", message: `Files can be at most ${formatBy
 
 const upload = new Hono<AuthGuardEnv>()
   // Upload one file (multipart field "file"), optionally for a bot's chat. It is linked to the chat when sent.
-  .post("/", userLimit, async (c) => {
+  // The global 1 MiB limit skips this route; cap the body at the file limit itself.
+  .post("/", userLimit, bodyLimit({ maxSize: MAX_FILE_BYTES + 64 * 1024 }), async (c) => {
     const { db, env } = getRequestContext(c);
     const userId = c.get("session").user.id;
     if (Number(c.req.header("content-length") ?? 0) > MAX_FILE_BYTES + 64 * 1024) return c.json(tooLarge, 413);

@@ -77,8 +77,10 @@ export class ChatRelayDurableObject extends DurableObject<Env> {
     // No await between here and the increment, so concurrent appends cannot share a seq.
     const event: RelayEvent = { seq: ++this.seq!, type, payload, ts: Date.now() };
 
-    broadcast(this.ctx.getWebSockets(), { type: "event", event });
+    // Persist first: the database is the replay source of truth, so an event a socket has
+    // already seen must be replayable after a crash (the file contract, previously inverted).
     await insertEvent(this.sql, this.threadId, event);
+    broadcast(this.ctx.getWebSockets(), { type: "event", event });
     return event;
   }
 
