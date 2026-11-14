@@ -1,0 +1,37 @@
+{
+	"name": "bot",
+	"private": true,
+	"scripts": {
+		"build": "turbo run build",
+		"dev": "turbo run dev",
+		"lint": "turbo run lint",
+		"format": "biome format --write .",
+		"check-types": "turbo run check-types",
+		"check": "biome check .",
+		"check:fix": "biome check --write .",
+		"lint:biome": "biome lint .",
+		"format:check": "biome format .",
+		"ci": "biome ci .",
+		"migrate": "biome migrate --write"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "2.6.7",
+		"prettier": "3.9.6",
+		"shadcn": "^4.23.0",
+		"turbo": "^2.11.11",
+		"typescript": "7.0.2"
+	},
+	"engines": {
+		"node": "26.x"
+	},
+	"devEngines": {
+		"packageManager": {
+			"name": "bun",
+			"version": "1.4.4"
+		}
+	},
+	"workspaces": [
+		"apps/*",
+		"packages/*"
+	]
+}
