@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { Streamdown } from "streamdown";
+import { Screenshot } from "@/components/chat/screenshot";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
 import { Button } from "@/components/ui/button";
 import { CodeBlock, CodeBlockContent } from "@/components/ui/code-block";
@@ -176,7 +177,7 @@ type SearchOutput = {
 };
 type DesktopOutput = {
 	streamUrl?: string;
-	screenshotBase64?: string;
+	screenshotKey?: string;
 	stdout?: string;
 	stderr?: string;
 	exitCode?: number;
@@ -251,14 +252,7 @@ function ToolDetail({ part }: { part: EveToolPart }) {
 				{d.stdout !== undefined && (
 					<Terminal text={[d.stdout, d.stderr].filter(Boolean).join("\n")} />
 				)}
-				{d.screenshotBase64 && (
-					// biome-ignore lint/performance/noImgElement: inline base64 screenshot
-					<img
-						src={`data:image/png;base64,${d.screenshotBase64}`}
-						alt="Desktop screenshot after this action"
-						className="max-w-full rounded-md border"
-					/>
-				)}
+				{d.screenshotKey && <Screenshot k={d.screenshotKey} />}
 				{d.streamUrl && (
 					<a
 						href={d.streamUrl}

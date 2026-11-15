@@ -1,3 +1,8 @@
+import {
+	getScreenshot,
+	newScreenshotKey,
+	putScreenshot,
+} from "@repo/shared/storage";
 import { defineTool, toolOutput, toolOutputPart } from "eve/tools";
 import { z } from "zod";
 import { getUserDesktop } from "../lib/desktop";
@@ -47,7 +52,7 @@ export default defineTool({
 					: `Desktop: ${i.action.replace("_", " ")}`,
 	},
 	async execute(input, ctx) {
-		const { desktop, streamUrl } = await getUserDesktop(
+		const { userId, desktop, streamUrl } = await getUserDesktop(
 			ctx.session.auth.current,
 		);
 		const need = <T>(v: T | undefined, name: string): T => {
@@ -105,21 +110,26 @@ export default defineTool({
 		// Give the UI a moment to settle before capturing.
 		if (input.action !== "screenshot" && input.action !== "run")
 			await desktop.wait(500);
-		const png = await desktop.screenshot();
+		// The image goes to object storage; only its key is kept in the event log.
+		const screenshotKey = newScreenshotKey(userId);
+		await putScreenshot(screenshotKey, await desktop.screenshot());
 		return {
 			action: input.action,
 			streamUrl,
 			...(input.action === "run"
 				? { command: input.command, stdout, stderr, exitCode }
 				: {}),
-			screenshotBase64: Buffer.from(png).toString("base64"),
+			screenshotKey,
 		};
 	},
-	toModelOutput(output) {
-		const { screenshotBase64, streamUrl: _s, ...rest } = output;
+	async toModelOutput(output) {
+		const { screenshotKey, streamUrl: _s, ...rest } = output;
+		const png = await getScreenshot(screenshotKey);
 		return toolOutput.content([
 			toolOutputPart.text(JSON.stringify(rest)),
-			toolOutputPart.file(screenshotBase64, { mediaType: "image/png" }),
+			toolOutputPart.file(Buffer.from(png).toString("base64"), {
+				mediaType: "image/png",
+			}),
 		]);
 	},
 });

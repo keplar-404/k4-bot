@@ -11,6 +11,7 @@ import {
 	SquarePenIcon,
 } from "lucide-react";
 import { useRef, useState } from "react";
+import { toast } from "sonner";
 import { AssistantMessage, UserMessage } from "@/components/chat/messages";
 import {
 	defaultMode,
@@ -46,6 +47,7 @@ import {
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { api, notifyChatsChanged } from "@/lib/api";
+import { getToken } from "@/lib/auth-client";
 
 const SUGGESTIONS = [
 	"Search the web for this week's top AI news.",
@@ -58,6 +60,21 @@ const SUGGESTIONS = [
 // Saved chats follow eve's Next.js guide: create the chat record before the
 // first message, save the session id from onSessionChange, reopen with
 // initialSession + resume, and switch the URL with History.replaceState.
+// The chat only reopens if its session id is saved, so retry a few times.
+async function saveSession(id: string, eveSessionId: string) {
+	for (let i = 0; i < 3; i++) {
+		try {
+			const res = await api.api.chats[":id"].$patch({
+				param: { id },
+				json: { eveSessionId },
+			});
+			if (res.ok) return true;
+		} catch {}
+		await new Promise((r) => setTimeout(r, 1000 * (i + 1)));
+	}
+	return false;
+}
+
 export function Chat({
 	chatId: savedChatId,
 	sessionId,
@@ -68,6 +85,8 @@ export function Chat({
 	const chatIdRef = useRef(savedChatId);
 	const savedSessionRef = useRef(sessionId ?? undefined);
 	const agent = useEveAgent({
+		// The agent checks this token on every request; it is re-read each time.
+		auth: { bearer: async () => (await getToken()) ?? "" },
 		...(sessionId
 			? { initialSession: { sessionId, streamIndex: 0 }, resume: true }
 			: {}),
@@ -76,9 +95,12 @@ export function Chat({
 			const sid = session?.sessionId;
 			if (!id || !sid || sid === savedSessionRef.current) return;
 			savedSessionRef.current = sid;
-			void api.api.chats[":id"].$patch({
-				param: { id },
-				json: { eveSessionId: sid },
+			void saveSession(id, sid).then((ok) => {
+				if (ok) return;
+				savedSessionRef.current = undefined; // let the next change try again
+				toast.error(
+					"Could not save this chat. It may be missing from history.",
+				);
 			});
 		},
 	});

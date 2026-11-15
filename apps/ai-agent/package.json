@@ -12,14 +12,18 @@
 		"dev": "eve dev",
 		"eval": "eve eval",
 		"start": "eve start",
-		"typecheck": "tsc"
+		"test": "bun test",
+		"typecheck": "tsc",
+		"workflow:bootstrap": "bootstrap"
 	},
 	"dependencies": {
+		"@e2b/desktop": "^2.5.0",
 		"@neondatabase/serverless": "^1.2.1",
 		"@openrouter/ai-sdk-provider": "^3.1.0",
 		"@repo/shared": "workspace:*",
 		"@workflow/world-postgres": "5.2.0",
 		"ai": "^7.0.172",
+		"e2b": "^2.56.0",
 		"eve": "^1.0.0-rc.18",
 		"firecrawl": "^4.54.0",
 		"zod": "4.6.7"

@@ -1,5 +1,8 @@
 // App tables. Every row is owned by one user (userId), and every query filters by it.
+// userId is the Neon Auth user id (neon_auth.user.id). There is no foreign key: that
+// schema belongs to Neon, so we never link our tables to it.
 import {
+	bigint,
 	index,
 	integer,
 	jsonb,
@@ -8,16 +11,13 @@ import {
 	text,
 	timestamp,
 } from "drizzle-orm/pg-core";
-import { user } from "./auth-schema";
 
 // One chat = one eve session.
 export const chat = pgTable(
 	"chat",
 	{
 		id: text("id").primaryKey(),
-		userId: text("user_id")
-			.notNull()
-			.references(() => user.id, { onDelete: "cascade" }),
+		userId: text("user_id").notNull(),
 		title: text("title").notNull(),
 		eveSessionId: text("eve_session_id").unique(),
 		createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -37,7 +37,7 @@ export const agentEvent = pgTable(
 		sessionId: text("session_id").notNull(),
 		line: integer("line").notNull(),
 		index: integer("index").notNull(),
-		userId: text("user_id").references(() => user.id, { onDelete: "cascade" }),
+		userId: text("user_id"),
 		type: text("type").notNull(),
 		data: jsonb("data"),
 		createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -59,9 +59,15 @@ export const agentMemory = pgTable("agent_memory", {
 
 // Each user's own Linux desktop (E2B), created at sign-up and kept paused.
 export const userDesktop = pgTable("user_desktop", {
-	userId: text("user_id")
-		.primaryKey()
-		.references(() => user.id, { onDelete: "cascade" }),
+	userId: text("user_id").primaryKey(),
 	sandboxId: text("sandbox_id").notNull(),
 	createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Per-user request counters (see rate-limit.ts).
+export const rateLimit = pgTable("rate_limit", {
+	id: text("id").primaryKey(),
+	key: text("key").notNull().unique(),
+	count: integer("count").notNull(),
+	lastRequest: bigint("last_request", { mode: "number" }).notNull(),
 });

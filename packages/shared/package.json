@@ -2,11 +2,19 @@
 	"name": "@repo/shared",
 	"private": true,
 	"type": "module",
+	"scripts": {
+		"test": "bun test"
+	},
 	"exports": {
 		"./models": "./src/models.ts",
-		"./desktop": "./src/desktop.ts"
+		"./desktop": "./src/desktop.ts",
+		"./storage": "./src/storage.ts",
+		"./auth": "./src/auth.ts"
 	},
 	"dependencies": {
-		"@e2b/desktop": "^2.5.0"
+		"@aws-sdk/client-s3": "^3.1000.0",
+		"@aws-sdk/s3-request-presigner": "^3.1000.0",
+		"@e2b/desktop": "^2.5.0",
+		"jose": "^6.2.17"
 	}
 }

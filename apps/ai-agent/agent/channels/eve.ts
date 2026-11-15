@@ -1,9 +1,11 @@
+import { userFromBearer } from "@repo/shared/auth";
 import { findModel, pickEffort } from "@repo/shared/models";
 import { type AuthFn, ForbiddenError, localDev } from "eve/channels/auth";
 import { defaultEveAuth, eveChannel } from "eve/channels/eve";
 import { sessions } from "eve/server";
+import { overLimit } from "../lib/db";
+import { assertSessionOwner } from "../lib/owner";
 
-const backendUrl = process.env.BACKEND_URL ?? "http://localhost:8787";
 const MODES = ["ask", "plan", "full"] as const;
 
 // The user who started a session: the principal on its first admitted delivery.
@@ -27,32 +29,32 @@ async function sessionOwner(sessionId: string): Promise<string | null> {
 	}
 }
 
-// Browser requests carry the Better Auth cookie set by apps/backend.
-// Ask the backend who it belongs to, then check the session is theirs.
+// Browser requests carry the signed-in user's Neon Auth token (Authorization: Bearer).
+// It is checked locally against Neon's public keys, then the session must be theirs.
 const appSession: AuthFn<Request> = async (request) => {
-	const cookie = request.headers.get("cookie");
-	if (!cookie) return null;
-	const res = await fetch(`${backendUrl}/api/auth/get-session`, {
-		headers: { cookie },
-	});
-	if (!res.ok) return null;
-	const data = (await res.json()) as { user?: { id: string } } | null;
-	if (!data?.user) return null;
+	const user = await userFromBearer(request.headers.get("authorization"));
+	if (!user) return null;
 
 	const sessionId = /\/session\/([^/?]+)/.exec(
 		new URL(request.url).pathname,
 	)?.[1];
 	if (sessionId) {
-		const owner = await sessionOwner(sessionId).catch(() => null);
-		if (owner !== null && owner !== data.user.id) {
-			throw new ForbiddenError({
-				message: "This conversation belongs to another user.",
-			});
-		}
+		await assertSessionOwner(() => sessionOwner(sessionId), user.id);
+	}
+	// Each user has their own counter. Only POSTs (messages, approvals) count;
+	// reads and stream reconnects are free.
+	if (
+		request.method === "POST" &&
+		(await overLimit(`agent:${user.id}`, 60, 60_000))
+	) {
+		throw new ForbiddenError({
+			code: "rate_limited",
+			message: "Too many messages. Wait a minute and try again.",
+		});
 	}
 	return {
-		authenticator: "better-auth",
-		principalId: data.user.id,
+		authenticator: "neon-auth",
+		principalId: user.id,
 		principalType: "user",
 		attributes: {},
 	};

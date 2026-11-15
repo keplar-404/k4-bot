@@ -1,293 +1,323 @@
 {
-	"version": 2,
-	"skills": {
-		"add": {
-			"source": "vercel/turborepo",
-			"sourceType": "github",
-			"skillPath": "skills/add/SKILL.md",
-			"computedHash": "ef75a72c0728dce1139062476492c7e916c0778e78a93ccb65c0195e22dfb534"
-		},
-		"better-auth-best-practices": {
-			"source": "better-auth/skills",
-			"sourceType": "github",
-			"skillPath": "better-auth/best-practices/SKILL.md",
-			"computedHash": "2773c3687f2cf96d659049ebf2d8c86058a33541b09360712df0dc6b1404c403"
-		},
-		"better-auth-security-best-practices": {
-			"source": "better-auth/skills",
-			"sourceType": "github",
-			"skillPath": "security/SKILL.md",
-			"computedHash": "36e9710eaa13c61c00bec00a4902fdc6ed829e6de13127238ae57494e93c1d9d"
-		},
-		"biome-code-review": {
-			"source": "biomejs/biome",
-			"sourceType": "github",
-			"skillPath": ".agents/skills/biome-code-review/SKILL.md",
-			"computedHash": "da71f1cbb78cacaaf2f04a46b9a4068a71fe6e45589d8e12bc0a46bfff46cc11"
-		},
-		"bun-hono-integration": {
-			"source": "secondsky/claude-skills",
-			"sourceType": "github",
-			"skillPath": "plugins/bun/skills/bun-hono-integration/SKILL.md",
-			"computedHash": "a7e9407996e455098033bf8a6df610e7c43b484155d71204e2463664e80e8503"
-		},
-		"changeset": {
-			"source": "biomejs/biome",
-			"sourceType": "github",
-			"skillPath": ".agents/skills/changeset/SKILL.md",
-			"computedHash": "7bf06002a0ff61ac58053b79b0b9ce432fabfeea2a40f30a2031fb3e57aae84d"
-		},
-		"create-auth": {
-			"source": "better-auth/skills",
-			"sourceType": "github",
-			"skillPath": "better-auth/create-auth/SKILL.md",
-			"computedHash": "6f68253a5ab812aa8c9b70c57609aca763093a594e3b07163142e0fa7d64904a"
-		},
-		"diagnostics-development": {
-			"source": "biomejs/biome",
-			"sourceType": "github",
-			"skillPath": ".agents/skills/diagnostics-development/SKILL.md",
-			"computedHash": "2e021ff20bab7dd56a334ad001b15d82610f3affa3e272537e70d1eade42f7bc"
-		},
-		"doc-comments": {
-			"source": "biomejs/biome",
-			"sourceType": "github",
-			"skillPath": ".agents/skills/doc-comments/SKILL.md",
-			"computedHash": "1ed89ecd836e6f6cf4fb50cbc361b26b64d1bfea852169b48cf92f6884d008eb"
-		},
-		"drizzle-orm-patterns": {
-			"source": "giuseppe-trisciuoglio/developer-kit",
-			"sourceType": "github",
-			"skillPath": "plugins/developer-kit-typescript/skills/drizzle-orm-patterns/SKILL.md",
-			"computedHash": "a5eaf7e1ff588b6f03c7fc71fb2850c0bf36fb66949ad41fd012ae1bc70e6c84"
-		},
-		"email-and-password-best-practices": {
-			"source": "better-auth/skills",
-			"sourceType": "github",
-			"skillPath": "better-auth/emailAndPassword/SKILL.md",
-			"computedHash": "407c1244202876daa748818ed41dc55afde1b3f7aec48ae3a1f1c8a7ee40465e"
-		},
-		"eslint-migrate-options": {
-			"source": "biomejs/biome",
-			"sourceType": "github",
-			"skillPath": ".agents/skills/eslint-migrate-options/SKILL.md",
-			"computedHash": "183efe7c68b9394f7c845ad12ee764fb3731f6311d00b296aa6aa0b7b234a898"
-		},
-		"eve": {
-			"source": "vercel/eve",
-			"sourceType": "github",
-			"skillPath": "skills/eve/SKILL.md",
-			"computedHash": "9c1eaa91f1aa5a1733b90937ee5186bc14f43e88ef6524a956750e535b0e2a60"
-		},
-		"find-skills": {
-			"source": "vercel-labs/skills",
-			"sourceType": "github",
-			"skillPath": "skills/find-skills/SKILL.md",
-			"computedHash": "7bc223e2aafbdbf6e50ea243ba6ef67fe432bb069ab439fea0390795dac0bf7f"
-		},
-		"firecrawl-build": {
-			"source": "firecrawl/skills",
-			"sourceType": "github",
-			"skillPath": "skills/build/firecrawl-build/SKILL.md",
-			"computedHash": "d9ed6df3cb7e0dd830414eaa0e257db8f6608dc84e62e67d4363764afce85309"
-		},
-		"firecrawl-build-interact": {
-			"source": "firecrawl/skills",
-			"sourceType": "github",
-			"skillPath": "skills/build/firecrawl-build-interact/SKILL.md",
-			"computedHash": "460a6d43dc315a313d32839e425aab89732d008fa8f14fa013ade8276f483b0b"
-		},
-		"firecrawl-build-onboarding": {
-			"source": "firecrawl/skills",
-			"sourceType": "github",
-			"skillPath": "skills/build/firecrawl-build-onboarding/SKILL.md",
-			"computedHash": "cbb2e926deec632c0bbf2d7a7dbeb64600a43dcf3bf7b1573a092e0b473c3d09"
-		},
-		"firecrawl-build-scrape": {
-			"source": "firecrawl/skills",
-			"sourceType": "github",
-			"skillPath": "skills/build/firecrawl-build-scrape/SKILL.md",
-			"computedHash": "e918a42db5e8f41ddfaac91329cec668e56aa919ca03161da98b592b984f4570"
-		},
-		"firecrawl-build-search": {
-			"source": "firecrawl/skills",
-			"sourceType": "github",
-			"skillPath": "skills/build/firecrawl-build-search/SKILL.md",
-			"computedHash": "b228991bad43079fd68d1b9c9b087c0cb54a031387205a4691a99c6234dc6766"
-		},
-		"formatter-development": {
-			"source": "biomejs/biome",
-			"sourceType": "github",
-			"skillPath": ".agents/skills/formatter-development/SKILL.md",
-			"computedHash": "55c311af4c774d22dac69ac51477e62e35245fb12e0afa06292bff985af7a290"
-		},
-		"lint-rule-development": {
-			"source": "biomejs/biome",
-			"sourceType": "github",
-			"skillPath": ".agents/skills/lint-rule-development/SKILL.md",
-			"computedHash": "e87c1e8adae6ab34159aff3a0e1d40192b45bb5ba839050ff9ac6d3e93bd13c0"
-		},
-		"neon": {
-			"source": "neondatabase/agent-skills",
-			"sourceType": "github",
-			"skillPath": "skills/neon/SKILL.md",
-			"computedHash": "18f5e4de54d88f84d2e36b5e4f1888211940abbd0ae794ff597556340787da77"
-		},
-		"neon-ai-gateway": {
-			"source": "neondatabase/agent-skills",
-			"sourceType": "github",
-			"skillPath": "skills/neon-ai-gateway/SKILL.md",
-			"computedHash": "263e14fec71917513f1c99fa60e466c99f0777c973b68084b0310490f847f285"
-		},
-		"neon-auth": {
-			"source": "neondatabase/agent-skills",
-			"sourceType": "github",
-			"skillPath": "skills/neon-auth/SKILL.md",
-			"computedHash": "81c1fdecc6bca04edc77d85379ceb21f9da5b6315217d19d83cab2fb2f068adf"
-		},
-		"neon-functions": {
-			"source": "neondatabase/agent-skills",
-			"sourceType": "github",
-			"skillPath": "skills/neon-functions/SKILL.md",
-			"computedHash": "6ec12cc01706f8062dfe90dc7d1d13e30089d00efe5b7cccbd8dcd80bcb20ff5"
-		},
-		"neon-object-storage": {
-			"source": "neondatabase/agent-skills",
-			"sourceType": "github",
-			"skillPath": "skills/neon-object-storage/SKILL.md",
-			"computedHash": "257069dffd0080b5265b9d3d2162d3e45d6581bd26d25449d8de05bb7a2ac687"
-		},
-		"neon-postgres": {
-			"source": "neondatabase/agent-skills",
-			"sourceType": "github",
-			"skillPath": "skills/neon-postgres/SKILL.md",
-			"computedHash": "0e1db49f25e9208cb24fa2084a542d52d60a85c09271b915acc3dad6901de6a0"
-		},
-		"neon-realtime": {
-			"source": "neondatabase/agent-skills",
-			"sourceType": "github",
-			"skillPath": "skills/neon-realtime/SKILL.md",
-			"computedHash": "0c53a628305df36d3c5926683bf5ae2b9ca8969bfb86f8e2bc4835b5fe7cf521"
-		},
-		"next-bundle-optimizer": {
-			"source": "vercel/next.js",
-			"sourceType": "github",
-			"skillPath": "skills/next-bundle-optimizer/SKILL.md",
-			"computedHash": "2a2d38e9ba5476f6eef7a86cc1531801b454fdcd5ee8b96745973e01b5d25397"
-		},
-		"next-cache-components-adoption": {
-			"source": "vercel/next.js",
-			"sourceType": "github",
-			"skillPath": "skills/next-cache-components-adoption/SKILL.md",
-			"computedHash": "2bf109a8693bb67ba45e05a531021bda876fafe048e764ffffe1bb1c460ec286"
-		},
-		"next-cache-components-optimizer": {
-			"source": "vercel/next.js",
-			"sourceType": "github",
-			"skillPath": "skills/next-cache-components-optimizer/SKILL.md",
-			"computedHash": "88f1a9480dbb67bca44060e50fc45559d1bd70c2e7e766a44d015568634a9868"
-		},
-		"next-dev-loop": {
-			"source": "vercel/next.js",
-			"sourceType": "github",
-			"skillPath": "skills/next-dev-loop/SKILL.md",
-			"computedHash": "abe7b5e77b26f95ab21304b10ce1003a41e4e75b601505d76c8a0294e33a450d"
-		},
-		"next-partial-prefetching-adoption": {
-			"source": "vercel/next.js",
-			"sourceType": "github",
-			"skillPath": "skills/next-partial-prefetching-adoption/SKILL.md",
-			"computedHash": "a9ac6534a71de4bc7a43b84fbaa42e1ddeb091fe8db71c9c97038d949df22e0f"
-		},
-		"next-partial-prefetching-optimizer": {
-			"source": "vercel/next.js",
-			"sourceType": "github",
-			"skillPath": "skills/next-partial-prefetching-optimizer/SKILL.md",
-			"computedHash": "6f8bc71150496e962da7bd0615640e8c866e50a913d0c801294dc46e38f5fae1"
-		},
-		"organization-best-practices": {
-			"source": "better-auth/skills",
-			"sourceType": "github",
-			"skillPath": "better-auth/organization/SKILL.md",
-			"computedHash": "e5b1238c3b62c789918fe397ed52787742e50944343de33f459629f29b0fe922"
-		},
-		"parser-development": {
-			"source": "biomejs/biome",
-			"sourceType": "github",
-			"skillPath": ".agents/skills/parser-development/SKILL.md",
-			"computedHash": "a50597b87446a722c635fd3896ea9fa4b0315cca9fac844501ea4c103078ea3b"
-		},
-		"ponytail": {
-			"source": "DietrichGebert/ponytail",
-			"sourceType": "github",
-			"skillPath": "skills/ponytail/SKILL.md",
-			"computedHash": "56d72677aca02689ac89bd48734e8c19b40ab86716d1257eaf5f1238b43cda6b"
-		},
-		"ponytail-audit": {
-			"source": "DietrichGebert/ponytail",
-			"sourceType": "github",
-			"skillPath": "skills/ponytail-audit/SKILL.md",
-			"computedHash": "20dca08a5d047285c61702d496317eb84f501bbd573a45f3c8f93fdb3cecde4c"
-		},
-		"ponytail-debt": {
-			"source": "DietrichGebert/ponytail",
-			"sourceType": "github",
-			"skillPath": "skills/ponytail-debt/SKILL.md",
-			"computedHash": "6bcafbbd5d7ab3c09fbe1b040c2c8f3d0aae3c7e6e24339be253af354ab5cacd"
-		},
-		"ponytail-help": {
-			"source": "DietrichGebert/ponytail",
-			"sourceType": "github",
-			"skillPath": "skills/ponytail-help/SKILL.md",
-			"computedHash": "decfe28950443ddc04cf06badab1ebe325d149bc7dccdd3ce43ff8be27d92103"
-		},
-		"ponytail-review": {
-			"source": "DietrichGebert/ponytail",
-			"sourceType": "github",
-			"skillPath": "skills/ponytail-review/SKILL.md",
-			"computedHash": "fe7b781db99ce79d931cdc798b3fbccd84b82538de4a3fc5f6d9d466946d1458"
-		},
-		"promote-lint-rules": {
-			"source": "biomejs/biome",
-			"sourceType": "github",
-			"skillPath": ".agents/skills/promote-lint-rules/SKILL.md",
-			"computedHash": "8fd719139225b5ce6095df708581c26535addadcbd88b10fef8d7fbe35432785"
-		},
-		"shadcn": {
-			"source": "shadcn/ui",
-			"sourceType": "github",
-			"skillPath": "skills/shadcn/SKILL.md",
-			"computedHash": "388962d16c7a4f13aaeee0d8f128e50a87df8553d42ef7988c39c0e1c74a40e8"
-		},
-		"syntax-text-handling": {
-			"source": "biomejs/biome",
-			"sourceType": "github",
-			"skillPath": ".agents/skills/syntax-text-handling/SKILL.md",
-			"computedHash": "8198eb6a4e5e3f68874d21405c49cca23d00faa2e73d151d0e1823372c7d2490"
-		},
-		"testing-codegen": {
-			"source": "biomejs/biome",
-			"sourceType": "github",
-			"skillPath": ".agents/skills/testing-codegen/SKILL.md",
-			"computedHash": "3d559b23c19cc28eee6a58fc3b7d29eb9389afd6c0b04330cc3228f0b439005d"
-		},
-		"turborepo": {
-			"source": "vercel/turborepo",
-			"sourceType": "github",
-			"skillPath": "skills/turborepo/SKILL.md",
-			"computedHash": "49bb6427015253ce5d93f15dfa6c9ade3f8528f0fbe54769b6da1e1458f058d4"
-		},
-		"two-factor-authentication-best-practices": {
-			"source": "better-auth/skills",
-			"sourceType": "github",
-			"skillPath": "better-auth/twoFactor/SKILL.md",
-			"computedHash": "89ca7fde92a69aec2cf7407d29058c5428e17d228e2578c79e0129d128524f38"
-		},
-		"type-inference": {
-			"source": "biomejs/biome",
-			"sourceType": "github",
-			"skillPath": ".agents/skills/type-inference/SKILL.md",
-			"computedHash": "7e08bb833b0c9cb635880b6bb6f3cf809a68bcf7ce3efc6ca0d693edf1893180"
-		}
-	}
+  "version": 2,
+  "skills": {
+    "add": {
+      "source": "vercel/turborepo",
+      "sourceType": "github",
+      "skillPath": "skills/add/SKILL.md",
+      "computedHash": "ef75a72c0728dce1139062476492c7e916c0778e78a93ccb65c0195e22dfb534"
+    },
+    "better-auth-best-practices": {
+      "source": "better-auth/skills",
+      "sourceType": "github",
+      "skillPath": "better-auth/best-practices/SKILL.md",
+      "computedHash": "2773c3687f2cf96d659049ebf2d8c86058a33541b09360712df0dc6b1404c403"
+    },
+    "better-auth-security-best-practices": {
+      "source": "better-auth/skills",
+      "sourceType": "github",
+      "skillPath": "security/SKILL.md",
+      "computedHash": "36e9710eaa13c61c00bec00a4902fdc6ed829e6de13127238ae57494e93c1d9d"
+    },
+    "biome-code-review": {
+      "source": "biomejs/biome",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/biome-code-review/SKILL.md",
+      "computedHash": "da71f1cbb78cacaaf2f04a46b9a4068a71fe6e45589d8e12bc0a46bfff46cc11"
+    },
+    "bun-hono-integration": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/bun/skills/bun-hono-integration/SKILL.md",
+      "computedHash": "a7e9407996e455098033bf8a6df610e7c43b484155d71204e2463664e80e8503"
+    },
+    "changeset": {
+      "source": "biomejs/biome",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/changeset/SKILL.md",
+      "computedHash": "7bf06002a0ff61ac58053b79b0b9ce432fabfeea2a40f30a2031fb3e57aae84d"
+    },
+    "create-auth": {
+      "source": "better-auth/skills",
+      "sourceType": "github",
+      "skillPath": "better-auth/create-auth/SKILL.md",
+      "computedHash": "6f68253a5ab812aa8c9b70c57609aca763093a594e3b07163142e0fa7d64904a"
+    },
+    "diagnostics-development": {
+      "source": "biomejs/biome",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/diagnostics-development/SKILL.md",
+      "computedHash": "2e021ff20bab7dd56a334ad001b15d82610f3affa3e272537e70d1eade42f7bc"
+    },
+    "doc-comments": {
+      "source": "biomejs/biome",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/doc-comments/SKILL.md",
+      "computedHash": "1ed89ecd836e6f6cf4fb50cbc361b26b64d1bfea852169b48cf92f6884d008eb"
+    },
+    "drizzle-orm-patterns": {
+      "source": "giuseppe-trisciuoglio/developer-kit",
+      "sourceType": "github",
+      "skillPath": "plugins/developer-kit-typescript/skills/drizzle-orm-patterns/SKILL.md",
+      "computedHash": "a5eaf7e1ff588b6f03c7fc71fb2850c0bf36fb66949ad41fd012ae1bc70e6c84"
+    },
+    "email-and-password-best-practices": {
+      "source": "better-auth/skills",
+      "sourceType": "github",
+      "skillPath": "better-auth/emailAndPassword/SKILL.md",
+      "computedHash": "407c1244202876daa748818ed41dc55afde1b3f7aec48ae3a1f1c8a7ee40465e"
+    },
+    "eslint-migrate-options": {
+      "source": "biomejs/biome",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/eslint-migrate-options/SKILL.md",
+      "computedHash": "183efe7c68b9394f7c845ad12ee764fb3731f6311d00b296aa6aa0b7b234a898"
+    },
+    "eve": {
+      "source": "vercel/eve",
+      "sourceType": "github",
+      "skillPath": "skills/eve/SKILL.md",
+      "computedHash": "9c1eaa91f1aa5a1733b90937ee5186bc14f43e88ef6524a956750e535b0e2a60"
+    },
+    "find-skills": {
+      "source": "vercel-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/find-skills/SKILL.md",
+      "computedHash": "7bc223e2aafbdbf6e50ea243ba6ef67fe432bb069ab439fea0390795dac0bf7f"
+    },
+    "firecrawl-build": {
+      "source": "firecrawl/skills",
+      "sourceType": "github",
+      "skillPath": "skills/build/firecrawl-build/SKILL.md",
+      "computedHash": "d9ed6df3cb7e0dd830414eaa0e257db8f6608dc84e62e67d4363764afce85309"
+    },
+    "firecrawl-build-interact": {
+      "source": "firecrawl/skills",
+      "sourceType": "github",
+      "skillPath": "skills/build/firecrawl-build-interact/SKILL.md",
+      "computedHash": "460a6d43dc315a313d32839e425aab89732d008fa8f14fa013ade8276f483b0b"
+    },
+    "firecrawl-build-onboarding": {
+      "source": "firecrawl/skills",
+      "sourceType": "github",
+      "skillPath": "skills/build/firecrawl-build-onboarding/SKILL.md",
+      "computedHash": "cbb2e926deec632c0bbf2d7a7dbeb64600a43dcf3bf7b1573a092e0b473c3d09"
+    },
+    "firecrawl-build-scrape": {
+      "source": "firecrawl/skills",
+      "sourceType": "github",
+      "skillPath": "skills/build/firecrawl-build-scrape/SKILL.md",
+      "computedHash": "e918a42db5e8f41ddfaac91329cec668e56aa919ca03161da98b592b984f4570"
+    },
+    "firecrawl-build-search": {
+      "source": "firecrawl/skills",
+      "sourceType": "github",
+      "skillPath": "skills/build/firecrawl-build-search/SKILL.md",
+      "computedHash": "b228991bad43079fd68d1b9c9b087c0cb54a031387205a4691a99c6234dc6766"
+    },
+    "formatter-development": {
+      "source": "biomejs/biome",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/formatter-development/SKILL.md",
+      "computedHash": "55c311af4c774d22dac69ac51477e62e35245fb12e0afa06292bff985af7a290"
+    },
+    "hono-middleware": {
+      "source": "bobmatnyc/claude-mpm-skills",
+      "sourceType": "github",
+      "skillPath": "toolchains/javascript/frameworks/hono/hono-middleware/SKILL.md",
+      "computedHash": "580fb1316f82cac89ca0762f12703531d99e0db9742c4c7dc4a317df1e81f3ea"
+    },
+    "hono-rpc": {
+      "source": "bobmatnyc/claude-mpm-skills",
+      "sourceType": "github",
+      "skillPath": "toolchains/javascript/frameworks/hono/hono-rpc/SKILL.md",
+      "computedHash": "c62648ba80f6dadf5fd374fd1636c2fceab1a29db577a7f9808ed827e626f3b0"
+    },
+    "hono-testing": {
+      "source": "bobmatnyc/claude-mpm-skills",
+      "sourceType": "github",
+      "skillPath": "toolchains/javascript/frameworks/hono/hono-testing/SKILL.md",
+      "computedHash": "c77431b6492f039ff5e56753b31351ef5053310fddefb81c5d3128b8255c66e9"
+    },
+    "hono-typescript": {
+      "source": "Mindrally/skills",
+      "sourceType": "github",
+      "skillPath": "hono-typescript/SKILL.md",
+      "computedHash": "b2ec459e17f8c31fe191869ed92894ad70eb530805f1b561270d4f01d7398ffa"
+    },
+    "hono-validation": {
+      "source": "bobmatnyc/claude-mpm-skills",
+      "sourceType": "github",
+      "skillPath": "toolchains/javascript/frameworks/hono/hono-validation/SKILL.md",
+      "computedHash": "1e0134415a54e5ffc4b575a423034be35abb0ee4baf1c80de67f18f5f7dc8773"
+    },
+    "lint-rule-development": {
+      "source": "biomejs/biome",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/lint-rule-development/SKILL.md",
+      "computedHash": "e87c1e8adae6ab34159aff3a0e1d40192b45bb5ba839050ff9ac6d3e93bd13c0"
+    },
+    "neon": {
+      "source": "neondatabase/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/neon/SKILL.md",
+      "computedHash": "18f5e4de54d88f84d2e36b5e4f1888211940abbd0ae794ff597556340787da77"
+    },
+    "neon-ai-gateway": {
+      "source": "neondatabase/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/neon-ai-gateway/SKILL.md",
+      "computedHash": "263e14fec71917513f1c99fa60e466c99f0777c973b68084b0310490f847f285"
+    },
+    "neon-auth": {
+      "source": "neondatabase/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/neon-auth/SKILL.md",
+      "computedHash": "81c1fdecc6bca04edc77d85379ceb21f9da5b6315217d19d83cab2fb2f068adf"
+    },
+    "neon-functions": {
+      "source": "neondatabase/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/neon-functions/SKILL.md",
+      "computedHash": "6ec12cc01706f8062dfe90dc7d1d13e30089d00efe5b7cccbd8dcd80bcb20ff5"
+    },
+    "neon-object-storage": {
+      "source": "neondatabase/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/neon-object-storage/SKILL.md",
+      "computedHash": "257069dffd0080b5265b9d3d2162d3e45d6581bd26d25449d8de05bb7a2ac687"
+    },
+    "neon-postgres": {
+      "source": "neondatabase/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/neon-postgres/SKILL.md",
+      "computedHash": "0e1db49f25e9208cb24fa2084a542d52d60a85c09271b915acc3dad6901de6a0"
+    },
+    "neon-realtime": {
+      "source": "neondatabase/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/neon-realtime/SKILL.md",
+      "computedHash": "0c53a628305df36d3c5926683bf5ae2b9ca8969bfb86f8e2bc4835b5fe7cf521"
+    },
+    "next-bundle-optimizer": {
+      "source": "vercel/next.js",
+      "sourceType": "github",
+      "skillPath": "skills/next-bundle-optimizer/SKILL.md",
+      "computedHash": "2a2d38e9ba5476f6eef7a86cc1531801b454fdcd5ee8b96745973e01b5d25397"
+    },
+    "next-cache-components-adoption": {
+      "source": "vercel/next.js",
+      "sourceType": "github",
+      "skillPath": "skills/next-cache-components-adoption/SKILL.md",
+      "computedHash": "2bf109a8693bb67ba45e05a531021bda876fafe048e764ffffe1bb1c460ec286"
+    },
+    "next-cache-components-optimizer": {
+      "source": "vercel/next.js",
+      "sourceType": "github",
+      "skillPath": "skills/next-cache-components-optimizer/SKILL.md",
+      "computedHash": "88f1a9480dbb67bca44060e50fc45559d1bd70c2e7e766a44d015568634a9868"
+    },
+    "next-dev-loop": {
+      "source": "vercel/next.js",
+      "sourceType": "github",
+      "skillPath": "skills/next-dev-loop/SKILL.md",
+      "computedHash": "abe7b5e77b26f95ab21304b10ce1003a41e4e75b601505d76c8a0294e33a450d"
+    },
+    "next-partial-prefetching-adoption": {
+      "source": "vercel/next.js",
+      "sourceType": "github",
+      "skillPath": "skills/next-partial-prefetching-adoption/SKILL.md",
+      "computedHash": "a9ac6534a71de4bc7a43b84fbaa42e1ddeb091fe8db71c9c97038d949df22e0f"
+    },
+    "next-partial-prefetching-optimizer": {
+      "source": "vercel/next.js",
+      "sourceType": "github",
+      "skillPath": "skills/next-partial-prefetching-optimizer/SKILL.md",
+      "computedHash": "6f8bc71150496e962da7bd0615640e8c866e50a913d0c801294dc46e38f5fae1"
+    },
+    "organization-best-practices": {
+      "source": "better-auth/skills",
+      "sourceType": "github",
+      "skillPath": "better-auth/organization/SKILL.md",
+      "computedHash": "e5b1238c3b62c789918fe397ed52787742e50944343de33f459629f29b0fe922"
+    },
+    "parser-development": {
+      "source": "biomejs/biome",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/parser-development/SKILL.md",
+      "computedHash": "a50597b87446a722c635fd3896ea9fa4b0315cca9fac844501ea4c103078ea3b"
+    },
+    "ponytail": {
+      "source": "DietrichGebert/ponytail",
+      "sourceType": "github",
+      "skillPath": "skills/ponytail/SKILL.md",
+      "computedHash": "56d72677aca02689ac89bd48734e8c19b40ab86716d1257eaf5f1238b43cda6b"
+    },
+    "ponytail-audit": {
+      "source": "DietrichGebert/ponytail",
+      "sourceType": "github",
+      "skillPath": "skills/ponytail-audit/SKILL.md",
+      "computedHash": "20dca08a5d047285c61702d496317eb84f501bbd573a45f3c8f93fdb3cecde4c"
+    },
+    "ponytail-debt": {
+      "source": "DietrichGebert/ponytail",
+      "sourceType": "github",
+      "skillPath": "skills/ponytail-debt/SKILL.md",
+      "computedHash": "6bcafbbd5d7ab3c09fbe1b040c2c8f3d0aae3c7e6e24339be253af354ab5cacd"
+    },
+    "ponytail-help": {
+      "source": "DietrichGebert/ponytail",
+      "sourceType": "github",
+      "skillPath": "skills/ponytail-help/SKILL.md",
+      "computedHash": "decfe28950443ddc04cf06badab1ebe325d149bc7dccdd3ce43ff8be27d92103"
+    },
+    "ponytail-review": {
+      "source": "DietrichGebert/ponytail",
+      "sourceType": "github",
+      "skillPath": "skills/ponytail-review/SKILL.md",
+      "computedHash": "fe7b781db99ce79d931cdc798b3fbccd84b82538de4a3fc5f6d9d466946d1458"
+    },
+    "promote-lint-rules": {
+      "source": "biomejs/biome",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/promote-lint-rules/SKILL.md",
+      "computedHash": "8fd719139225b5ce6095df708581c26535addadcbd88b10fef8d7fbe35432785"
+    },
+    "shadcn": {
+      "source": "shadcn/ui",
+      "sourceType": "github",
+      "skillPath": "skills/shadcn/SKILL.md",
+      "computedHash": "388962d16c7a4f13aaeee0d8f128e50a87df8553d42ef7988c39c0e1c74a40e8"
+    },
+    "syntax-text-handling": {
+      "source": "biomejs/biome",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/syntax-text-handling/SKILL.md",
+      "computedHash": "8198eb6a4e5e3f68874d21405c49cca23d00faa2e73d151d0e1823372c7d2490"
+    },
+    "testing-codegen": {
+      "source": "biomejs/biome",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/testing-codegen/SKILL.md",
+      "computedHash": "3d559b23c19cc28eee6a58fc3b7d29eb9389afd6c0b04330cc3228f0b439005d"
+    },
+    "turborepo": {
+      "source": "vercel/turborepo",
+      "sourceType": "github",
+      "skillPath": "skills/turborepo/SKILL.md",
+      "computedHash": "49bb6427015253ce5d93f15dfa6c9ade3f8528f0fbe54769b6da1e1458f058d4"
+    },
+    "two-factor-authentication-best-practices": {
+      "source": "better-auth/skills",
+      "sourceType": "github",
+      "skillPath": "better-auth/twoFactor/SKILL.md",
+      "computedHash": "89ca7fde92a69aec2cf7407d29058c5428e17d228e2578c79e0129d128524f38"
+    },
+    "type-inference": {
+      "source": "biomejs/biome",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/type-inference/SKILL.md",
+      "computedHash": "7e08bb833b0c9cb635880b6bb6f3cf809a68bcf7ce3efc6ca0d693edf1893180"
+    }
+  }
 }

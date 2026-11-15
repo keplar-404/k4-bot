@@ -1,6 +1,6 @@
 # Project Overview
 
-Turborepo monorepo (bun workspaces) for an AI agent app: Next.js web UI, Hono API backend with Google/email login, and an `eve` agent.
+Turborepo monorepo (bun workspaces) for an AI agent app: Next.js web UI, Hono API backend, Neon Auth (Managed Better Auth) for login, and an `eve` agent.
 
 ## 1. Folder structure
 
@@ -10,7 +10,7 @@ Turborepo monorepo (bun workspaces) for an AI agent app: Next.js web UI, Hono AP
    - `src/components/ui` — shadcn components, incl. chat ones (`message`, `bubble`, `message-scroller`, `trace`, `code-block`, `input-group`).
    - `src/components/chat` — chat page: `chat.tsx`, `messages.tsx`, `pickers.tsx`.
    - `src/lib` — `auth-client.ts`, `session.ts`, `ai.ts`. `src/proxy.ts` guards `/dashboard`.
-2. `apps/backend` — Hono on Bun, port 8787. Better Auth + Drizzle + Neon Postgres (`src/auth.ts`, `src/db`, `drizzle.config.ts`).
+2. `apps/backend` — Hono on Bun, port 8787. Checks the user's Neon Auth token (`src/auth.ts`), Drizzle + Neon Postgres (`src/db`, `drizzle.config.ts`). Creates each user's desktop (`src/desktop.ts`, `POST /api/me/desktop`).
 3. `apps/ai-agent` — `eve` AI agent. Own `.env` (`OPENROUTER_API_KEY`, `E2B_API_KEY`, `FIRECRAWL_API_KEY`, `BACKEND_URL`).
    - `agent/agent.ts` — dynamic OpenRouter model + reasoning, chosen per turn by the web picker.
    - `agent/lib/models.ts` — model allowlist and per-model reasoning efforts (from the OpenRouter models API); also imported by web as `ai-agent/models`.
@@ -25,12 +25,12 @@ Turborepo monorepo (bun workspaces) for an AI agent app: Next.js web UI, Hono AP
 
 1. Turborepo starter; bun is the package manager.
 2. Old `backend` renamed `ai-agent`; new Hono-on-Bun app created as `backend`.
-3. Auth in the backend: Better Auth with Google and email/password. Tables `user`, `session`, `account`, `verification`, `rate_limit` (rate limits in DB). CORS allows any localhost in dev, only `WEB_URL` in production.
-4. Web login: `/login` (shadcn `login-04` layout) with email/password and Google. Home page shows Login or Dashboard by session.
+3. Login is Neon Auth (Managed Better Auth): users and sessions live in the `neon_auth` schema, the web app proxies `/api/auth/*` to it (`apps/web/src/app/api/auth`), and the browser sends a short-lived token as `Authorization: Bearer` to the backend and the agent, which check it against `NEON_AUTH_JWKS_URL` (`packages/shared/src/auth.ts`). Sign-in limits and emails are Neon's (shared SMTP for now).
+4. Web login: `/login` (shadcn `login-04` layout) with email/password and Google (Neon's shared Google credentials: development only). Home page shows Login or Dashboard by session.
 5. Dashboard: shadcn `sidebar-07` as a shared layout. Dark/light/system theme in the user menu (`next-themes`).
 6. Chat page `/dashboard/chat`: frontend only. Message scroller, bubbles, reasoning and tool rows, markdown replies, prompt bar with model + reasoning picker and Ask/Plan/Full mode, suggestions, mobile responsive. Replies are scripted (`@shadcn/helpers`).
 7. Biome set up at the root (`bunx biome check --write .`); config ignores generated shadcn files.
-8. Installed: `better-auth`, `drizzle-orm`, `drizzle-kit`, `@neondatabase/serverless`, `zod`, `zustand` (not used yet), `ai`, `@ai-sdk/react`, `@shadcn/helpers`, `streamdown`, `next-themes`.
+8. Installed: `@neon/auth`, `jose`, `drizzle-orm`, `drizzle-kit`, `@neondatabase/serverless`, `zod`, `zustand` (not used yet), `ai`, `@ai-sdk/react`, `@shadcn/helpers`, `streamdown`, `next-themes`.
 
 ## 3. Not done yet
 
@@ -39,13 +39,15 @@ Turborepo monorepo (bun workspaces) for an AI agent app: Next.js web UI, Hono AP
 3. Production setup: HTTPS, secure cookies, cross-domain cookies if web and backend use different domains, email verification and password reset (no email provider).
 4. Firecrawl build skills (`firecrawl-build*`) are installed in `.claude/skills`. Skills for hono, bun, zod, zustand are not installed (`bunx skills add` failed). Commands are in the chat history.
 5. Sidebar and dashboard overview still show shadcn demo data.
-6. No tests.
+6. Tests: `bun run test` (turbo runs `bun test` in `packages/shared` and `apps/ai-agent`). No CI workflow yet.
 
 ## 4. Run
 
 1. `bun install`, then `bun run dev` at the root (web on 3000, backend on 8787).
-2. Env: copy `apps/backend/.env.example` to `.env` and fill it in (Neon URL, auth secret, Google keys). `apps/web/.env.example` has `NEXT_PUBLIC_API_URL`.
-3. DB: `cd apps/backend && bunx drizzle-kit push` (only touches the auth tables, via `tablesFilter`).
+2. Env: copy `apps/backend/.env.example` to `.env` and fill it in (Neon URLs, `NEON_AUTH_JWKS_URL`, E2B and storage keys; `neon env pull` fills most of it). `apps/web/.env.example` has the Neon Auth URL, the cookie secret and `NEXT_PUBLIC_API_URL`; `apps/ai-agent/.env.example` has the agent's keys.
+3. DB: `cd apps/backend && bun run db:migrate` (migrations in `apps/backend/drizzle`, made with `bun run db:generate`). An existing database made with `push` needs the first migration marked as applied once. `db:push` is for throwaway local databases only.
+3a. Agent sessions: set `WORKFLOW_POSTGRES_URL` (direct Neon URL) in `apps/ai-agent/.env`, then `cd apps/ai-agent && bun run workflow:bootstrap` once. Dev and production both store chats in Postgres.
+3b. Screenshots: `neon link`, then `neon deploy` (creates the private `screenshots` bucket from `neon.ts`); `neon env pull` writes the AWS_* vars into the apps' `.env`.
 4. Check code: `bunx biome check --write .` at the root.
 
 ## 5. Tools available to the AI assistant

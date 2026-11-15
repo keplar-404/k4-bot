@@ -3,15 +3,17 @@
 	"type": "module",
 	"scripts": {
 		"dev": "bun run --hot src/index.ts",
-		"db:push": "drizzle-kit push"
+		"db:push": "drizzle-kit push",
+		"db:generate": "drizzle-kit generate",
+		"db:migrate": "drizzle-kit migrate",
+		"test": "bun test"
 	},
 	"dependencies": {
 		"@hono/zod-validator": "^0.9.1",
 		"@neondatabase/serverless": "^1.2.1",
 		"@repo/shared": "workspace:*",
-		"better-auth": "^1.7.24",
 		"drizzle-orm": "^0.45.4",
-		"hono": "^4.8.9",
+		"hono": "4.13.18",
 		"zod": "^4.6.7"
 	},
 	"devDependencies": {

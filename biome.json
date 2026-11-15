@@ -17,6 +17,8 @@
 			"!.commandcode",
 			"!**/*.md",
 			"!.agents",
+			"!skills-lock.json",
+			"!**/.output",
 			"!.claude",
 			"!**/components/ui",
 			"!**/public",

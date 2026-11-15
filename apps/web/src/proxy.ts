@@ -1,13 +1,12 @@
-import { getSessionCookie } from "better-auth/cookies";
-import { type NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth/server";
 
-// Better Auth Next.js docs: optimistic cookie check only; the backend and the
-// agent validate the session. getSessionCookie also finds the __Secure- cookie.
-export function proxy(request: NextRequest) {
-	if (!getSessionCookie(request)) {
-		return NextResponse.redirect(new URL("/login", request.url));
-	}
-	return NextResponse.next();
-}
+// Neon Auth middleware: signed-out visitors go to /login. /api/auth is public by
+// default; /eve is checked by the agent itself (it needs a bearer token, not a redirect).
+export default auth.middleware({
+	loginUrl: "/login",
+	publicRoutes: ["/", "/login", "/eve"],
+});
 
-export const config = { matcher: ["/dashboard/:path*"] };
+export const config = {
+	matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+};

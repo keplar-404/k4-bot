@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { AppSidebar } from "@/components/app-sidebar";
 import { DashboardHeader } from "@/components/dashboard-header";
+import { EnsureDesktop } from "@/components/ensure-desktop";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { getSession } from "@/lib/session";
 
@@ -18,6 +19,7 @@ export default function DashboardLayout({
 }) {
 	return (
 		<SidebarProvider>
+			<EnsureDesktop />
 			<Suspense>
 				<UserSidebar />
 			</Suspense>

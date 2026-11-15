@@ -1,11 +1,16 @@
 // Typed client for apps/backend (Hono RPC: hono.dev/docs/guides/rpc).
-// credentials: "include" sends the Better Auth cookie with every request.
+// Every request carries the signed-in user's Neon Auth token as a bearer header.
 import type { AppType } from "backend/app";
 import { hc } from "hono/client";
+import { getToken } from "@/lib/auth-client";
 
 export const api = hc<AppType>(
 	process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8787",
-	{ init: { credentials: "include" } },
+	{
+		headers: async () => {
+			return { authorization: `Bearer ${(await getToken()) ?? ""}` };
+		},
+	},
 );
 
 /** Tells the sidebar's chat list to reload after a create or delete. */

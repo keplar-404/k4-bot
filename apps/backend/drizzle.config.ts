@@ -6,13 +6,9 @@ if (!process.env.DATABASE_URL_UNPOOLED) {
 }
 
 export default defineConfig({
-	schema: ["./src/db/auth-schema.ts", "./src/db/app-schema.ts"],
+	schema: "./src/db/app-schema.ts",
 	// push only touches these tables, never anything else in the DB
 	tablesFilter: [
-		"user",
-		"session",
-		"account",
-		"verification",
 		"rate_limit",
 		"chat",
 		"agent_event",

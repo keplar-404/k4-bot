@@ -14,5 +14,19 @@ export function sql() {
 export function appUserId(
 	auth: { authenticator: string; principalId: string } | null | undefined,
 ): string | null {
-	return auth?.authenticator === "better-auth" ? auth.principalId : null;
+	return auth?.authenticator === "neon-auth" ? auth.principalId : null;
+}
+
+/** Per-user fixed-window counter in the rate_limit table. True when over `max`. */
+export async function overLimit(key: string, max: number, windowMs: number) {
+	const now = Date.now();
+	const start = now - windowMs;
+	const [row] = (await sql()`
+		insert into rate_limit (id, key, count, last_request)
+		values (${crypto.randomUUID()}, ${key}, 1, ${now})
+		on conflict (key) do update set
+			count = case when rate_limit.last_request < ${start} then 1 else rate_limit.count + 1 end,
+			last_request = case when rate_limit.last_request < ${start} then ${now} else rate_limit.last_request end
+		returning count`) as { count: number }[];
+	return Number(row.count) > max;
 }
