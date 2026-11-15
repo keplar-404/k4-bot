@@ -5,10 +5,13 @@ import {
 	LogOutIcon,
 	MonitorIcon,
 	MoonIcon,
+	SettingsIcon,
 	SunIcon,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
+import { useState } from "react";
+import { SettingsDialog } from "@/components/settings-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
 	DropdownMenu,
@@ -35,6 +38,7 @@ export function NavUser({
 	const { isMobile } = useSidebar();
 	const { setTheme } = useTheme();
 	const router = useRouter();
+	const [settingsOpen, setSettingsOpen] = useState(false);
 	const initials = user.name
 		.split(" ")
 		.map((w) => w[0])
@@ -96,6 +100,11 @@ export function NavUser({
 							</DropdownMenuItem>
 						</DropdownMenuGroup>
 						<DropdownMenuSeparator />
+						<DropdownMenuItem onClick={() => setSettingsOpen(true)}>
+							<SettingsIcon />
+							Settings
+						</DropdownMenuItem>
+						<DropdownMenuSeparator />
 						<DropdownMenuItem
 							onClick={async () => {
 								await authClient.signOut();
@@ -108,6 +117,7 @@ export function NavUser({
 						</DropdownMenuItem>
 					</DropdownMenuContent>
 				</DropdownMenu>
+				<SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
 			</SidebarMenuItem>
 		</SidebarMenu>
 	);

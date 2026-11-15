@@ -8,6 +8,13 @@
 			"when": 1794751641367,
 			"tag": "0000_next_supernaut",
 			"breakpoints": true
+		},
+		{
+			"idx": 1,
+			"version": "7",
+			"when": 1794757394839,
+			"tag": "0001_memory_by_user",
+			"breakpoints": true
 		}
 	]
 }

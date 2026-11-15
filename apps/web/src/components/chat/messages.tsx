@@ -1,5 +1,6 @@
 "use client";
 
+import type { DesktopOutput, SearchOutput } from "@repo/shared/tools";
 import type {
 	EveMessage,
 	EveMessagePart,
@@ -172,16 +173,6 @@ const RUNNING = new Set([
 	"blocked",
 ]);
 
-type SearchOutput = {
-	results?: { url: string; title: string; snippet: string }[];
-};
-type DesktopOutput = {
-	streamUrl?: string;
-	screenshotKey?: string;
-	stdout?: string;
-	stderr?: string;
-	exitCode?: number;
-};
 type ShellOutput = { stdout?: string; stderr?: string };
 
 function ToolRow({

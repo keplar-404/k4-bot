@@ -15,6 +15,16 @@ test("unknown paths and signed-out chat calls answer in JSON", async () => {
 	expect(await chats.json()).toEqual({ error: "Unauthorized" });
 });
 
+test("memory is only for the signed-in user", async () => {
+	expect((await call("/api/me/memory")).status).toBe(401);
+	const put = await call("/api/me/memory", {
+		method: "PUT",
+		headers: { "content-type": "application/json" },
+		body: JSON.stringify({ content: "x" }),
+	});
+	expect(put.status).toBe(401);
+});
+
 test("every response has a request id and security headers", async () => {
 	const res = await call("/");
 	expect(res.headers.get("x-request-id")).toBeTruthy();

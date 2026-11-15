@@ -23,6 +23,7 @@
 		"@repo/shared": "workspace:*",
 		"@workflow/world-postgres": "5.2.0",
 		"ai": "^7.0.172",
+		"drizzle-orm": "^0.45.4",
 		"e2b": "^2.56.0",
 		"eve": "^1.0.0-rc.18",
 		"firecrawl": "^4.54.0",

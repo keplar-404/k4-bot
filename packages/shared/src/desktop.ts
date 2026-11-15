@@ -33,14 +33,19 @@ export async function createUserDesktop(userId: string): Promise<string> {
 	return desktop.sandboxId;
 }
 
+/** Resume a user's desktop (connect() resumes a paused one) and restart its idle timer. */
+export async function connectDesktop(sandboxId: string): Promise<Sandbox> {
+	const { Sandbox } = await import("@e2b/desktop");
+	const desktop = await Sandbox.connect(sandboxId);
+	await desktop.setTimeout(DESKTOP_TIMEOUT_MS);
+	return desktop;
+}
+
 /** Resume a user's paused desktop and start a password-protected, view-only stream. */
 export async function openUserDesktop(
 	sandboxId: string,
 ): Promise<{ desktop: Sandbox; streamUrl: string }> {
-	const { Sandbox } = await import("@e2b/desktop");
-	// connect() resumes a paused sandbox.
-	const desktop = await Sandbox.connect(sandboxId);
-	await desktop.setTimeout(DESKTOP_TIMEOUT_MS);
+	const desktop = await connectDesktop(sandboxId);
 	// A resumed desktop is often still streaming from the last run, and only the
 	// instance that started a stream knows its password. Restart it, so this instance
 	// owns the key (start() alone throws "already running", then getAuthKey() fails).

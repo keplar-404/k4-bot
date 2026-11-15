@@ -3,6 +3,7 @@ import {
 	newScreenshotKey,
 	putScreenshot,
 } from "@repo/shared/storage";
+import type { DesktopOutput } from "@repo/shared/tools";
 import { defineTool, toolOutput, toolOutputPart } from "eve/tools";
 import { z } from "zod";
 import { getUserDesktop } from "../lib/desktop";
@@ -53,7 +54,7 @@ export default defineTool({
 					? "Type on the desktop"
 					: `Desktop: ${i.action.replace("_", " ")}`,
 	},
-	async execute(input, ctx) {
+	async execute(input, ctx): Promise<DesktopOutput> {
 		const { userId, desktop, streamUrl } = await getUserDesktop(
 			ctx.session.auth.current,
 		);

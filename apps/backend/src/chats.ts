@@ -1,11 +1,11 @@
 import { zValidator } from "@hono/zod-validator";
+import { agentEvent, chat } from "@repo/shared/schema";
 import { screenshotUrl } from "@repo/shared/storage";
 import { and, desc, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import { type Env, requireUser, webUrl } from "./auth";
 import { db } from "./db";
-import { agentEvent, chat } from "./db/app-schema";
 
 // Chat ids are UUIDs we made. Anything else is simply "not found" (the web app
 // then sends the user to a new chat).

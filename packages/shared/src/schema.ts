@@ -1,6 +1,6 @@
-// App tables. Every row is owned by one user (userId), and every query filters by it.
-// userId is the Neon Auth user id (neon_auth.user.id). There is no foreign key: that
-// schema belongs to Neon, so we never link our tables to it.
+// App tables, shared by apps/backend (migrations, API) and apps/ai-agent. Every row is
+// owned by one user (userId), and every query filters by it. userId is the Neon Auth user
+// id (neon_auth.user.id); no foreign key, because that schema belongs to Neon.
 import {
 	bigint,
 	index,
@@ -48,13 +48,16 @@ export const agentEvent = pgTable(
 	],
 );
 
-// eve fileMemory documents (custom backend, eve docs memory/file). `key` is
-// eve's opaque per-scope key; scope is per signed-in user (byPrincipal).
+// What the agent remembers about each user: plain text, one fact per line. The
+// agent's memory provider (apps/ai-agent/agent/memory/profile.ts) and the user's
+// Settings > Memory (PUT /api/me/memory) both read and write this row.
 export const agentMemory = pgTable("agent_memory", {
-	key: text("key").primaryKey(),
-	content: text("content").notNull(),
-	version: integer("version").notNull(),
-	updatedAt: timestamp("updated_at").defaultNow().notNull(),
+	userId: text("user_id").primaryKey(),
+	content: text("content").notNull().default(""),
+	updatedAt: timestamp("updated_at")
+		.defaultNow()
+		.$onUpdate(() => new Date())
+		.notNull(),
 });
 
 // Each user's own Linux desktop (E2B), created at sign-up and kept paused.
@@ -64,7 +67,7 @@ export const userDesktop = pgTable("user_desktop", {
 	createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-// Per-user request counters (see rate-limit.ts).
+// Per-user request counters (see rate-limit.ts in this package).
 export const rateLimit = pgTable("rate_limit", {
 	id: text("id").primaryKey(),
 	key: text("key").notNull().unique(),

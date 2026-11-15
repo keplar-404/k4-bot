@@ -1,5 +1,5 @@
-import { Sandbox } from "@e2b/desktop";
-import { DESKTOP_TIMEOUT_MS } from "@repo/shared/desktop";
+import type { Sandbox } from "@e2b/desktop";
+import { connectDesktop, DESKTOP_TIMEOUT_MS } from "@repo/shared/desktop";
 import { CommandExitError, NotFoundError } from "e2b";
 import {
 	defineSandboxProvider,
@@ -10,12 +10,6 @@ import {
 import { userDesktopId } from "./desktop";
 
 const sh = (s: string) => `'${s.replaceAll("'", `'\\''`)}'`;
-
-async function open(sandboxId: string) {
-	const sandbox = await Sandbox.connect(sandboxId); // resumes it if paused
-	await sandbox.setTimeout(DESKTOP_TIMEOUT_MS);
-	return sandbox;
-}
 
 // eve's bash and file tools run inside the user's one E2B desktop, the same machine
 // the `computer` tool drives. This provider never creates a sandbox; the backend
@@ -30,13 +24,13 @@ export const E2BSandbox = defineSandboxProvider({
 			async start(ctx) {
 				const { sandboxId } = await userDesktopId(ctx.session.auth.initiator);
 				return {
-					connection: connect(await open(sandboxId)),
+					connection: connect(await connectDesktop(sandboxId)),
 					state: { sandboxId },
 				};
 			},
 			async resume(_ctx, _artifact, state) {
 				try {
-					return connect(await open(state.sandboxId));
+					return connect(await connectDesktop(state.sandboxId));
 				} catch (error) {
 					if (error instanceof NotFoundError)
 						throw new SandboxSessionGoneError(

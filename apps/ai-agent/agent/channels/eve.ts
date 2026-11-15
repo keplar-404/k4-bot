@@ -1,9 +1,10 @@
 import { userFromBearer } from "@repo/shared/auth";
 import { findModel, pickEffort } from "@repo/shared/models";
+import { overLimit } from "@repo/shared/rate-limit";
 import { type AuthFn, ForbiddenError, localDev } from "eve/channels/auth";
 import { defaultEveAuth, eveChannel } from "eve/channels/eve";
 import { sessions } from "eve/server";
-import { overLimit } from "../lib/db";
+import { db } from "../lib/db";
 import { assertSessionOwner } from "../lib/owner";
 
 const MODES = ["ask", "plan", "full"] as const;
@@ -45,7 +46,7 @@ const appSession: AuthFn<Request> = async (request) => {
 	// reads and stream reconnects are free.
 	if (
 		request.method === "POST" &&
-		(await overLimit(`agent:${user.id}`, 60, 60_000))
+		(await overLimit(db(), `agent:${user.id}`, 60, 60_000))
 	) {
 		throw new ForbiddenError({
 			code: "rate_limited",

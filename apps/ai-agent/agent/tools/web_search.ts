@@ -1,3 +1,4 @@
+import type { SearchOutput } from "@repo/shared/tools";
 import { defineTool } from "eve/tools";
 import { z } from "zod";
 
@@ -19,7 +20,7 @@ export default defineTool({
 		scrape: z.boolean().default(false),
 	}),
 	label: { start: ({ query }) => `Search the web for “${query}”` },
-	async execute({ query, limit, recency, scrape }) {
+	async execute({ query, limit, recency, scrape }): Promise<SearchOutput> {
 		const { Firecrawl } = await import("firecrawl");
 		const client = new Firecrawl({
 			apiKey: process.env.FIRECRAWL_API_KEY || undefined,

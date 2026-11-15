@@ -6,7 +6,7 @@ if (!process.env.DATABASE_URL_UNPOOLED) {
 }
 
 export default defineConfig({
-	schema: "./src/db/app-schema.ts",
+	schema: "../../packages/shared/src/schema.ts",
 	// push only touches these tables, never anything else in the DB
 	tablesFilter: [
 		"rate_limit",

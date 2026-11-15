@@ -1,6 +1,10 @@
+import type { AppType } from "backend/app";
+import { hc } from "hono/client";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { Chat } from "@/components/chat/chat";
+import { ChatSkeleton } from "@/components/chat/chat-skeleton";
+import { API_URL } from "@/lib/api";
 import { auth } from "@/lib/auth/server";
 
 // Reads params and the signed-in user, so it renders inside <Suspense>
@@ -11,19 +15,15 @@ async function SavedChat({ params }: { params: Promise<{ id: string }> }) {
 	const { data: token } = await (
 		auth.token as () => Promise<{ data?: { token: string } }>
 	)();
-	const res = await fetch(
-		`${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8787"}/api/chats/${encodeURIComponent(id)}`,
-		{
-			headers: { authorization: `Bearer ${token?.token}` },
-			cache: "no-store",
-		},
+	const res = await hc<AppType>(API_URL).api.chats[":id"].$get(
+		{ param: { id } },
+		{ headers: { authorization: `Bearer ${token?.token}` } },
 	);
 	// Missing, or another user's chat: back to a new chat, which shows a toast.
 	if (res.status === 404) redirect("/dashboard/chat?notfound=1");
-	if (!res.ok) throw new Error("Could not load the chat");
-	const { chat } = (await res.json()) as {
-		chat: { id: string; eveSessionId: string | null };
-	};
+	const body = await res.json();
+	if (!("chat" in body)) throw new Error("Could not load the chat");
+	const { chat } = body;
 	return <Chat key={chat.id} chatId={chat.id} sessionId={chat.eveSessionId} />;
 }
 
@@ -33,7 +33,7 @@ export default function ChatPage({
 	params: Promise<{ id: string }>;
 }) {
 	return (
-		<Suspense>
+		<Suspense fallback={<ChatSkeleton />}>
 			<SavedChat params={params} />
 		</Suspense>
 	);

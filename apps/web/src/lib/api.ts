@@ -4,14 +4,14 @@ import type { AppType } from "backend/app";
 import { hc } from "hono/client";
 import { getToken } from "@/lib/auth-client";
 
-export const api = hc<AppType>(
-	process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8787",
-	{
-		headers: async () => {
-			return { authorization: `Bearer ${(await getToken()) ?? ""}` };
-		},
+export const API_URL =
+	process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8787";
+
+export const api = hc<AppType>(API_URL, {
+	headers: async () => {
+		return { authorization: `Bearer ${(await getToken()) ?? ""}` };
 	},
-);
+});
 
 /** Tells the sidebar's chat list to reload after a create or delete. */
 export const CHATS_CHANGED = "chats-changed";

@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
+import { MessagesSkeleton } from "@/components/chat/chat-skeleton";
 import { AssistantMessage, UserMessage } from "@/components/chat/messages";
 import {
 	defaultMode,
@@ -61,6 +62,16 @@ const SUGGESTIONS = [
 // first message, save the session id from onSessionChange, reopen with
 // initialSession + resume, and switch the URL with History.replaceState.
 // The chat only reopens if its session id is saved, so retry a few times.
+// Change the address bar only. The native method, because Next patches
+// window.history.replaceState to sync its router, and this must not navigate.
+const setUrl = (path: string) =>
+	History.prototype.replaceState.call(
+		window.history,
+		window.history.state,
+		"",
+		path,
+	);
+
 async function saveSession(id: string, eveSessionId: string) {
 	for (let i = 0; i < 3; i++) {
 		try {
@@ -125,12 +136,7 @@ export function Chat({
 			if (!res.ok) return setInput(t);
 			const { id } = await res.json();
 			chatIdRef.current = id;
-			History.prototype.replaceState.call(
-				window.history,
-				window.history.state,
-				"",
-				`/dashboard/chat/${encodeURIComponent(id)}`,
-			);
+			setUrl(`/dashboard/chat/${encodeURIComponent(id)}`);
 			notifyChatsChanged();
 		}
 		// Sent while running, the message steers the current turn.
@@ -143,12 +149,7 @@ export function Chat({
 		agent.newSession();
 		chatIdRef.current = undefined;
 		savedSessionRef.current = undefined;
-		History.prototype.replaceState.call(
-			window.history,
-			window.history.state,
-			"",
-			"/dashboard/chat",
-		);
+		setUrl("/dashboard/chat");
 	}
 
 	return (
@@ -181,7 +182,9 @@ export function Chat({
 
 				{/* full width so the empty side space scrolls the chat too */}
 				<div className="min-h-0 flex-1 max-w-none!">
-					{agent.messages.length === 0 ? (
+					{resuming && agent.messages.length === 0 ? (
+						<MessagesSkeleton />
+					) : agent.messages.length === 0 ? (
 						<Empty className="h-full">
 							<EmptyHeader>
 								<EmptyMedia variant="icon">
@@ -224,7 +227,7 @@ export function Chat({
 					)}
 				</div>
 
-				{!busy && agent.messages.length === 0 && (
+				{!busy && !resuming && agent.messages.length === 0 && (
 					<div className="flex gap-2 overflow-x-auto pb-1 sm:flex-wrap">
 						{SUGGESTIONS.map((s) => (
 							<Button

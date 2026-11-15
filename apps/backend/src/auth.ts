@@ -1,6 +1,7 @@
 import { type AppUser, userFromBearer } from "@repo/shared/auth";
+import { overLimit } from "@repo/shared/rate-limit";
 import { createMiddleware } from "hono/factory";
-import { overLimit } from "./rate-limit";
+import { db } from "./db";
 
 export const webUrl = process.env.WEB_URL ?? "http://localhost:3000";
 export const isDev = process.env.NODE_ENV !== "production";
@@ -13,7 +14,7 @@ export const requireUser = createMiddleware<Env>(async (c, next) => {
 	const user = await userFromBearer(c.req.header("authorization"));
 	if (!user) return c.json({ error: "Unauthorized" }, 401);
 	// Each user has their own counter, so one heavy user never blocks another.
-	if (await overLimit(`api:${user.id}`, 120, 60_000)) {
+	if (await overLimit(db, `api:${user.id}`, 120, 60_000)) {
 		return c.json({ error: "Too many requests" }, 429);
 	}
 	c.set("user", user);

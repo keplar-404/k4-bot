@@ -13,7 +13,7 @@ K4 is a personal computer-use AI assistant. You sign in and chat with an agent t
 - **Web search** with cited sources (Firecrawl).
 - **Your own Linux desktop** (E2B: Ubuntu and XFCE). The agent can click, type, open apps and run commands on it. Screenshots appear in the chat, there is a live view link, and the desktop pauses when idle and keeps its files.
 - **Shell and file tools** that run on the same desktop, in `/home/user`.
-- **Memory.** The agent keeps stable facts and preferences about each user across chats.
+- **Memory you control.** The agent saves your preferences and lasting facts on its own and uses them in every chat. You can view and edit them in **Settings → Memory**. Memory is stored in Postgres, so it follows your account to any device.
 - **Transparent steps.** The agent's reasoning and every tool call, with its input and output, can be expanded in the chat.
 
 ## Architecture

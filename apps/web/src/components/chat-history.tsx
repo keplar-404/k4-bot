@@ -31,7 +31,8 @@ type Chat = { id: string; title: string };
 // The signed-in user's chats (the backend filters by user), newest first.
 export function ChatHistory() {
 	const [chats, setChats] = useState<Chat[]>([]);
-	const [deleting, setDeleting] = useState<string>();
+	// A set, so starting a second delete keeps the first one's spinner.
+	const [deleting, setDeleting] = useState<ReadonlySet<string>>(new Set());
 	const pathname = usePathname();
 	const router = useRouter();
 
@@ -46,10 +47,16 @@ export function ChatHistory() {
 	}, []);
 
 	async function remove(chat: Chat) {
-		setDeleting(chat.id);
-		const res = await api.api.chats[":id"].$delete({ param: { id: chat.id } });
-		setDeleting(undefined);
-		if (!res.ok) return;
+		setDeleting((s) => new Set(s).add(chat.id));
+		const res = await api.api.chats[":id"]
+			.$delete({ param: { id: chat.id } })
+			.catch(() => undefined);
+		setDeleting((s) => {
+			const next = new Set(s);
+			next.delete(chat.id);
+			return next;
+		});
+		if (!res?.ok) return;
 		setChats((c) => c.filter((x) => x.id !== chat.id));
 		if (pathname === `/dashboard/chat/${chat.id}`)
 			router.push("/dashboard/chat");
@@ -77,11 +84,11 @@ export function ChatHistory() {
 							render={<Link href={`/dashboard/chat/${chat.id}`} />}
 						>
 							<MessageSquareIcon />
-							<span className={deleting === chat.id ? "shimmer" : undefined}>
+							<span className={deleting.has(chat.id) ? "shimmer" : undefined}>
 								{chat.title}
 							</span>
 						</SidebarMenuButton>
-						{deleting === chat.id ? (
+						{deleting.has(chat.id) ? (
 							<SidebarMenuAction aria-label="Deleting">
 								<LoaderCircleIcon className="animate-spin" />
 							</SidebarMenuAction>
