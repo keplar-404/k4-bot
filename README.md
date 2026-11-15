@@ -1,159 +1,55 @@
-# Turborepo starter
+# K4
 
-This Turborepo starter is maintained by the Turborepo core team.
+K4 is a personal computer-use AI assistant. You sign in and chat with an agent that can search the web and do real work on **your own Linux desktop in the cloud**, which you can watch live. The desktop keeps its files between chats, and your chats and the agent's memory of you are saved to your account.
 
-## Using this example
+## Features
 
-Run the following command:
+- **Chat with saved history.** Conversations stream live, resume after a reload, and appear in the sidebar. You can delete them from the sidebar.
+- **Model and reasoning picker.** Models come through OpenRouter, and the reasoning effort is set per model.
+- **Three modes:**
+  - **Ask:** risky actions (desktop, shell, file edits) wait for your approval.
+  - **Plan:** the agent only plans and can only search the web.
+  - **Full:** the agent acts without asking.
+- **Web search** with cited sources (Firecrawl).
+- **Your own Linux desktop** (E2B: Ubuntu and XFCE). The agent can click, type, open apps and run commands on it. Screenshots appear in the chat, there is a live view link, and the desktop pauses when idle and keeps its files.
+- **Shell and file tools** that run on the same desktop, in `/home/user`.
+- **Memory.** The agent keeps stable facts and preferences about each user across chats.
+- **Transparent steps.** The agent's reasoning and every tool call, with its input and output, can be expanded in the chat.
 
-```sh
-npx create-turbo@latest
-```
+## Architecture
 
-## What's inside?
+| Path | Role | Stack |
+| --- | --- | --- |
+| `apps/web` | UI: login, dashboard, chat. Proxies `/eve/v1/*` to the agent. | Next.js 16, React 19, Tailwind 4, shadcn/ui |
+| `apps/backend` | API: chats, desktop setup, screenshot links, per-user rate limits. | Hono on Bun, Drizzle, Neon Postgres |
+| `apps/ai-agent` | The agent: models, tools, approvals, memory, durable sessions. | eve, OpenRouter, E2B, Firecrawl |
+| `packages/shared` | Token check, model list, E2B desktop helpers, screenshot storage. | jose, E2B SDK, S3 client |
 
-This Turborepo includes the following packages/apps:
+Sign-in uses **Neon Auth** (Managed Better Auth). The browser sends a short-lived token as `Authorization: Bearer`. The backend and the agent each check it against Neon's public keys, and every query is scoped to that user. Screenshots are stored in a private Neon Object Storage bucket.
 
-### Apps and Packages
+## Getting started
 
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `@next/eslint-plugin-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
-
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
-
-### Utilities
-
-This Turborepo has some additional tools already setup for you:
-
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
-
-### Build
-
-To build all apps and packages, run the following command:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
+**Prerequisites:** Bun 1.4, a Neon project (Postgres, Auth, Object Storage), and API keys for E2B, OpenRouter and Firecrawl.
 
 ```sh
-cd my-turborepo
-turbo build
+bun install
+
+# Environment: copy each .env.example and fill it in (`neon env pull` fills most of it)
+#   apps/backend/.env   apps/ai-agent/.env   apps/web/.env.local
+
+cd apps/backend && bun run db:migrate && cd -              # app tables
+cd apps/ai-agent && bun run workflow:bootstrap && cd -     # agent session store (once)
+
+bun run dev
 ```
 
-Without global `turbo`, use your package manager:
+Open http://localhost:3000. The web app runs on port 3000, the backend on 8787, and the agent is started by the web app in development.
+
+## Development
 
 ```sh
-cd my-turborepo
-npx turbo build
-bun exec turbo build
-bun exec turbo build
+bun run test               # unit tests (shared, backend, agent)
+bunx biome check --write . # lint and format
 ```
 
-You can build a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo build --filter=docs
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo build --filter=docs
-bun exec turbo build --filter=docs
-bun exec turbo build --filter=docs
-```
-
-### Develop
-
-To develop all apps and packages, run the following command:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo dev
-```
-
-Without global `turbo`, use your package manager:
-
-```sh
-cd my-turborepo
-npx turbo dev
-bun exec turbo dev
-bun exec turbo dev
-```
-
-You can develop a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo dev --filter=web
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo dev --filter=web
-bun exec turbo dev --filter=web
-bun exec turbo dev --filter=web
-```
-
-### Remote Caching
-
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
-
-Turborepo can use a technique known as [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
-
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo login
-```
-
-Without global `turbo`, use your package manager:
-
-```sh
-cd my-turborepo
-npx turbo login
-bun exec turbo login
-bun exec turbo login
-```
-
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
-
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo link
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo link
-bun exec turbo link
-bun exec turbo link
-```
-
-## Useful Links
-
-Learn more about the power of Turborepo:
-
-- [Tasks](https://turborepo.dev/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.dev/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.dev/docs/reference/configuration)
-- [CLI Usage](https://turborepo.dev/docs/reference/command-line-reference)
+See [PROJECT.md](PROJECT.md) for the detailed layout, current status and known limitations.

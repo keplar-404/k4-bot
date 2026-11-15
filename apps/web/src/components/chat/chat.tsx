@@ -113,7 +113,6 @@ export function Chat({
 	const resuming = agent.status === "resuming";
 	const running = activeTurn(agent.view) !== undefined;
 	const busy = agent.status === "busy" || running;
-	const last = agent.messages.at(-1);
 
 	async function send(text: string) {
 		const t = text.trim();
@@ -180,12 +179,6 @@ export function Chat({
 					</Tooltip>
 				</div>
 
-				{agent.error && (
-					<p role="alert" className="text-sm text-destructive">
-						{agent.error.message}
-					</p>
-				)}
-
 				{/* full width so the empty side space scrolls the chat too */}
 				<div className="min-h-0 flex-1 max-w-none!">
 					{agent.messages.length === 0 ? (
@@ -224,18 +217,6 @@ export function Chat({
 											)}
 										</MessageScrollerItem>
 									))}
-									{busy && last?.role === "user" && (
-										<MessageScrollerItem messageId="thinking">
-											<Marker role="status">
-												<MarkerIcon>
-													<LoaderCircleIcon className="animate-spin" />
-												</MarkerIcon>
-												<MarkerContent className="shimmer">
-													Thinking…
-												</MarkerContent>
-											</Marker>
-										</MessageScrollerItem>
-									)}
 								</MessageScrollerContent>
 							</MessageScrollerViewport>
 							<MessageScrollerButton />
@@ -264,8 +245,15 @@ export function Chat({
 						<MarkerIcon>
 							<LoaderCircleIcon className="animate-spin" />
 						</MarkerIcon>
-						<MarkerContent className="shimmer">working deep dive</MarkerContent>
+						<MarkerContent className="shimmer">Working…</MarkerContent>
 					</Marker>
+				)}
+
+				{/* Next to the input, under the turn that failed, so it reads as that turn's result. */}
+				{agent.error && !busy && (
+					<p role="alert" className="text-sm text-destructive">
+						{agent.error.message}
+					</p>
 				)}
 
 				<form

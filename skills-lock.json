@@ -151,6 +151,12 @@
       "skillPath": "toolchains/javascript/frameworks/hono/hono-validation/SKILL.md",
       "computedHash": "1e0134415a54e5ffc4b575a423034be35abb0ee4baf1c80de67f18f5f7dc8773"
     },
+    "improve-codebase-architecture": {
+      "source": "mattpocock/skills",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/improve-codebase-architecture/SKILL.md",
+      "computedHash": "f0820b18426a7d9a6c823a890988ba0ac70bf0fd596d30d7ef07c88558728c23"
+    },
     "lint-rule-development": {
       "source": "biomejs/biome",
       "sourceType": "github",

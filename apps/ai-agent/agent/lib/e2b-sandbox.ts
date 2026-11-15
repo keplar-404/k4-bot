@@ -56,6 +56,10 @@ function connect(sandbox: Sandbox): SandboxConnection {
 	// using the shell would hit the 5-minute auto-pause. Push the clock on every use.
 	const touch = () => sandbox.setTimeout(DESKTOP_TIMEOUT_MS);
 	return {
+		// eve's default /workspace does not exist on E2B desktops and `user` can't create
+		// it. Use the user's home (E2B docs: template/user-and-workdir), which always
+		// exists and is where the desktop's file manager and terminal open.
+		workspaceRoot: "/home/user",
 		async spawn({ signal, command, env, workingDirectory, stdin }) {
 			await touch();
 			let out!: ReadableStreamDefaultController<Uint8Array>;

@@ -10,7 +10,9 @@ import { getUserDesktop } from "../lib/desktop";
 // Drives a Linux desktop (E2B Desktop: Ubuntu + XFCE, 1280x800) with mouse,
 // keyboard and shell. Every action returns a fresh screenshot so the model
 // sees the result. API per docs.e2b.dev/use-cases/computer-use.
-const point = z.tuple([z.number().int().min(0), z.number().int().min(0)]);
+// [x, y]. Not z.tuple: its JSON Schema uses array-form `items`, which some
+// providers behind OpenRouter reject, failing the whole model call.
+const point = z.array(z.number().int().min(0).max(1279)).length(2);
 
 export default defineTool({
 	description: [
@@ -60,6 +62,9 @@ export default defineTool({
 				throw new Error(`\`${name}\` is required for ${input.action}.`);
 			return v;
 		};
+		// The schema guarantees two numbers.
+		const xy = (p: number[] | undefined, name: string) =>
+			need(p, name) as [number, number];
 		let stdout: string | undefined;
 		let stderr: string | undefined;
 		let exitCode: number | undefined;
@@ -67,19 +72,19 @@ export default defineTool({
 			case "screenshot":
 				break;
 			case "left_click":
-				await desktop.leftClick(...need(input.at, "at"));
+				await desktop.leftClick(...xy(input.at, "at"));
 				break;
 			case "right_click":
-				await desktop.rightClick(...need(input.at, "at"));
+				await desktop.rightClick(...xy(input.at, "at"));
 				break;
 			case "double_click":
-				await desktop.doubleClick(...need(input.at, "at"));
+				await desktop.doubleClick(...xy(input.at, "at"));
 				break;
 			case "move":
-				await desktop.moveMouse(...need(input.at, "at"));
+				await desktop.moveMouse(...xy(input.at, "at"));
 				break;
 			case "drag":
-				await desktop.drag(need(input.at, "at"), need(input.to, "to"));
+				await desktop.drag(xy(input.at, "at"), xy(input.to, "to"));
 				break;
 			case "type":
 				await desktop.write(need(input.text, "text"));

@@ -8,7 +8,7 @@ async function AuthButton() {
 	return (
 		<Button
 			nativeButton={false}
-			render={<Link href={session ? "/dashboard" : "/login"} />}
+			render={<Link href={session ? "/dashboard/chat" : "/login"} />}
 		>
 			{session ? "Dashboard" : "Login"}
 		</Button>

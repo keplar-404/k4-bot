@@ -216,10 +216,19 @@ function ToolRow({
 			<TraceCollapsibleContent className="flex flex-col gap-2">
 				{asking && <Prompt interaction={asking} onAnswer={onAnswer} />}
 				{part.error && <p className="text-destructive">{part.error.message}</p>}
+				<ToolInput part={part} />
 				<ToolDetail part={part} />
 			</TraceCollapsibleContent>
 		</TraceCollapsible>
 	);
+}
+
+// What the model sent the tool. bash shows its command in the terminal instead.
+function ToolInput({ part }: { part: EveToolPart }) {
+	const input = part.input as Record<string, unknown> | undefined;
+	if (part.name === "bash" || !input || Object.keys(input).length === 0)
+		return null;
+	return <Terminal text={JSON.stringify(input, null, 2)} />;
 }
 
 function ToolDetail({ part }: { part: EveToolPart }) {

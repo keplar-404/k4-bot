@@ -2,8 +2,10 @@ import { sql } from "drizzle-orm";
 import { db } from "./db";
 
 // One counter per key (use the user id), so one user's traffic never counts against
-// another's. Fixed window, stored in Better Auth's rate_limit table so every instance
-// shares it. Returns true when the caller is over `max` in the window.
+// another's. Fixed window, stored in the app's rate_limit table (db/app-schema.ts) so
+// every instance shares it. Returns true when the caller is over `max` in the window.
+// The agent has the same query in apps/ai-agent/agent/lib/db.ts (it uses the Neon HTTP
+// driver, not Drizzle); change both together.
 export async function overLimit(key: string, max: number, windowMs: number) {
 	const now = Date.now();
 	const start = now - windowMs;

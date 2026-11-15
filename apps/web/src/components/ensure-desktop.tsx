@@ -3,14 +3,12 @@
 import { useEffect } from "react";
 import { api } from "@/lib/api";
 
-// Once per browser session, ask the backend to make sure this user has their one
-// computer (it is created there, never by the agent). Safe to repeat.
+// On every dashboard load, ask the backend to make sure this user has their one
+// computer (it is created there, never by the agent). Safe to repeat, and it rebuilds
+// a desktop E2B lost, so "reload the dashboard" really fixes a missing computer.
 export function EnsureDesktop() {
 	useEffect(() => {
-		if (sessionStorage.getItem("desktop-ready")) return;
-		void api.api.me.desktop.$post().then((res) => {
-			if (res.ok) sessionStorage.setItem("desktop-ready", "1");
-		});
+		void api.api.me.desktop.$post();
 	}, []);
 	return null;
 }

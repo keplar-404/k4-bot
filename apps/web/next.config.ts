@@ -7,6 +7,17 @@ const nextConfig: NextConfig = {
 	cacheComponents: true,
 	partialPrefetching: true,
 	reactCompiler: true,
+	// The chat is the dashboard for now. A config redirect, not redirect() in a page:
+	// that throws during the Cache Components prerender check.
+	async redirects() {
+		return [
+			{
+				source: "/dashboard",
+				destination: "/dashboard/chat",
+				permanent: false,
+			},
+		];
+	},
 	// Stops other sites from framing the app (clickjacking the approve buttons).
 	async headers() {
 		return [

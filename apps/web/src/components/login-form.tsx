@@ -42,7 +42,7 @@ export function LoginForm({
 			return setError("Too many attempts. Please wait a minute and try again.");
 		}
 		if (error) return setError(error.message ?? "Something went wrong");
-		router.push("/dashboard");
+		router.push("/dashboard/chat");
 	}
 
 	return (
@@ -95,7 +95,7 @@ export function LoginForm({
 									onClick={() =>
 										authClient.signIn.social({
 											provider: "google",
-											callbackURL: `${window.location.origin}/dashboard`,
+											callbackURL: `${window.location.origin}/dashboard/chat`,
 										})
 									}
 								>
