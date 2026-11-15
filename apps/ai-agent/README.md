@@ -1,4 +1,4 @@
-# backend
+# ai-agent
 
 This is an [eve](https://eve.dev) agent bootstrapped with [`eve init`](https://eve.dev/docs/reference/cli#eve-init).
 

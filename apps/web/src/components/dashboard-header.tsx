@@ -1,6 +1,5 @@
 "use client";
 
-import { usePathname } from "next/navigation";
 import {
 	Breadcrumb,
 	BreadcrumbItem,
@@ -10,13 +9,11 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 
-const titles: Record<string, string> = {
-	"/dashboard": "Overview",
-	"/dashboard/chat": "AI Chat",
-};
+// Every dashboard page is the chat now. No usePathname(): it blocks
+// prerendering of dynamic routes like /dashboard/chat/[id] (Cache Components).
+const title = "AI Chat";
 
 export function DashboardHeader() {
-	const title = titles[usePathname()] ?? "Dashboard";
 	return (
 		<header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
 			<div className="flex items-center gap-2 px-4">

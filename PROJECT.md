@@ -10,8 +10,13 @@ Turborepo monorepo (bun workspaces) for an AI agent app: Next.js web UI, Hono AP
    - `src/components/ui` — shadcn components, incl. chat ones (`message`, `bubble`, `message-scroller`, `trace`, `code-block`, `input-group`).
    - `src/components/chat` — chat page: `chat.tsx`, `messages.tsx`, `pickers.tsx`.
    - `src/lib` — `auth-client.ts`, `session.ts`, `ai.ts`. `src/proxy.ts` guards `/dashboard`.
-2. `apps/backend` — Hono on Bun, port 3001. Better Auth + Drizzle + Neon Postgres (`src/auth.ts`, `src/db`, `drizzle.config.ts`).
-3. `apps/ai-agent` — `eve` AI agent (OpenRouter model, E2B sandbox). Own `.env`. Not connected to web/backend yet.
+2. `apps/backend` — Hono on Bun, port 8787. Better Auth + Drizzle + Neon Postgres (`src/auth.ts`, `src/db`, `drizzle.config.ts`).
+3. `apps/ai-agent` — `eve` AI agent. Own `.env` (`OPENROUTER_API_KEY`, `E2B_API_KEY`, `FIRECRAWL_API_KEY`, `BACKEND_URL`).
+   - `agent/agent.ts` — dynamic OpenRouter model + reasoning, chosen per turn by the web picker.
+   - `agent/lib/models.ts` — model allowlist and per-model reasoning efforts (from the OpenRouter models API); also imported by web as `ai-agent/models`.
+   - `agent/channels/eve.ts` — auth: forwards the browser cookie to the backend's `/api/auth/get-session`; reads `{ model, reasoning, mode }` from `clientContext`.
+   - `agent/tools/web_search.ts` — Firecrawl `/search` (replaces eve's built-in `web_search`).
+   - `agent/tools/computer.ts` + `agent/lib/desktop.ts` — Linux desktop (E2B Desktop) control with screenshots and a live view URL.
 4. `packages/ui`, `packages/eslint-config`, `packages/typescript-config` — starter shared packages.
 5. `.claude/skills`, `.agents/skills`, `skills-lock.json` — installed agent skills.
 6. Root: `turbo.json`, `biome.json`, `bun.lock`, `AGENTS.md`, `README.md`, this file.
@@ -29,16 +34,16 @@ Turborepo monorepo (bun workspaces) for an AI agent app: Next.js web UI, Hono AP
 
 ## 3. Not done yet
 
-1. Chat has no backend: needs a route that streams AI SDK UI messages, then swap `transport` in `chat.tsx`. The model, reasoning and mode picks are not sent anywhere.
-2. `ai-agent` is not connected to the web app or backend.
+1. Chat is live: `next.config.ts` wraps the app in `withEve` (eve proxies `/eve/v1/*` to `apps/ai-agent`), and `chat.tsx` uses `useEveAgent`. Conversations are not saved per user yet (a reload starts a new chat).
+2. `FIRECRAWL_API_KEY` must be set: keyless Firecrawl is refused from some networks.
 3. Production setup: HTTPS, secure cookies, cross-domain cookies if web and backend use different domains, email verification and password reset (no email provider).
-4. Skills for hono, bun, zod, zustand are not installed (`bunx skills add` failed). Commands are in the chat history.
+4. Firecrawl build skills (`firecrawl-build*`) are installed in `.claude/skills`. Skills for hono, bun, zod, zustand are not installed (`bunx skills add` failed). Commands are in the chat history.
 5. Sidebar and dashboard overview still show shadcn demo data.
 6. No tests.
 
 ## 4. Run
 
-1. `bun install`, then `bun run dev` at the root (web on 3000, backend on 3001).
+1. `bun install`, then `bun run dev` at the root (web on 3000, backend on 8787).
 2. Env: copy `apps/backend/.env.example` to `.env` and fill it in (Neon URL, auth secret, Google keys). `apps/web/.env.example` has `NEXT_PUBLIC_API_URL`.
 3. DB: `cd apps/backend && bunx drizzle-kit push` (only touches the auth tables, via `tablesFilter`).
 4. Check code: `bunx biome check --write .` at the root.

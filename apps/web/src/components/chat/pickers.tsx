@@ -1,5 +1,6 @@
 "use client";
 
+import { type Effort, models } from "@repo/shared/models";
 import {
 	BrainIcon,
 	ChevronDownIcon,
@@ -20,29 +21,19 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { InputGroupButton } from "@/components/ui/input-group";
 
-const providers = [
-	{
-		name: "Anthropic",
-		models: [
-			{ id: "claude-sonnet-5-5", name: "Sonnet 5.5" },
-			{ id: "claude-haiku-5-5", name: "Haiku 5.5" },
-		],
-	},
-	{
-		name: "OpenAI",
-		models: [
-			{ id: "gpt-5", name: "GPT-5" },
-			{ id: "gpt-5-mini", name: "GPT-5 mini" },
-		],
-	},
-];
-const models = providers.flatMap((p) => p.models);
+const providers = [...new Set(models.map((m) => m.provider))].map((name) => ({
+	name,
+	models: models.filter((m) => m.provider === name),
+}));
 
-const efforts = [
-	{ id: "low", name: "Low" },
-	{ id: "medium", name: "Medium" },
-	{ id: "high", name: "High" },
-];
+const effortNames: Record<Effort, string> = {
+	none: "Off",
+	minimal: "Minimal",
+	low: "Low",
+	medium: "Medium",
+	high: "High",
+	xhigh: "Extra high",
+};
 
 const modes = [
 	{ id: "ask", name: "Ask", icon: MessageCircleQuestionIcon },
@@ -50,13 +41,11 @@ const modes = [
 	{ id: "full", name: "Full", icon: ZapIcon },
 ];
 
-export const defaultModel = models[0].id;
-export const defaultEffort = "medium";
 export const defaultMode = "ask";
 
 type PickerProps = { value: string; onChange: (v: string) => void };
 
-// Model + reasoning effort in one menu.
+// Model + reasoning effort in one menu. The effort list follows the model.
 export function ModelPicker({
 	model,
 	effort,
@@ -64,12 +53,12 @@ export function ModelPicker({
 	onEffort,
 }: {
 	model: string;
-	effort: string;
+	effort: string | undefined;
 	onModel: (v: string) => void;
-	onEffort: (v: string) => void;
+	onEffort: (v: Effort) => void;
 }) {
 	const m = models.find((x) => x.id === model) ?? models[0];
-	const e = efforts.find((x) => x.id === effort) ?? efforts[1];
+	const e = m.efforts.find((x) => x === effort) ?? m.defaultEffort;
 	return (
 		<DropdownMenu>
 			<DropdownMenuTrigger
@@ -77,17 +66,21 @@ export function ModelPicker({
 					<InputGroupButton
 						size="sm"
 						variant="outline"
-						aria-label={`Model: ${m.name}, reasoning: ${e.name}`}
+						aria-label={`Model: ${m.name}${e ? `, reasoning: ${effortNames[e]}` : ""}`}
 						className="min-w-0"
 					/>
 				}
 			>
 				<span className="truncate">{m.name}</span>
-				<span className="hidden text-muted-foreground sm:inline">{e.name}</span>
+				{e && (
+					<span className="hidden text-muted-foreground sm:inline">
+						{effortNames[e]}
+					</span>
+				)}
 				<ChevronDownIcon />
 			</DropdownMenuTrigger>
-			<DropdownMenuContent align="start" side="top" className="w-52">
-				<DropdownMenuRadioGroup value={model} onValueChange={onModel}>
+			<DropdownMenuContent align="start" side="top" className="w-56">
+				<DropdownMenuRadioGroup value={m.id} onValueChange={onModel}>
 					{providers.map((p, i) => (
 						<Fragment key={p.name}>
 							{i > 0 && <DropdownMenuSeparator />}
@@ -106,20 +99,27 @@ export function ModelPicker({
 						</Fragment>
 					))}
 				</DropdownMenuRadioGroup>
-				<DropdownMenuSeparator />
-				<DropdownMenuGroup>
-					<DropdownMenuLabel className="flex items-center gap-1.5">
-						<BrainIcon className="size-3.5" />
-						Reasoning
-					</DropdownMenuLabel>
-					<DropdownMenuRadioGroup value={effort} onValueChange={onEffort}>
-						{efforts.map((item) => (
-							<DropdownMenuRadioItem key={item.id} value={item.id} closeOnClick>
-								{item.name}
-							</DropdownMenuRadioItem>
-						))}
-					</DropdownMenuRadioGroup>
-				</DropdownMenuGroup>
+				{m.efforts.length > 0 && (
+					<>
+						<DropdownMenuSeparator />
+						<DropdownMenuGroup>
+							<DropdownMenuLabel className="flex items-center gap-1.5">
+								<BrainIcon className="size-3.5" />
+								Reasoning
+							</DropdownMenuLabel>
+							<DropdownMenuRadioGroup
+								value={e}
+								onValueChange={(v) => onEffort(v as Effort)}
+							>
+								{m.efforts.map((item) => (
+									<DropdownMenuRadioItem key={item} value={item} closeOnClick>
+										{effortNames[item]}
+									</DropdownMenuRadioItem>
+								))}
+							</DropdownMenuRadioGroup>
+						</DropdownMenuGroup>
+					</>
+				)}
 			</DropdownMenuContent>
 		</DropdownMenu>
 	);

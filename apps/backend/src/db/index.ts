@@ -1,5 +1,13 @@
-import { neon } from "@neondatabase/serverless";
-import { drizzle } from "drizzle-orm/neon-http";
-import * as schema from "./auth-schema";
+// Neon guide, "Neon WebSocket" option: long-running server, interactive transactions.
+// Bun has a global WebSocket, so `ws` / neonConfig.webSocketConstructor is not needed.
+import { Pool } from "@neondatabase/serverless";
+import { drizzle } from "drizzle-orm/neon-serverless";
+import * as appSchema from "./app-schema";
+import * as authSchema from "./auth-schema";
 
-export const db = drizzle(neon(process.env.DATABASE_URL!), { schema });
+if (!process.env.DATABASE_URL) {
+	throw new Error("DATABASE_URL is not defined");
+}
+
+export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+export const db = drizzle(pool, { schema: { ...authSchema, ...appSchema } });

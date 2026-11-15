@@ -1,10 +1,25 @@
 import { defineConfig } from "drizzle-kit";
 
+// Neon: migrations use the direct (unpooled) connection.
+if (!process.env.DATABASE_URL_UNPOOLED) {
+	throw new Error("DATABASE_URL_UNPOOLED is not set in .env file");
+}
+
 export default defineConfig({
-	schema: "./src/db/auth-schema.ts",
+	schema: ["./src/db/auth-schema.ts", "./src/db/app-schema.ts"],
 	// push only touches these tables, never anything else in the DB
-	tablesFilter: ["user", "session", "account", "verification", "rate_limit"],
+	tablesFilter: [
+		"user",
+		"session",
+		"account",
+		"verification",
+		"rate_limit",
+		"chat",
+		"agent_event",
+		"user_desktop",
+		"agent_memory",
+	],
 	out: "./drizzle",
 	dialect: "postgresql",
-	dbCredentials: { url: process.env.DATABASE_URL! },
+	dbCredentials: { url: process.env.DATABASE_URL_UNPOOLED },
 });

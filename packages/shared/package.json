@@ -1,0 +1,12 @@
+{
+	"name": "@repo/shared",
+	"private": true,
+	"type": "module",
+	"exports": {
+		"./models": "./src/models.ts",
+		"./desktop": "./src/desktop.ts"
+	},
+	"dependencies": {
+		"@e2b/desktop": "^2.5.0"
+	}
+}

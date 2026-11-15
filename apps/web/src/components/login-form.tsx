@@ -37,6 +37,10 @@ export function LoginForm({
 					password,
 				})
 			: await authClient.signIn.email({ email, password });
+		// Better Auth rate limit: 429 when too many attempts (see backend auth.ts).
+		if (error?.status === 429) {
+			return setError("Too many attempts. Please wait a minute and try again.");
+		}
 		if (error) return setError(error.message ?? "Something went wrong");
 		router.push("/dashboard");
 	}

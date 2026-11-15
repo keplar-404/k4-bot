@@ -14,6 +14,7 @@
 			"!**/.turbo",
 			"!**/dist",
 			"!**/.eve",
+			"!.commandcode",
 			"!**/*.md",
 			"!.agents",
 			"!.claude",

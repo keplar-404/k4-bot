@@ -1,35 +1,23 @@
 "use client";
 
-import { useChat } from "@ai-sdk/react";
-import { createChat } from "@shadcn/helpers/ai-sdk";
+import { defaultModelId, type Effort } from "@repo/shared/models";
+import { activeTurn } from "eve/events";
+import { useEveAgent } from "eve/react";
 import {
 	ArrowUpIcon,
-	GlobeIcon,
 	LoaderCircleIcon,
 	MessageCircleDashedIcon,
-	PaperclipIcon,
-	PlusIcon,
 	SquareIcon,
 	SquarePenIcon,
-	TelescopeIcon,
 } from "lucide-react";
 import { useRef, useState } from "react";
 import { AssistantMessage, UserMessage } from "@/components/chat/messages";
 import {
-	defaultEffort,
 	defaultMode,
-	defaultModel,
 	ModelPicker,
 	ModePicker,
 } from "@/components/chat/pickers";
 import { Button } from "@/components/ui/button";
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuItem,
-	DropdownMenuSeparator,
-	DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
 	Empty,
 	EmptyDescription,
@@ -57,96 +45,99 @@ import {
 	TooltipContent,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { type ChatMessage, getMessageText } from "@/lib/ai";
+import { api, notifyChatsChanged } from "@/lib/api";
 
-const FIRST = "Add a loading skeleton to the dashboard overview.";
-const SECOND = "Run the type check.";
-const SUGGESTIONS = [FIRST, SECOND, "What can you do?"];
+const SUGGESTIONS = [
+	"Search the web for this week's top AI news.",
+	"Open Firefox on the desktop and go to news.ycombinator.com.",
+	"What can you do?",
+];
 
-// Frontend-only showcase: a scripted conversation streamed through the real
-// useChat lifecycle. Swap `transport` for a real one when a backend exists.
-const script = createChat<ChatMessage>()
-	.user(FIRST)
-	.assistant(({ writer }) => {
-		writer.reasoning(
-			"The overview page renders three placeholder cards. I should find where they live before adding skeletons.",
-		);
-		writer.sleep(300);
-		writer
-			.tool("runCommand", { input: { command: "rg -l Overview src/app" } })
-			.sleep(700)
-			.output({ stdout: "src/app/dashboard/page.tsx" });
-		writer.sleep(300);
-		writer.text(`The cards are in \`src/app/dashboard/page.tsx\`. I wrapped them in a \`Suspense\` boundary with a **Skeleton** fallback.
-
-**Changes**
-
-- Added a \`loading.tsx\` next to the page.
-- Reused the \`Skeleton\` component, so no custom styles.
-
-\`\`\`tsx
-export default function Loading() {
-  return <Skeleton className="aspect-video rounded-xl" />
-}
-\`\`\`
-`);
-	})
-	.user(SECOND)
-	.assistant(({ writer }) => {
-		writer
-			.tool("runCommand", { input: { command: "bunx tsc --noEmit" } })
-			.sleep(1200)
-			.output({ stdout: "Found 0 errors." });
-		writer.sleep(300);
-		writer.text(
-			"The type check passes with **0 errors**, so it is safe to ship.",
-		);
+// Talks to the eve agent in apps/ai-agent through /eve/v1/* (see next.config.ts).
+// The agent checks the Better Auth session cookie against apps/backend.
+// Saved chats follow eve's Next.js guide: create the chat record before the
+// first message, save the session id from onSessionChange, reopen with
+// initialSession + resume, and switch the URL with History.replaceState.
+export function Chat({
+	chatId: savedChatId,
+	sessionId,
+}: {
+	chatId?: string;
+	sessionId?: string | null;
+}) {
+	const chatIdRef = useRef(savedChatId);
+	const savedSessionRef = useRef(sessionId ?? undefined);
+	const agent = useEveAgent({
+		...(sessionId
+			? { initialSession: { sessionId, streamIndex: 0 }, resume: true }
+			: {}),
+		onSessionChange: (session) => {
+			const id = chatIdRef.current;
+			const sid = session?.sessionId;
+			if (!id || !sid || sid === savedSessionRef.current) return;
+			savedSessionRef.current = sid;
+			void api.api.chats[":id"].$patch({
+				param: { id },
+				json: { eveSessionId: sid },
+			});
+		},
 	});
-
-const initialMessages = script.get(2);
-const transport = script.transport({
-	delayMs: 14,
-	fallback: ({ writer, messages }) => {
-		const last = messages.findLast((m) => m.role === "user");
-		const quote = (last ? getMessageText(last) : "")
-			.split("\n")
-			.map((l) => `> ${l}`)
-			.join("\n");
-		writer.reasoning(
-			"This is a frontend-only showcase, so no model is connected. I'll say what is missing.",
-		);
-		writer.sleep(300);
-		writer.text(`${quote}
-
-I only know the scripted turns. Connect a backend route that streams **AI SDK UI messages** and swap the \`transport\` in \`chat.tsx\` to get real replies.`);
-	},
-});
-
-export function Chat() {
-	const { messages, sendMessage, setMessages, status, stop } =
-		useChat<ChatMessage>({ messages: initialMessages, transport });
 	const [input, setInput] = useState("");
-	const [model, setModel] = useState(defaultModel);
-	const [effort, setEffort] = useState(defaultEffort);
+	const [model, setModel] = useState(defaultModelId);
+	const [effort, setEffort] = useState<Effort>();
 	const [mode, setMode] = useState(defaultMode);
 	const formRef = useRef<HTMLFormElement>(null);
-	const busy = status === "submitted" || status === "streaming";
 
-	function send(text: string) {
+	const resuming = agent.status === "resuming";
+	const running = activeTurn(agent.view) !== undefined;
+	const busy = agent.status === "busy" || running;
+	const last = agent.messages.at(-1);
+
+	async function send(text: string) {
 		const t = text.trim();
-		if (!t || busy) return;
-		void sendMessage({ text: t });
+		if (!t || resuming) return;
 		setInput("");
+		if (!chatIdRef.current) {
+			const res = await api.api.chats.$post({
+				json: { title: t.slice(0, 80) },
+			});
+			if (!res.ok) return setInput(t);
+			const { id } = await res.json();
+			chatIdRef.current = id;
+			History.prototype.replaceState.call(
+				window.history,
+				window.history.state,
+				"",
+				`/dashboard/chat/${encodeURIComponent(id)}`,
+			);
+			notifyChatsChanged();
+		}
+		// Sent while running, the message steers the current turn.
+		await agent.send(t, {
+			clientContext: { model, reasoning: effort ?? null, mode },
+		});
+	}
+
+	function newChat() {
+		agent.newSession();
+		chatIdRef.current = undefined;
+		savedSessionRef.current = undefined;
+		History.prototype.replaceState.call(
+			window.history,
+			window.history.state,
+			"",
+			"/dashboard/chat",
+		);
 	}
 
 	return (
 		<MessageScrollerProvider autoScroll>
-			<div className="mx-auto flex h-[calc(100dvh-4rem)] min-h-0 w-full max-w-4xl flex-col gap-2 px-3 pb-3 sm:px-6 sm:pb-4">
+			<div className="flex h-[calc(100dvh-4rem)] min-h-0 w-full flex-col gap-2 px-3 pb-3 *:mx-auto *:w-full *:max-w-4xl sm:px-6 sm:pb-4">
 				<div className="flex items-center justify-between gap-2">
 					<div className="min-w-0">
 						<div className="truncate font-medium">AI Assistant</div>
 						<div className="truncate text-xs text-muted-foreground">
-							Frontend demo, scripted replies
+							Web search, Linux desktop and a sandbox shell
 						</div>
 					</div>
 					<Tooltip>
@@ -157,7 +148,7 @@ export function Chat() {
 									size="icon"
 									aria-label="New chat"
 									disabled={busy}
-									onClick={() => setMessages([])}
+									onClick={newChat}
 								/>
 							}
 						>
@@ -167,14 +158,21 @@ export function Chat() {
 					</Tooltip>
 				</div>
 
-				<div className="min-h-0 flex-1">
-					{messages.length === 0 ? (
+				{agent.error && (
+					<p role="alert" className="text-sm text-destructive">
+						{agent.error.message}
+					</p>
+				)}
+
+				{/* full width so the empty side space scrolls the chat too */}
+				<div className="min-h-0 flex-1 max-w-none!">
+					{agent.messages.length === 0 ? (
 						<Empty className="h-full">
 							<EmptyHeader>
 								<EmptyMedia variant="icon">
 									<MessageCircleDashedIcon />
 								</EmptyMedia>
-								<EmptyTitle>What should we build?</EmptyTitle>
+								<EmptyTitle>What should we do?</EmptyTitle>
 								<EmptyDescription>
 									Pick a suggestion below or type your own message.
 								</EmptyDescription>
@@ -183,8 +181,11 @@ export function Chat() {
 					) : (
 						<MessageScroller>
 							<MessageScrollerViewport className="scrollbar-none [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-								<MessageScrollerContent aria-busy={busy} className="gap-6">
-									{messages.map((m) => (
+								<MessageScrollerContent
+									aria-busy={busy}
+									className="mx-auto max-w-4xl gap-6"
+								>
+									{agent.messages.map((m) => (
 										<MessageScrollerItem
 											key={m.id}
 											messageId={m.id}
@@ -195,20 +196,23 @@ export function Chat() {
 											) : (
 												<AssistantMessage
 													message={m}
-													streaming={busy && m === messages.at(-1)}
+													streaming={m.metadata?.status === "streaming"}
+													onAnswer={(answers) => void agent.respond(answers)}
 												/>
 											)}
 										</MessageScrollerItem>
 									))}
-									{status === "submitted" && (
-										<Marker role="status">
-											<MarkerIcon>
-												<LoaderCircleIcon className="animate-spin" />
-											</MarkerIcon>
-											<MarkerContent className="shimmer">
-												Thinking…
-											</MarkerContent>
-										</Marker>
+									{busy && last?.role === "user" && (
+										<MessageScrollerItem messageId="thinking">
+											<Marker role="status">
+												<MarkerIcon>
+													<LoaderCircleIcon className="animate-spin" />
+												</MarkerIcon>
+												<MarkerContent className="shimmer">
+													Thinking…
+												</MarkerContent>
+											</Marker>
+										</MessageScrollerItem>
 									)}
 								</MessageScrollerContent>
 							</MessageScrollerViewport>
@@ -217,15 +221,15 @@ export function Chat() {
 					)}
 				</div>
 
-				{!busy && (
-					<div className="-mx-3 flex gap-2 overflow-x-auto px-3 pb-1 sm:mx-0 sm:flex-wrap sm:px-0">
+				{!busy && agent.messages.length === 0 && (
+					<div className="flex gap-2 overflow-x-auto pb-1 sm:flex-wrap">
 						{SUGGESTIONS.map((s) => (
 							<Button
 								key={s}
 								variant="outline"
 								size="sm"
 								className="shrink-0"
-								onClick={() => send(s)}
+								onClick={() => void send(s)}
 							>
 								{s}
 							</Button>
@@ -233,19 +237,31 @@ export function Chat() {
 					</div>
 				)}
 
+				{busy && (
+					<Marker role="status">
+						<MarkerIcon>
+							<LoaderCircleIcon className="animate-spin" />
+						</MarkerIcon>
+						<MarkerContent className="shimmer">working deep dive</MarkerContent>
+					</Marker>
+				)}
+
 				<form
 					ref={formRef}
 					onSubmit={(e) => {
 						e.preventDefault();
-						send(input);
+						void send(input);
 					}}
 				>
 					<InputGroup>
 						<InputGroupTextarea
 							value={input}
 							onChange={(e) => setInput(e.target.value)}
-							placeholder="Ask the assistant…"
+							placeholder={
+								running ? "Steer the assistant…" : "Ask the assistant…"
+							}
 							aria-label="Message"
+							disabled={resuming}
 							className="max-h-40 min-h-14 text-base md:text-sm"
 							onKeyDown={(e) => {
 								if (
@@ -259,49 +275,23 @@ export function Chat() {
 							}}
 						/>
 						<InputGroupAddon align="block-end" className="pt-1">
-							<DropdownMenu>
-								<DropdownMenuTrigger
-									render={
-										<InputGroupButton
-											type="button"
-											size="icon-sm"
-											variant="outline"
-											aria-label="Add context"
-										/>
-									}
-								>
-									<PlusIcon />
-								</DropdownMenuTrigger>
-								<DropdownMenuContent align="start" side="top" className="w-44">
-									<DropdownMenuItem>
-										<PaperclipIcon />
-										Add Photos & Files
-									</DropdownMenuItem>
-									<DropdownMenuSeparator />
-									<DropdownMenuItem>
-										<TelescopeIcon />
-										Deep Research
-									</DropdownMenuItem>
-									<DropdownMenuItem>
-										<GlobeIcon />
-										Web Search
-									</DropdownMenuItem>
-								</DropdownMenuContent>
-							</DropdownMenu>
 							<ModelPicker
 								model={model}
 								effort={effort}
-								onModel={setModel}
+								onModel={(m) => {
+									setModel(m);
+									setEffort(undefined); // fall back to the new model's default
+								}}
 								onEffort={setEffort}
 							/>
 							<ModePicker value={mode} onChange={setMode} />
-							{busy ? (
+							{running && !input.trim() ? (
 								<InputGroupButton
 									type="button"
 									size="icon-sm"
 									variant="default"
 									className="ml-auto"
-									onClick={() => void stop()}
+									onClick={() => void agent.cancel()}
 								>
 									<SquareIcon />
 									<span className="sr-only">Stop</span>
@@ -312,7 +302,7 @@ export function Chat() {
 									size="icon-sm"
 									variant="default"
 									className="ml-auto"
-									disabled={!input.trim()}
+									disabled={!input.trim() || resuming}
 								>
 									<ArrowUpIcon />
 									<span className="sr-only">Send</span>

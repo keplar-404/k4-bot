@@ -1,16 +1,13 @@
 "use client";
 
 import {
-	BadgeCheckIcon,
-	BellIcon,
 	ChevronsUpDownIcon,
-	CreditCardIcon,
 	LogOutIcon,
 	MonitorIcon,
 	MoonIcon,
-	SparklesIcon,
 	SunIcon,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -28,18 +25,34 @@ import {
 	SidebarMenuItem,
 	useSidebar,
 } from "@/components/ui/sidebar";
+import { authClient } from "@/lib/auth-client";
 
 export function NavUser({
 	user,
 }: {
-	user: {
-		name: string;
-		email: string;
-		avatar: string;
-	};
+	user: { name: string; email: string; image?: string | null };
 }) {
 	const { isMobile } = useSidebar();
 	const { setTheme } = useTheme();
+	const router = useRouter();
+	const initials = user.name
+		.split(" ")
+		.map((w) => w[0])
+		.join("")
+		.slice(0, 2)
+		.toUpperCase();
+	const avatar = (
+		<Avatar>
+			<AvatarImage src={user.image ?? undefined} alt={user.name} />
+			<AvatarFallback>{initials}</AvatarFallback>
+		</Avatar>
+	);
+	const who = (
+		<div className="grid flex-1 text-left text-sm leading-tight">
+			<span className="truncate font-medium">{user.name}</span>
+			<span className="truncate text-xs">{user.email}</span>
+		</div>
+	);
 	return (
 		<SidebarMenu>
 			<SidebarMenuItem>
@@ -49,14 +62,8 @@ export function NavUser({
 							<SidebarMenuButton size="lg" className="aria-expanded:bg-muted" />
 						}
 					>
-						<Avatar>
-							<AvatarImage src={user.avatar} alt={user.name} />
-							<AvatarFallback>CN</AvatarFallback>
-						</Avatar>
-						<div className="grid flex-1 text-left text-sm leading-tight">
-							<span className="truncate font-medium">{user.name}</span>
-							<span className="truncate text-xs">{user.email}</span>
-						</div>
+						{avatar}
+						{who}
 						<ChevronsUpDownIcon className="ml-auto size-4" />
 					</DropdownMenuTrigger>
 					<DropdownMenuContent
@@ -68,38 +75,10 @@ export function NavUser({
 						<DropdownMenuGroup>
 							<DropdownMenuLabel className="p-0 font-normal">
 								<div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-									<Avatar>
-										<AvatarImage src={user.avatar} alt={user.name} />
-										<AvatarFallback>CN</AvatarFallback>
-									</Avatar>
-									<div className="grid flex-1 text-left text-sm leading-tight">
-										<span className="truncate font-medium">{user.name}</span>
-										<span className="truncate text-xs">{user.email}</span>
-									</div>
+									{avatar}
+									{who}
 								</div>
 							</DropdownMenuLabel>
-						</DropdownMenuGroup>
-						<DropdownMenuSeparator />
-						<DropdownMenuGroup>
-							<DropdownMenuItem>
-								<SparklesIcon />
-								Upgrade to Pro
-							</DropdownMenuItem>
-						</DropdownMenuGroup>
-						<DropdownMenuSeparator />
-						<DropdownMenuGroup>
-							<DropdownMenuItem>
-								<BadgeCheckIcon />
-								Account
-							</DropdownMenuItem>
-							<DropdownMenuItem>
-								<CreditCardIcon />
-								Billing
-							</DropdownMenuItem>
-							<DropdownMenuItem>
-								<BellIcon />
-								Notifications
-							</DropdownMenuItem>
 						</DropdownMenuGroup>
 						<DropdownMenuSeparator />
 						<DropdownMenuGroup>
@@ -117,7 +96,13 @@ export function NavUser({
 							</DropdownMenuItem>
 						</DropdownMenuGroup>
 						<DropdownMenuSeparator />
-						<DropdownMenuItem>
+						<DropdownMenuItem
+							onClick={async () => {
+								await authClient.signOut();
+								router.push("/login");
+								router.refresh();
+							}}
+						>
 							<LogOutIcon />
 							Log out
 						</DropdownMenuItem>
