@@ -9,7 +9,7 @@ Turborepo monorepo (bun workspaces): Next.js web UI, Hono API backend, Neon Auth
 1. `apps/web` — Next.js 16 (App Router, Cache Components, React Compiler, Tailwind 4, shadcn/ui on Base UI).
    - `src/app` — `/` (Login or Dashboard button), `/login`, `/dashboard`, `/dashboard/chat`, `/dashboard/chat/[id]` (saved chat), `api/auth/[...path]` (Neon Auth proxy).
    - `src/app/dashboard/layout.tsx` — shared sidebar + header; mounts `EnsureDesktop` (calls `POST /api/me/desktop` on every dashboard load; safe to repeat, rebuilds a lost desktop).
-   - `src/components/chat` — `chat.tsx` (`useEveAgent`, creates the chat row, saves the eve session id), `messages.tsx` (reasoning rows; tool rows show the tool's input and output, desktop screenshots and the live-view link), `pickers.tsx`, `screenshot.tsx`, `chat-not-found-toast.tsx`. `src/components/chat-history.tsx` — sidebar chat list (several deletes can run at once). `src/components/settings-dialog.tsx` — Settings modal from the user menu: section list on the left, Memory on the right (read-only until Edit, then Save).
+   - `src/components/chat` — `chat.tsx` (`useEveAgent`, creates the chat row, saves the eve session id, builds the parts' start order), `messages.tsx` (one "Steps" block per turn, then the reply; see section 7), `split-turn.ts` (+ test: orders a turn's parts and splits steps from the reply), `pickers.tsx`, `screenshot.tsx`, `chat-not-found-toast.tsx`. `src/lib/chat-ui.ts` — small Zustand store for which Steps blocks and rows the user opened or closed. `src/components/chat-history.tsx` — sidebar chat list (several deletes can run at once). `src/components/settings-dialog.tsx` — Settings modal from the user menu: section list on the left, Memory on the right (read-only until Edit, then Save).
    - `src/lib` — `api.ts` (Hono RPC client, bearer token), `auth-client.ts`, `auth/server.ts`, `session.ts`, `highlighter.tsx`. `src/proxy.ts` — Neon Auth middleware (`/eve` is public; the agent checks the token).
    - `next.config.ts` — `withEve` proxies `/eve/v1/*` to `apps/ai-agent`; security headers; `/dashboard` redirects to `/dashboard/chat`.
 2. `apps/backend` — Hono on Bun, port 8787. Exports `AppType` as `backend/app` for the web RPC client.
@@ -43,9 +43,10 @@ Turborepo monorepo (bun workspaces): Next.js web UI, Hono API backend, Neon Auth
 5. Chat is live and saved: each chat is a `chat` row tied to one eve session; reopening `/dashboard/chat/[id]` resumes it. Sessions and events are stored in Postgres (workflow world) and copied to `agent_event`.
 6. Agent: model + reasoning picker, Ask/Plan/Full modes with approvals, Firecrawl web search, per-user memory the user can view and edit in Settings, per-user E2B desktop (computer tool + bash/file tools), screenshots in object storage.
 7. Security: session ownership check, per-user rate limits (backend and agent), CORS to the web origin only, security headers, frame-ancestors none.
-8. Tests: `bun run test` — `packages/shared` (auth, models, memory), `apps/ai-agent` (owner check), `apps/backend` (404/401 JSON, headers, CORS).
+8. Tests: `bun run test` — `packages/shared` (auth, models, memory), `apps/ai-agent` (owner check), `apps/backend` (404/401 JSON, headers, CORS). Web: `cd apps/web && bun test src/components/chat` (part ordering; `*.test.ts` is excluded from the web `tsconfig`, which has no Bun types).
 9. Biome at the root (`bunx biome check --write .`).
 10. Browser-tested end to end (2026-11-15): sign-in, desktop setup, chat + resume after reload, history, delete chat, web search, desktop (open, click, screenshot, live view), bash, Ask approvals, Plan (no tools run), Full (no prompts), memory across chats.
+11. Chat UI rework (2026-11-16, browser-checked by the user): a Steps block per turn (shimmer while working, folds to "Steps N · Xs" when done), placeholder row the moment a message is sent, parts in the order the model produced them (also for parallel tool calls), bottom-stacking scroll. Details in section 7.
 
 ## 3. Not done yet
 
@@ -57,6 +58,9 @@ Turborepo monorepo (bun workspaces): Next.js web UI, Hono API backend, Neon Auth
 6. The default `openrouter/free` router is unreliable: replies can be filtered ("The model provider filtered this response") or rate-limited upstream. Errors show above the prompt box; pick another model to retry.
 7. Tool input schemas must avoid `z.tuple` (array-form `items` is rejected by some OpenRouter providers); see `agent/tools/computer.ts`.
 8. `ensureUserDesktop` holds a pooled DB connection while E2B creates a desktop (seconds). Fine at current scale; move the E2B call out of the transaction if many users sign in at once.
+9. Parallel `computer` calls would drive the one desktop at the same time; nothing in the agent stops it yet (add a line to `instructions.md` or serialize the tool if it happens).
+10. `startOrder(agent.events)` scans every event on each render. Fine for normal chats; cache it by event count if very long chats get slow.
+11. Markdown images in replies show "[Image blocked]" (Streamdown's URL allowlist); screenshots render through the `Screenshot` component instead.
 
 ## 4. Run
 
@@ -91,3 +95,19 @@ Use these on demand, not by default.
 8. Global (`~/.claude/skills`): Firecrawl set, Omarchy, Clerk, others.
 
 **Rule: use any of the tools or skills above only when the task calls for it.**
+
+## 7. Chat UI: how a turn renders
+
+**State.** The conversation lives only in eve's `useEveAgent` store: it folds the NDJSON event stream from `/eve/v1/*` into `messages` (each with `parts`) and `view`. Components only project it; nothing copies messages into another store. Zustand (`lib/chat-ui.ts`) holds only the user's open/closed choice per Steps block (`steps:<messageId>`), thinking row and tool row (`t:<callId>`), so it survives remounts. Everything else is local `useState`.
+
+**Events → UI.** `delivery.consumed` turns the optimistic user bubble into a sent one. `turn.started` makes `activeTurn(view)` defined (the composer shows Stop). `content.delta` streams text/reasoning parts (`state: "streaming"`), `content.completed` finishes them. `call.input` → tool part `streaming` with `inputText`; `call.requested` → validated `input`; `call.settled` → `output`/`error`. `interaction.opened` → approval/question buttons (`agent.respond`). `turn.settled` → turn done, Steps folds. Model, usage and context events are not rendered.
+
+**One turn on screen** (`messages.tsx`):
+- `PendingAssistant` shows at once after send, while the last message is still the user's and the agent is busy, so there is no blank gap before the first event.
+- `Steps`: logo + "Deep diving" (shimmer) while running, open; "Steps N · Xs" with a chevron when done, folded. A user click overrides the auto open/close. Stays open while an approval is waiting. One `sr-only` status line instead of announcing every update.
+- Rows inside: thinking (`ReasoningRow`, max 12rem, auto-follows new text unless scrolled up, bottom fade via `data-more` + `mask-image`, no scrollbar), tool rows (icon per tool, spinner while running, one-line gist: query/command/typed text/URL; closed unless asking for approval, so parallel calls don't make panels jump), narration (small italic line with a speech icon, trimmed).
+- The reply is the text after the last non-text part, rendered with Streamdown; copy/vote buttons after the turn ends.
+
+**Part order** (`split-turn.ts`). eve sorts a turn's parts by when each was *recorded*. Thinking is recorded when it ends, after the calls that followed it, and streaming parts sort last, so parallel tool calls showed above the thinking that led to them. `startOrder(agent.events)` maps each part id / call id to when it first appeared on the stream (first `content.delta`/`content.completed`, or first `call.input`/`call.requested`). eve stores these progress lines and replays them on reload, so the order survives a refresh. `splitTurn` sorts by `stepIndex`, then by that start order. Fallback when a step has parts the stream doesn't name (imported history): thinking, narration, then calls. A step uses one ordering or the other, never a mix. Also dropped: hidden tools, file parts, empty (redacted) reasoning parts.
+
+**Scrolling.** shadcn `MessageScroller` with `autoScroll` and no `scrollAnchor`: the chat stacks from the bottom (old turns move up, the new one appears above the prompt bar) and follows the stream until the user scrolls up; the ↓ button resumes following. `scrollAnchor` was removed because it pins each new user message to the top and re-anchors on every resize, which made parallel tool rows bump the view.
