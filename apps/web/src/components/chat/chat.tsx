@@ -3,20 +3,17 @@
 import { defaultModelId, type Effort } from "@repo/shared/models";
 import { activeTurn } from "eve/events";
 import { useEveAgent } from "eve/react";
-import {
-	ArrowUpIcon,
-	MessageCircleDashedIcon,
-	SquareIcon,
-	SquarePenIcon,
-} from "lucide-react";
-import { useRef, useState } from "react";
+import { ArrowUpIcon, MessageCircleDashedIcon, SquareIcon } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { MessagesSkeleton } from "@/components/chat/chat-skeleton";
 import {
 	AssistantMessage,
 	PendingAssistant,
+	RUNNING,
 	UserMessage,
 } from "@/components/chat/messages";
+import { OpenRequests } from "@/components/chat/open-requests";
 import {
 	defaultMode,
 	ModelPicker,
@@ -45,17 +42,12 @@ import {
 	MessageScrollerProvider,
 	MessageScrollerViewport,
 } from "@/components/ui/message-scroller";
-import {
-	Tooltip,
-	TooltipContent,
-	TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { api, notifyChatsChanged } from "@/lib/api";
 import { getToken } from "@/lib/auth-client";
+import { setMemoryBusy } from "@/lib/chat-ui";
 
 const SUGGESTIONS = [
 	"Search the web for this week's top AI news.",
-	"Open Firefox on the desktop and go to news.ycombinator.com.",
 	"What can you do?",
 ];
 
@@ -129,6 +121,18 @@ export function Chat({
 	const order = startOrder(agent.events);
 	const running = activeTurn(agent.view) !== undefined;
 	const busy = agent.status === "busy" || running;
+	const savingMemory = agent.messages.some((m) =>
+		m.parts.some(
+			(p) =>
+				p.type === "tool" &&
+				p.name.startsWith("profile__") &&
+				RUNNING.has(p.state),
+		),
+	);
+	useEffect(() => {
+		setMemoryBusy(savingMemory);
+		return () => setMemoryBusy(false);
+	}, [savingMemory]);
 
 	async function send(text: string) {
 		const t = text.trim();
@@ -150,41 +154,9 @@ export function Chat({
 		});
 	}
 
-	function newChat() {
-		agent.newSession();
-		chatIdRef.current = undefined;
-		savedSessionRef.current = undefined;
-		setUrl("/dashboard/chat");
-	}
-
 	return (
 		<MessageScrollerProvider autoScroll>
 			<div className="flex h-[calc(100dvh-4rem)] min-h-0 w-full flex-col gap-2 px-3 pb-3 *:mx-auto *:w-full *:max-w-4xl sm:px-6 sm:pb-4">
-				<div className="flex items-center justify-between gap-2">
-					<div className="min-w-0">
-						<div className="truncate font-medium">AI Assistant</div>
-						<div className="truncate text-xs text-muted-foreground">
-							Web search, Linux desktop and a sandbox shell
-						</div>
-					</div>
-					<Tooltip>
-						<TooltipTrigger
-							render={
-								<Button
-									variant="outline"
-									size="icon"
-									aria-label="New chat"
-									disabled={busy}
-									onClick={newChat}
-								/>
-							}
-						>
-							<SquarePenIcon />
-						</TooltipTrigger>
-						<TooltipContent>New chat</TooltipContent>
-					</Tooltip>
-				</div>
-
 				{/* full width so the empty side space scrolls the chat too */}
 				<div className="min-h-0 flex-1 max-w-none!">
 					{resuming && agent.messages.length === 0 ? (
@@ -217,7 +189,6 @@ export function Chat({
 													message={m}
 													streaming={m.metadata?.status === "streaming"}
 													order={order}
-													onAnswer={(answers) => void agent.respond(answers)}
 												/>
 											)}
 										</MessageScrollerItem>
@@ -255,6 +226,21 @@ export function Chat({
 					<p role="alert" className="text-sm text-destructive">
 						{agent.error.message}
 					</p>
+				)}
+
+				{/* What the agent is waiting on (eve human-in-the-loop), above the prompt bar. */}
+				{/* Only once the stream has caught up: eve refuses answers while it resumes. */}
+				{!resuming && (
+					<OpenRequests
+						view={agent.view}
+						onAnswer={(answers) =>
+							agent
+								.respond(answers)
+								.catch(() =>
+									toast.error("Could not send your answer. Try again."),
+								)
+						}
+					/>
 				)}
 
 				<form

@@ -1,14 +1,15 @@
 // eve docs, memory/custom-provider: the user's memory note (@repo/shared/memory),
 // keyed by the verified user id, so the user can also edit it in Settings > Memory.
 import {
-	appendMemory,
+	MAX_MEMORY_CHARS,
 	memoryFacts,
 	readMemory,
-	removeMemoryFact,
+	replaceMemory,
 } from "@repo/shared/memory";
 import { defineMemory, defineMemoryProvider } from "eve/memory";
 import { byPrincipal } from "eve/memory/scope";
 import { defineTool } from "eve/tools";
+import { always } from "eve/tools/approval";
 import { z } from "zod";
 import { appUserId, db } from "../lib/db";
 
@@ -29,7 +30,7 @@ const profileMemory = defineMemoryProvider({
 					{
 						id: "profile",
 						content: facts.length
-							? `What you remember about the user (numbered; remove by number):\n${facts.map((f, i) => `${i + 1}. ${f}`).join("\n")}`
+							? `What you remember about the user:\n${facts.map((f) => `- ${f}`).join("\n")}`
 							: "You have nothing saved about the user yet.",
 					},
 				],
@@ -40,24 +41,15 @@ const profileMemory = defineMemoryProvider({
 		const userId = userOf(ctx);
 		if (!userId) return null;
 		return {
-			save: defineTool({
+			// The only memory write: rewrites everything, so the user approves every call (eve docs: Human
+			// in the Loop > Approvals). A tricked model can't wipe memory unseen.
+			update: defineTool({
 				description:
-					"Save one lasting fact or preference about the user (one short sentence).",
-				inputSchema: z.object({ fact: z.string().trim().min(1).max(500) }),
-				async execute({ fact }) {
-					if (!(await appendMemory(db(), userId, fact)))
-						throw new Error(
-							"Memory is full. Remove outdated facts first, or ask the user to edit it in Settings.",
-						);
-					return { saved: fact };
-				},
-			}),
-			remove: defineTool({
-				description:
-					"Remove one saved fact about the user by its number in the recalled list.",
-				inputSchema: z.object({ number: z.number().int().min(1) }),
-				async execute({ number }) {
-					return { removed: await removeMemoryFact(db(), userId, number) };
+					"Replace the whole memory note with new text, one fact per line. Use it to correct, merge or remove facts. The user must approve each call.",
+				inputSchema: z.object({ content: z.string().max(MAX_MEMORY_CHARS) }),
+				approval: always(),
+				async execute({ content }) {
+					return { saved: await replaceMemory(db(), userId, content) };
 				},
 			}),
 		};

@@ -7,8 +7,6 @@
 	},
 	"exports": {
 		"./models": "./src/models.ts",
-		"./desktop": "./src/desktop.ts",
-		"./storage": "./src/storage.ts",
 		"./auth": "./src/auth.ts",
 		"./schema": "./src/schema.ts",
 		"./db": "./src/db.ts",
@@ -17,9 +15,6 @@
 		"./tools": "./src/tools.ts"
 	},
 	"dependencies": {
-		"@aws-sdk/client-s3": "^3.1000.0",
-		"@aws-sdk/s3-request-presigner": "^3.1000.0",
-		"@e2b/desktop": "^2.5.0",
 		"drizzle-orm": "^0.45.4",
 		"jose": "^6.2.17"
 	}

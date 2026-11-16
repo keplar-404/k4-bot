@@ -1,7 +1,9 @@
 import { expect, test } from "bun:test";
 
 // Importing the app needs these; nothing here connects to a database.
-process.env.DATABASE_URL ??= "postgres://u:p@localhost/db";
+// Same URL as routes.test.ts: test files share one module cache, and src/db reads it once.
+process.env.DATABASE_URL =
+	process.env.TEST_DATABASE_URL ?? "postgres://u:p@localhost/db";
 const { default: server } = await import("../src/index");
 const call = (path: string, init?: RequestInit) =>
 	server.fetch(new Request(`http://api.test${path}`, init));
@@ -23,6 +25,15 @@ test("memory is only for the signed-in user", async () => {
 		body: JSON.stringify({ content: "x" }),
 	});
 	expect(put.status).toBe(401);
+});
+
+test("an oversized body is refused before auth", async () => {
+	const res = await call("/api/me/memory", {
+		method: "PUT",
+		headers: { "content-type": "application/json" },
+		body: "x".repeat(65 * 1024),
+	});
+	expect(res.status).toBe(413);
 });
 
 test("every response has a request id and security headers", async () => {

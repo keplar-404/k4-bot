@@ -36,6 +36,8 @@ export async function userFromBearer(
 			algorithms: ["EdDSA"],
 			issuer,
 			audience: issuer,
+			// A token without an expiry or subject would otherwise never expire.
+			requiredClaims: ["exp", "sub"],
 		});
 		if (typeof payload.sub !== "string") return null;
 		return { id: payload.sub, email: String(payload.email ?? "") };

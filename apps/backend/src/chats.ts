@@ -1,6 +1,5 @@
 import { zValidator } from "@hono/zod-validator";
 import { agentEvent, chat } from "@repo/shared/schema";
-import { screenshotUrl } from "@repo/shared/storage";
 import { and, desc, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
@@ -40,19 +39,6 @@ export const chats = new Hono<Env>()
 				})
 				.returning({ id: chat.id });
 			return c.json({ id: row.id }, 201);
-		},
-	)
-	// A short-lived link to one of the user's own desktop screenshots. The first
-	// segment of the key is the owner (see newScreenshotKey).
-	.get(
-		"/screenshot",
-		zValidator("query", z.object({ key: z.string().max(300) })),
-		async (c) => {
-			const { key } = c.req.valid("query");
-			if (!key.startsWith(`${c.get("user").id}/`)) {
-				return c.json({ error: "Not found" }, 404);
-			}
-			return c.json({ url: await screenshotUrl(key) }, 200);
 		},
 	)
 	.get("/:id", chatId, async (c) => {

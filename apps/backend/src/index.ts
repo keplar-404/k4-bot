@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
 import { logger } from "hono/logger";
@@ -17,6 +18,8 @@ const app = new Hono()
 	.use(requestId())
 	.use(logger())
 	.use(secureHeaders())
+	// The largest real body is an 8,000-character memory note; refuse anything far bigger.
+	.use(bodyLimit({ maxSize: 64 * 1024 }))
 	// dev: any localhost origin; prod: only WEB_URL (WEB_URL)
 	.use(
 		"*",

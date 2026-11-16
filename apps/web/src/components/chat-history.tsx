@@ -23,6 +23,7 @@ import {
 	SidebarMenuAction,
 	SidebarMenuButton,
 	SidebarMenuItem,
+	SidebarMenuSkeleton,
 } from "@/components/ui/sidebar";
 import { api, CHATS_CHANGED } from "@/lib/api";
 
@@ -31,6 +32,7 @@ type Chat = { id: string; title: string };
 // The signed-in user's chats (the backend filters by user), newest first.
 export function ChatHistory() {
 	const [chats, setChats] = useState<Chat[]>([]);
+	const [loading, setLoading] = useState(true);
 	// A set, so starting a second delete keeps the first one's spinner.
 	const [deleting, setDeleting] = useState<ReadonlySet<string>>(new Set());
 	const pathname = usePathname();
@@ -40,6 +42,7 @@ export function ChatHistory() {
 		const load = async () => {
 			const res = await api.api.chats.$get();
 			if (res.ok) setChats((await res.json()).chats);
+			setLoading(false);
 		};
 		void load();
 		window.addEventListener(CHATS_CHANGED, load);
@@ -77,6 +80,12 @@ export function ChatHistory() {
 			</SidebarMenu>
 			<SidebarGroupLabel>History</SidebarGroupLabel>
 			<SidebarMenu>
+				{loading &&
+					[0, 1, 2, 3, 4].map((i) => (
+						<SidebarMenuItem key={i}>
+							<SidebarMenuSkeleton showIcon />
+						</SidebarMenuItem>
+					))}
 				{chats.map((chat) => (
 					<SidebarMenuItem key={chat.id}>
 						<SidebarMenuButton

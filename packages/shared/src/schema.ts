@@ -60,13 +60,6 @@ export const agentMemory = pgTable("agent_memory", {
 		.notNull(),
 });
 
-// Each user's own Linux desktop (E2B), created at sign-up and kept paused.
-export const userDesktop = pgTable("user_desktop", {
-	userId: text("user_id").primaryKey(),
-	sandboxId: text("sandbox_id").notNull(),
-	createdAt: timestamp("created_at").defaultNow().notNull(),
-});
-
 // Per-user request counters (see rate-limit.ts in this package).
 export const rateLimit = pgTable("rate_limit", {
 	id: text("id").primaryKey(),

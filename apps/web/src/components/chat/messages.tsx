@@ -1,25 +1,21 @@
 "use client";
 
-import type { DesktopOutput, SearchOutput } from "@repo/shared/tools";
-import type { EveMessage, EveToolPart, UseEveAgentReturn } from "eve/react";
+import type { SearchOutput } from "@repo/shared/tools";
+import type { EveMessage, EveToolPart } from "eve/react";
 import {
 	BrainIcon,
 	CheckIcon,
 	CopyIcon,
-	ExternalLinkIcon,
 	GlobeIcon,
 	LoaderCircleIcon,
 	MessageSquareTextIcon,
-	MonitorIcon,
 	SparklesIcon,
-	TerminalIcon,
 	ThumbsDownIcon,
 	ThumbsUpIcon,
 	WrenchIcon,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Streamdown } from "streamdown";
-import { Screenshot } from "@/components/chat/screenshot";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
 import { Button } from "@/components/ui/button";
 import { CodeBlock, CodeBlockContent } from "@/components/ui/code-block";
@@ -46,8 +42,6 @@ import {
 import { useManualOpen } from "@/lib/chat-ui";
 import { type StartOrder, type Step, splitTurn } from "./split-turn";
 
-type Answers = Parameters<UseEveAgentReturn["respond"]>[0];
-
 const textOf = (m: EveMessage) =>
 	m.parts.flatMap((p) => (p.type === "text" ? [p.text] : [])).join("");
 
@@ -72,12 +66,10 @@ export function AssistantMessage({
 	message,
 	streaming,
 	order,
-	onAnswer,
 }: {
 	message: EveMessage;
 	streaming: boolean;
 	order?: StartOrder;
-	onAnswer: (answers: Answers) => void;
 }) {
 	const { steps, reply } = splitTurn(message.parts, order);
 	const running = streaming || steps.some(isRunning);
@@ -85,12 +77,7 @@ export function AssistantMessage({
 		<Message>
 			<MessageContent className="gap-3">
 				{(running || steps.length > 0) && (
-					<Steps
-						id={message.id}
-						steps={steps}
-						running={running}
-						onAnswer={onAnswer}
-					/>
+					<Steps id={message.id} steps={steps} running={running} />
 				)}
 				{reply && (
 					<Streamdown
@@ -116,13 +103,13 @@ export function PendingAssistant() {
 	return (
 		<Message>
 			<MessageContent>
-				<Steps id="pending" steps={[]} running onAnswer={() => {}} />
+				<Steps id="pending" steps={[]} running />
 			</MessageContent>
 		</Message>
 	);
 }
 
-const RUNNING = new Set([
+export const RUNNING = new Set([
 	"streaming",
 	"requested",
 	"approval",
@@ -167,12 +154,10 @@ function Steps({
 	id,
 	steps,
 	running,
-	onAnswer,
 }: {
 	id: string;
 	steps: Step[];
 	running: boolean;
-	onAnswer: (a: Answers) => void;
 }) {
 	// Open while the agent works, folded when it finishes. Once the person
 	// toggles it, their choice wins.
@@ -214,14 +199,8 @@ function Steps({
 								running={p.state === "streaming"}
 							/>
 						) : p.type === "tool" ? (
-							<ToolRow key={p.callId} part={p} onAnswer={onAnswer} />
-						) : p.type === "interaction" ? (
-							<Prompt
-								key={p.interactionId}
-								interaction={p}
-								onAnswer={onAnswer}
-							/>
-						) : (
+							<ToolRow key={p.callId} part={p} />
+						) : p.type === "interaction" ? null : (
 							p.text.trim() && (
 								<div
 									key={p.id ?? `t${i}`}
@@ -310,8 +289,6 @@ function FadeScroll({
 	);
 }
 
-type ShellOutput = { stdout?: string; stderr?: string };
-
 // The one-line gist next to a tool's title: the query, command or action.
 function gist(part: EveToolPart) {
 	const i = (part.input ?? {}) as Record<string, unknown>;
@@ -319,29 +296,17 @@ function gist(part: EveToolPart) {
 	return typeof v === "string" ? v : undefined;
 }
 
-function ToolRow({
-	part,
-	onAnswer,
-}: {
-	part: EveToolPart;
-	onAnswer: (a: Answers) => void;
-}) {
+function ToolRow({ part }: { part: EveToolPart }) {
 	const [manual, setManual] = useManualOpen(`t:${part.callId}`);
 	const running = RUNNING.has(part.state);
 	const failed = part.state === "failed" || part.state === "rejected";
 	const Icon =
 		part.name === "web_search" || part.name === "web_fetch"
 			? GlobeIcon
-			: part.name === "computer"
-				? MonitorIcon
-				: part.name === "bash"
-					? TerminalIcon
-					: WrenchIcon;
-	const asking =
-		part.interaction?.status === "open" ? part.interaction : undefined;
+			: WrenchIcon;
 	const g = gist(part);
 	return (
-		<TraceCollapsible open={manual ?? !!asking} onOpenChange={setManual}>
+		<TraceCollapsible open={manual ?? false} onOpenChange={setManual}>
 			<TraceCollapsibleTrigger>
 				<TraceLine status={running ? "running" : failed ? "error" : undefined}>
 					<TraceIcon>
@@ -352,7 +317,6 @@ function ToolRow({
 				</TraceLine>
 			</TraceCollapsibleTrigger>
 			<TraceCollapsibleContent className="flex flex-col gap-2">
-				{asking && <Prompt interaction={asking} onAnswer={onAnswer} />}
 				{part.error && <p className="text-destructive">{part.error.message}</p>}
 				<ToolInput part={part} />
 				<ToolDetail part={part} />
@@ -361,13 +325,12 @@ function ToolRow({
 	);
 }
 
-// What the model sent the tool. bash shows its command in the terminal instead.
+// What the model sent the tool.
 function ToolInput({ part }: { part: EveToolPart }) {
 	if (part.state === "streaming" && part.inputText)
 		return <Terminal text={part.inputText} />;
 	const input = part.input as Record<string, unknown> | undefined;
-	if (part.name === "bash" || !input || Object.keys(input).length === 0)
-		return null;
+	if (!input || Object.keys(input).length === 0) return null;
 	return <Terminal text={JSON.stringify(input, null, 2)} />;
 }
 
@@ -394,36 +357,6 @@ function ToolDetail({ part }: { part: EveToolPart }) {
 			</ul>
 		);
 	}
-	if (part.name === "computer") {
-		const d = out as DesktopOutput;
-		return (
-			<div className="flex flex-col gap-2">
-				{d.stdout !== undefined && (
-					<Terminal text={[d.stdout, d.stderr].filter(Boolean).join("\n")} />
-				)}
-				{d.screenshotKey && <Screenshot k={d.screenshotKey} />}
-				{d.streamUrl && (
-					<a
-						href={d.streamUrl}
-						target="_blank"
-						rel="noreferrer"
-						className="inline-flex items-center gap-1 text-xs underline-offset-2 hover:underline"
-					>
-						Watch the desktop live <ExternalLinkIcon className="size-3" />
-					</a>
-				)}
-			</div>
-		);
-	}
-	if (part.name === "bash") {
-		const s = out as ShellOutput;
-		const cmd = (part.input as { command?: string } | undefined)?.command;
-		return (
-			<Terminal
-				text={`$ ${cmd ?? ""}\n${[s.stdout, s.stderr].filter(Boolean).join("\n")}`}
-			/>
-		);
-	}
 	return (
 		<Terminal
 			text={typeof out === "string" ? out : JSON.stringify(out, null, 2)}
@@ -438,53 +371,6 @@ function Terminal({ text }: { text: string }) {
 				{text || "(no output)"}
 			</CodeBlockContent>
 		</CodeBlock>
-	);
-}
-
-// Approvals and questions from the agent (eve human-in-the-loop).
-function Prompt({
-	interaction,
-	onAnswer,
-}: {
-	interaction: NonNullable<EveToolPart["interaction"]>;
-	onAnswer: (a: Answers) => void;
-}) {
-	const { interactionId, request } = interaction;
-	if (interaction.status !== "open") return null;
-	if (request.kind === "sign-in") {
-		const s = request.signIn;
-		return (
-			<p>
-				{s?.instructions ?? request.prompt}{" "}
-				{s?.url && (
-					<a
-						href={s.url}
-						target="_blank"
-						rel="noreferrer"
-						className="underline"
-					>
-						Sign in
-					</a>
-				)}
-			</p>
-		);
-	}
-	return (
-		<div className="flex flex-col gap-2 rounded-md border p-2">
-			<p className="text-foreground">{request.prompt}</p>
-			<div className="flex flex-wrap gap-2">
-				{request.options?.map((o) => (
-					<Button
-						key={o.id}
-						size="sm"
-						variant="outline"
-						onClick={() => onAnswer([{ interactionId, optionId: o.id }])}
-					>
-						{o.label}
-					</Button>
-				))}
-			</div>
-		</div>
 	);
 }
 

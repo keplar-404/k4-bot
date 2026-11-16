@@ -1,0 +1,131 @@
+// Chat, memory and rate-limit routes against a real Postgres. Writes rows only for
+// random test users and deletes them afterwards. Skipped unless TEST_DATABASE_URL is
+// set; point it at a throwaway Neon branch, never production.
+import { afterAll, describe, expect, test } from "bun:test";
+import { exportJWK, generateKeyPair, SignJWT } from "jose";
+
+const dbUrl = process.env.TEST_DATABASE_URL;
+
+// A local stand-in for Neon Auth's public keys, so real signed tokens pass requireUser.
+const { publicKey, privateKey } = await generateKeyPair("EdDSA");
+const jwk = { ...(await exportJWK(publicKey)), alg: "EdDSA", kid: "test" };
+const keys = Bun.serve({
+	port: 0,
+	fetch: () => Response.json({ keys: [jwk] }),
+});
+const issuer = `http://localhost:${keys.port}`;
+
+const users = [crypto.randomUUID(), crypto.randomUUID()];
+const tokenFor = (sub: string) =>
+	new SignJWT({ email: "t@example.com" })
+		.setProtectedHeader({ alg: "EdDSA", kid: "test" })
+		.setSubject(sub)
+		.setIssuer(issuer)
+		.setAudience(issuer)
+		.setExpirationTime("5m")
+		.sign(privateKey);
+
+describe.skipIf(!dbUrl)("routes (TEST_DATABASE_URL)", async () => {
+	process.env.DATABASE_URL = dbUrl;
+	process.env.NEON_AUTH_JWKS_URL = `${issuer}/jwks`;
+	const { default: server } = await import("../src/index");
+	const { db, pool } = await import("../src/db");
+	const { overLimit } = await import("@repo/shared/rate-limit");
+	const { agentMemory, chat, rateLimit } = await import("@repo/shared/schema");
+	const { inArray, like } = await import("drizzle-orm");
+
+	const as = async (user: string, path: string, init: RequestInit = {}) =>
+		server.fetch(
+			new Request(`http://api.test${path}`, {
+				...init,
+				headers: {
+					"content-type": "application/json",
+					authorization: `Bearer ${await tokenFor(user)}`,
+				},
+			}),
+		);
+
+	afterAll(async () => {
+		await db.delete(chat).where(inArray(chat.userId, users));
+		await db.delete(agentMemory).where(inArray(agentMemory.userId, users));
+		for (const u of users)
+			await db.delete(rateLimit).where(like(rateLimit.key, `%${u}%`));
+		await pool.end();
+		keys.stop();
+	});
+
+	test("a chat can be created, listed, saved, read and deleted", async () => {
+		const [me] = users;
+		const created = await as(me, "/api/chats", {
+			method: "POST",
+			body: JSON.stringify({ title: "  Hello  " }),
+		});
+		expect(created.status).toBe(201);
+		const { id } = await created.json();
+
+		const list = await (await as(me, "/api/chats")).json();
+		expect(list.chats.map((c: { id: string }) => c.id)).toContain(id);
+
+		const saved = await as(me, `/api/chats/${id}`, {
+			method: "PATCH",
+			body: JSON.stringify({ eveSessionId: `sess-${id}` }),
+		});
+		expect(saved.status).toBe(200);
+		const got = await (await as(me, `/api/chats/${id}`)).json();
+		expect(got.chat).toMatchObject({
+			title: "Hello",
+			eveSessionId: `sess-${id}`,
+		});
+
+		// No eve session is running for this id; delete still removes the chat.
+		expect(
+			(await as(me, `/api/chats/${id}`, { method: "DELETE" })).status,
+		).toBe(200);
+		expect((await as(me, `/api/chats/${id}`)).status).toBe(404);
+	});
+
+	test("another user's chat is not found, and bad input is refused", async () => {
+		const [me, other] = users;
+		const { id } = await (
+			await as(me, "/api/chats", {
+				method: "POST",
+				body: JSON.stringify({ title: "mine" }),
+			})
+		).json();
+		expect((await as(other, `/api/chats/${id}`)).status).toBe(404);
+		expect(
+			(await as(other, `/api/chats/${id}`, { method: "DELETE" })).status,
+		).toBe(404);
+		expect((await as(me, "/api/chats/not-a-uuid")).status).toBe(404);
+		const empty = await as(me, "/api/chats", {
+			method: "POST",
+			body: JSON.stringify({ title: "   " }),
+		});
+		expect(empty.status).toBe(400);
+	});
+
+	test("memory is saved cleaned, per user, and capped", async () => {
+		const [me, other] = users;
+		const put = await as(me, "/api/me/memory", {
+			method: "PUT",
+			body: JSON.stringify({ content: " likes tea \n\n  lives in Oslo " }),
+		});
+		expect(await put.json()).toEqual({ content: "likes tea\nlives in Oslo" });
+		const mine = await (await as(me, "/api/me/memory")).json();
+		expect(mine.content).toBe("likes tea\nlives in Oslo");
+		expect((await (await as(other, "/api/me/memory")).json()).content).toBe("");
+		const big = await as(me, "/api/me/memory", {
+			method: "PUT",
+			body: JSON.stringify({ content: "x".repeat(mine.max + 1) }),
+		});
+		expect(big.status).toBe(400);
+	});
+
+	test("the rate limit counts per key and refuses over the max", async () => {
+		const key = `test:${users[0]}`;
+		expect(await overLimit(db, key, 2, 60_000)).toBe(false);
+		expect(await overLimit(db, key, 2, 60_000)).toBe(false);
+		expect(await overLimit(db, key, 2, 60_000)).toBe(true);
+		expect(await overLimit(db, `test:${users[1]}`, 2, 60_000)).toBe(false);
+	});
+});
