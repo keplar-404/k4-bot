@@ -5,7 +5,6 @@ import { activeTurn } from "eve/events";
 import { useEveAgent } from "eve/react";
 import {
 	ArrowUpIcon,
-	LoaderCircleIcon,
 	MessageCircleDashedIcon,
 	SquareIcon,
 	SquarePenIcon,
@@ -13,7 +12,11 @@ import {
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { MessagesSkeleton } from "@/components/chat/chat-skeleton";
-import { AssistantMessage, UserMessage } from "@/components/chat/messages";
+import {
+	AssistantMessage,
+	PendingAssistant,
+	UserMessage,
+} from "@/components/chat/messages";
 import {
 	defaultMode,
 	ModelPicker,
@@ -33,7 +36,6 @@ import {
 	InputGroupButton,
 	InputGroupTextarea,
 } from "@/components/ui/input-group";
-import { Marker, MarkerContent, MarkerIcon } from "@/components/ui/marker";
 import {
 	MessageScroller,
 	MessageScrollerButton,
@@ -220,6 +222,11 @@ export function Chat({
 											)}
 										</MessageScrollerItem>
 									))}
+									{busy && agent.messages.at(-1)?.role === "user" && (
+										<MessageScrollerItem messageId="pending">
+											<PendingAssistant />
+										</MessageScrollerItem>
+									)}
 								</MessageScrollerContent>
 							</MessageScrollerViewport>
 							<MessageScrollerButton />
@@ -241,15 +248,6 @@ export function Chat({
 							</Button>
 						))}
 					</div>
-				)}
-
-				{busy && (
-					<Marker role="status">
-						<MarkerIcon>
-							<LoaderCircleIcon className="animate-spin" />
-						</MarkerIcon>
-						<MarkerContent className="shimmer">Working…</MarkerContent>
-					</Marker>
 				)}
 
 				{/* Next to the input, under the turn that failed, so it reads as that turn's result. */}
