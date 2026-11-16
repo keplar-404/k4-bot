@@ -22,6 +22,7 @@ import {
 	ModelPicker,
 	ModePicker,
 } from "@/components/chat/pickers";
+import { startOrder } from "@/components/chat/split-turn";
 import { Button } from "@/components/ui/button";
 import {
 	Empty,
@@ -124,6 +125,8 @@ export function Chat({
 	const formRef = useRef<HTMLFormElement>(null);
 
 	const resuming = agent.status === "resuming";
+	// Real start order of every part, so parallel steps render as produced.
+	const order = startOrder(agent.events);
 	const running = activeTurn(agent.view) !== undefined;
 	const busy = agent.status === "busy" || running;
 
@@ -206,17 +209,14 @@ export function Chat({
 									className="mx-auto max-w-4xl gap-6"
 								>
 									{agent.messages.map((m) => (
-										<MessageScrollerItem
-											key={m.id}
-											messageId={m.id}
-											scrollAnchor={m.role === "user"}
-										>
+										<MessageScrollerItem key={m.id} messageId={m.id}>
 											{m.role === "user" ? (
 												<UserMessage message={m} />
 											) : (
 												<AssistantMessage
 													message={m}
 													streaming={m.metadata?.status === "streaming"}
+													order={order}
 													onAnswer={(answers) => void agent.respond(answers)}
 												/>
 											)}

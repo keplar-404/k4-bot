@@ -1,12 +1,7 @@
 "use client";
 
 import type { DesktopOutput, SearchOutput } from "@repo/shared/tools";
-import type {
-	EveMessage,
-	EveMessagePart,
-	EveToolPart,
-	UseEveAgentReturn,
-} from "eve/react";
+import type { EveMessage, EveToolPart, UseEveAgentReturn } from "eve/react";
 import {
 	BrainIcon,
 	CheckIcon,
@@ -14,6 +9,7 @@ import {
 	ExternalLinkIcon,
 	GlobeIcon,
 	LoaderCircleIcon,
+	MessageSquareTextIcon,
 	MonitorIcon,
 	SparklesIcon,
 	TerminalIcon,
@@ -48,6 +44,7 @@ import {
 	TraceTitle,
 } from "@/components/ui/trace";
 import { useManualOpen } from "@/lib/chat-ui";
+import { type StartOrder, type Step, splitTurn } from "./split-turn";
 
 type Answers = Parameters<UseEveAgentReturn["respond"]>[0];
 
@@ -74,13 +71,15 @@ export function UserMessage({ message }: { message: EveMessage }) {
 export function AssistantMessage({
 	message,
 	streaming,
+	order,
 	onAnswer,
 }: {
 	message: EveMessage;
 	streaming: boolean;
+	order?: StartOrder;
 	onAnswer: (answers: Answers) => void;
 }) {
-	const { steps, reply } = splitTurn(message.parts);
+	const { steps, reply } = splitTurn(message.parts, order);
 	const running = streaming || steps.some(isRunning);
 	return (
 		<Message>
@@ -121,24 +120,6 @@ export function PendingAssistant() {
 			</MessageContent>
 		</Message>
 	);
-}
-
-type Step = Exclude<EveMessagePart, { type: "file" }>;
-
-// Everything up to the last non-text part is "steps" (text in there is the
-// agent narrating between calls). The text after it is the final reply.
-function splitTurn(parts: readonly EveMessagePart[]) {
-	const visible = parts.filter(
-		(p): p is Step => p.type !== "file" && !(p.type === "tool" && p.hidden),
-	);
-	const last = visible.findLastIndex((p) => p.type !== "text");
-	return {
-		steps: visible.slice(0, last + 1),
-		reply: visible
-			.slice(last + 1)
-			.flatMap((p) => (p.type === "text" ? [p.text] : []))
-			.join(""),
-	};
 }
 
 const RUNNING = new Set([
@@ -241,9 +222,17 @@ function Steps({
 								onAnswer={onAnswer}
 							/>
 						) : (
-							<p key={p.id ?? `t${i}`} className="text-sm whitespace-pre-wrap">
-								{p.text}
-							</p>
+							p.text.trim() && (
+								<div
+									key={p.id ?? `t${i}`}
+									className="flex gap-2 text-xs text-muted-foreground"
+								>
+									<MessageSquareTextIcon className="mt-0.5 size-3.5 shrink-0" />
+									<p className="min-w-0 whitespace-pre-wrap italic">
+										{p.text.trim()}
+									</p>
+								</div>
+							)
 						),
 					)}
 					{running && steps.length === 0 && (
@@ -326,7 +315,7 @@ type ShellOutput = { stdout?: string; stderr?: string };
 // The one-line gist next to a tool's title: the query, command or action.
 function gist(part: EveToolPart) {
 	const i = (part.input ?? {}) as Record<string, unknown>;
-	const v = i.query ?? i.command ?? i.action ?? i.url;
+	const v = i.query ?? i.command ?? i.text ?? i.url;
 	return typeof v === "string" ? v : undefined;
 }
 
@@ -352,10 +341,7 @@ function ToolRow({
 		part.interaction?.status === "open" ? part.interaction : undefined;
 	const g = gist(part);
 	return (
-		<TraceCollapsible
-			open={manual ?? (running || !!asking)}
-			onOpenChange={setManual}
-		>
+		<TraceCollapsible open={manual ?? !!asking} onOpenChange={setManual}>
 			<TraceCollapsibleTrigger>
 				<TraceLine status={running ? "running" : failed ? "error" : undefined}>
 					<TraceIcon>
