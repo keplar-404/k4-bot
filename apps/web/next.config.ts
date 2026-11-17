@@ -1,4 +1,5 @@
 import path from "node:path";
+import { withSentryConfig } from "@sentry/nextjs/config";
 import { withEve } from "eve/next";
 import type { NextConfig } from "next";
 
@@ -43,5 +44,16 @@ const nextConfig: NextConfig = {
 };
 
 // Proxies /eve/v1/* to the agent in apps/ai-agent. In dev it reuses a running
-// `eve dev` for that agent or starts one.
-export default withEve(nextConfig, { eveRoot: "../ai-agent" });
+// `eve dev` for that agent or starts one. Sentry wraps outermost (Sentry docs:
+// apply other wrappers first); it uploads source maps when SENTRY_AUTH_TOKEN is set.
+export default withSentryConfig(
+	withEve(nextConfig, { eveRoot: "../ai-agent" }),
+	{
+		org: "shehub",
+		project: "k4-web",
+		silent: !process.env.CI,
+		// Browser events go to /monitoring on this site, which forwards them to Sentry:
+		// ad blockers (Brave Shields) block requests to sentry.io directly.
+		tunnelRoute: "/monitoring",
+	},
+);

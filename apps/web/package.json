@@ -11,6 +11,7 @@
 		"@base-ui/react": "^1.9.0",
 		"@neon/auth": "^0.8.2",
 		"@repo/shared": "workspace:*",
+		"@sentry/nextjs": "^11.13.0",
 		"@shadcn/react": "^0.3.1",
 		"backend": "workspace:*",
 		"class-variance-authority": "^0.7.1",

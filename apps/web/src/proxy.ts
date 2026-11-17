@@ -4,7 +4,8 @@ import { auth } from "@/lib/auth/server";
 // default; /eve is checked by the agent itself (it needs a bearer token, not a redirect).
 export default auth.middleware({
 	loginUrl: "/login",
-	publicRoutes: ["/", "/login", "/eve"],
+	// /monitoring is Sentry's tunnel (next.config.ts): errors on the login page count too.
+	publicRoutes: ["/", "/login", "/eve", "/monitoring"],
 });
 
 export const config = {
