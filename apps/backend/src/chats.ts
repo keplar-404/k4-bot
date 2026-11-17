@@ -1,6 +1,6 @@
 import { zValidator } from "@hono/zod-validator";
 import { agentEvent, chat } from "@repo/shared/schema";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, gt } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import { type Env, requireUser, webUrl } from "./auth";
@@ -41,44 +41,67 @@ export const chats = new Hono<Env>()
 			return c.json({ id: row.id }, 201);
 		},
 	)
-	.get("/:id", chatId, async (c) => {
-		const [row] = await db
-			.select()
-			.from(chat)
-			.where(
-				and(
-					eq(chat.id, c.req.valid("param").id),
-					eq(chat.userId, c.get("user").id),
-				),
-			);
-		if (!row) return c.json({ error: "Not found" }, 404);
-		// The session's saved events, for eve's initialEvents (eve docs: Resume a saved
-		// session): the page shows them at once and eve only catches up after them.
-		// Token deltas aren't saved; eve rebuilds the same state without them.
-		const rows = row.eveSessionId
-			? await db
-					.select()
-					.from(agentEvent)
-					.where(eq(agentEvent.sessionId, row.eveSessionId))
-					.orderBy(agentEvent.line, agentEvent.index)
-			: [];
-		// Rows saved before `scope` existed can't rebuild the view: replay as before.
-		const events = rows.every((e) => e.scope !== null)
-			? rows.map((e, i) => ({
-					type: e.type,
-					scope: e.scope,
-					data: e.data,
-					meta: {
-						position: { line: e.line, index: e.index },
-						at: e.createdAt.toISOString(),
-						// eve treats a line as done after an event without this, so every
-						// event but a line's last says more of its line follows.
-						...(rows[i + 1]?.line === e.line ? { endOfLine: false } : {}),
-					},
-				}))
-			: [];
-		return c.json({ chat: row, events }, 200);
-	})
+	// `after`: the last line this browser already has cached. Only newer events are
+	// read (Neon bills every byte sent out); an unchanged chat returns none.
+	.get(
+		"/:id",
+		chatId,
+		zValidator(
+			"query",
+			z.object({ after: z.coerce.number().int().min(-1).optional() }),
+		),
+		async (c) => {
+			const [row] = await db
+				.select()
+				.from(chat)
+				.where(
+					and(
+						eq(chat.id, c.req.valid("param").id),
+						eq(chat.userId, c.get("user").id),
+					),
+				);
+			if (!row) return c.json({ error: "Not found" }, 404);
+			// The session's saved events, for eve's initialEvents (eve docs: Resume a saved
+			// session): the page shows them at once and eve only catches up after them.
+			// Token deltas aren't saved; eve rebuilds the same state without them.
+			const after = c.req.valid("query").after ?? -1;
+			const rows = row.eveSessionId
+				? await db
+						.select({
+							line: agentEvent.line,
+							index: agentEvent.index,
+							type: agentEvent.type,
+							scope: agentEvent.scope,
+							data: agentEvent.data,
+							createdAt: agentEvent.createdAt,
+						})
+						.from(agentEvent)
+						.where(
+							and(
+								eq(agentEvent.sessionId, row.eveSessionId),
+								gt(agentEvent.line, after),
+							),
+						)
+						.orderBy(agentEvent.line, agentEvent.index)
+				: [];
+			// Rows saved before `scope` existed can't rebuild the view: replay as before.
+			const events = rows.every((e) => e.scope !== null)
+				? rows.map((e, i) => ({
+						type: e.type,
+						scope: e.scope,
+						data: e.data,
+						meta: {
+							position: { line: e.line, index: e.index },
+							at: e.createdAt.toISOString(),
+							// eve treats a line as done after an event without this, so every
+							// event but a line's last says more of its line follows.
+							...(rows[i + 1]?.line === e.line ? { endOfLine: false } : {}),
+						},
+					}))
+				: [];
+			return c.json({ chat: row, events }, 200);
+		},
+	)
 	.patch(
 		"/:id",
 		chatId,

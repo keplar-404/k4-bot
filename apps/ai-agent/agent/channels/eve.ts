@@ -19,7 +19,7 @@ const owners = new Map<string, string>();
 // persist.ts), with the session starter as user_id, and its primary key starts
 // with session_id, so one row answers it. Not `chat`: a browser could save another
 // user's session id there. Reading the session stream instead loads every stored
-// chunk (world-postgres has no limit): seconds on long chats.
+// chunk: seconds on long chats.
 async function sessionOwner(sessionId: string): Promise<string | null> {
 	const cached = owners.get(sessionId);
 	if (cached) return cached;

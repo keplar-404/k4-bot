@@ -30,10 +30,9 @@ export default defineAgent({
 		}
 		return undefined;
 	},
-	// eve docs, Workflow worlds: sessions and every event (including tool input and
-	// output) are stored in Postgres in dev and production, so a chat opens from any
-	// machine. Needs WORKFLOW_POSTGRES_URL (a direct, unpooled Neon URL) and
-	// `bun run workflow:bootstrap` once.
+	// No Workflow world set (eve docs, Workflow worlds): `eve dev` keeps runs in local
+	// files (.eve/), and Vercel uses Vercel Workflow. The Postgres world on Neon polled
+	// and re-read every stream chunk over the internet, using up Neon's network transfer.
 	// No 30-day idle timeout: an ended session's history is deleted (private sessions
 	// use zero retention outside dev), so old chats would open empty. Deleting a chat
 	// still ends its session and deletes its history.
@@ -50,5 +49,4 @@ export default defineAgent({
 			return used >= next;
 		},
 	},
-	experimental: { workflow: { world: "@workflow/world-postgres" } },
 });

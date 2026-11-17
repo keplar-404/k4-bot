@@ -58,7 +58,12 @@ export default defineTool({
 				return {
 					url: doc.url ?? doc.metadata?.sourceURL ?? doc.metadata?.url ?? "",
 					title: doc.title ?? doc.metadata?.title ?? "",
-					snippet: doc.description ?? doc.metadata?.description ?? "",
+					// Scraped results can carry the whole page here (a 132 KB "snippet" was
+					// seen); the page text belongs in `markdown`, capped below.
+					snippet: (doc.description ?? doc.metadata?.description ?? "").slice(
+						0,
+						500,
+					),
 					// ponytail: hard 8k cap per page keeps the context small; raise if answers miss detail.
 					...(doc.markdown ? { markdown: doc.markdown.slice(0, 8000) } : {}),
 				};

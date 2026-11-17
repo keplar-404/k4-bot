@@ -77,6 +77,27 @@ describe.skipIf(!dbUrl)("routes (TEST_DATABASE_URL)", async () => {
 			eveSessionId: `sess-${id}`,
 		});
 
+		// `after` returns only events past the browser's cached line.
+		const { agentEvent } = await import("@repo/shared/schema");
+		const ev = (line: number) => ({
+			sessionId: `sess-${id}`,
+			line,
+			index: 0,
+			userId: me,
+			type: "content.completed",
+			scope: {},
+			data: { line },
+		});
+		await db.insert(agentEvent).values([ev(0), ev(1), ev(2)]);
+		const lines = async (q: string) =>
+			(await (await as(me, `/api/chats/${id}${q}`)).json()).events.map(
+				(e: { meta: { position: { line: number } } }) => e.meta.position.line,
+			);
+		expect(await lines("")).toEqual([0, 1, 2]);
+		expect(await lines("?after=1")).toEqual([2]);
+		expect(await lines("?after=2")).toEqual([]);
+		expect((await as(me, `/api/chats/${id}?after=x`)).status).toBe(400);
+
 		// No eve session is running for this id; delete still removes the chat.
 		expect(
 			(await as(me, `/api/chats/${id}`, { method: "DELETE" })).status,

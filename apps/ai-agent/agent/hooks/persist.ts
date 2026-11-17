@@ -5,6 +5,7 @@
 import { agentEvent } from "@repo/shared/schema";
 import { defineHook } from "eve/hooks";
 import { appUserId, db } from "../lib/db";
+import { withoutPageText } from "../lib/page-text";
 
 export default defineHook({
 	events: {
@@ -26,7 +27,7 @@ export default defineHook({
 					type: event.type,
 					// {} for session-level events: null marks rows saved before scope existed.
 					scope: ("scope" in event ? event.scope : undefined) ?? {},
-					data: event.data ?? null,
+					data: withoutPageText(event.data) ?? null,
 				})
 				.onConflictDoNothing()
 				.catch((error: unknown) =>

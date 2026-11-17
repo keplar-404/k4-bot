@@ -7,6 +7,12 @@ export const authClient = createAuthClient();
 
 /** The signed-in user's token for our backend and the agent, or undefined when signed out. */
 export async function getToken() {
-	const { data } = await authClient.token();
-	return data?.token;
+	try {
+		const { data } = await authClient.token();
+		if (data?.token) return data.token;
+	} catch {}
+	// The session cookie is still there but Neon Auth refused it (expired, or the
+	// user was deleted): sign in again instead of failing every request.
+	if (window.location.pathname !== "/login") window.location.assign("/login");
+	return undefined;
 }

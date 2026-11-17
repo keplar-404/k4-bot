@@ -5,8 +5,8 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
 	/* config options here */
-	cacheComponents: true,
-	partialPrefetching: true,
+	// No cacheComponents: its streamed <Suspense> boundaries hit Next.js #94750
+	// (stuck `$~` reveal, page never hydrates) on ~1 in 8 chat loads in `next start`.
 	reactCompiler: true,
 	// The chat is the dashboard for now. A config redirect, not redirect() in a page:
 	// that throws during the Cache Components prerender check.

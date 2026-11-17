@@ -29,6 +29,7 @@ import {
 	useSidebar,
 } from "@/components/ui/sidebar";
 import { authClient } from "@/lib/auth-client";
+import { clearChatCache } from "@/lib/chat-cache";
 
 export function NavUser({
 	user,
@@ -107,6 +108,7 @@ export function NavUser({
 						<DropdownMenuSeparator />
 						<DropdownMenuItem
 							onClick={async () => {
+								await clearChatCache(); // this browser's copy of their chats
 								await authClient.signOut();
 								router.push("/login");
 								router.refresh();

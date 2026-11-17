@@ -36,7 +36,6 @@ bun install
 #   apps/backend/.env   apps/ai-agent/.env   apps/web/.env.local
 
 cd apps/backend && bun run db:migrate && cd -              # app tables
-cd apps/ai-agent && bun run workflow:bootstrap && cd -     # agent session store (once)
 
 bun run dev
 ```

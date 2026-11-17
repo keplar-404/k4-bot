@@ -22,7 +22,7 @@ export function MessagesSkeleton() {
 	);
 }
 
-// The whole chat page, for the server's <Suspense> while it looks up the chat.
+// The whole chat page, shown by SavedChat while it loads the chat.
 // Same outer layout as <Chat>, so nothing jumps when it swaps in.
 export function ChatSkeleton() {
 	return (

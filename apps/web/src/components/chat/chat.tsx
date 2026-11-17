@@ -1,7 +1,8 @@
 "use client";
 
-import { defaultModelId, type Effort } from "@repo/shared/models";
-import { activeTurn } from "eve/events";
+import { defaultModelId, type Effort, models } from "@repo/shared/models";
+import type { ClientSessionState } from "eve/client";
+import { activeTurn, openInteractions } from "eve/events";
 import { type UseEveAgentOptions, useEveAgent } from "eve/react";
 import { ArrowUpIcon, MessageCircleDashedIcon, SquareIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -45,6 +46,7 @@ import {
 } from "@/components/ui/message-scroller";
 import { api, notifyChatsChanged } from "@/lib/api";
 import { getToken } from "@/lib/auth-client";
+import { putCachedChat, recorded } from "@/lib/chat-cache";
 import { setMemoryBusy } from "@/lib/chat-ui";
 
 const SUGGESTIONS = [
@@ -68,6 +70,28 @@ const setUrl = (path: string) =>
 		path,
 	);
 
+const MODES = ["ask", "plan", "full"];
+
+// The last model/mode this browser picked. Read after mount (the server render has
+// no localStorage); a stored value that is no longer allowed falls back to the default.
+function useStored(key: string, initial: string, ok: (v: string) => boolean) {
+	const [value, setValue] = useState(initial);
+	// biome-ignore lint/correctness/useExhaustiveDependencies: read once per key on mount (`ok` is new each render)
+	useEffect(() => {
+		try {
+			const saved = localStorage.getItem(key);
+			if (saved && ok(saved)) setValue(saved);
+		} catch {}
+	}, [key]);
+	const set = (v: string) => {
+		setValue(v);
+		try {
+			localStorage.setItem(key, v);
+		} catch {}
+	};
+	return [value, set] as const;
+}
+
 async function saveSession(id: string, eveSessionId: string) {
 	for (let i = 0; i < 3; i++) {
 		try {
@@ -85,10 +109,13 @@ async function saveSession(id: string, eveSessionId: string) {
 export function Chat({
 	chatId: savedChatId,
 	sessionId,
+	session,
 	events,
 }: {
 	chatId?: string;
 	sessionId?: string | null;
+	/** eve's own cursor, as cached in this browser (eve docs: store `session` as given). */
+	session?: ClientSessionState;
 	/** Saved events of this session (backend GET /api/chats/:id), shown before catch-up. */
 	events?: unknown[];
 }) {
@@ -99,11 +126,16 @@ export function Chat({
 		auth: { bearer: async () => (await getToken()) ?? "" },
 		...(sessionId
 			? {
-					initialSession: { sessionId, streamIndex: 0 },
+					initialSession: session ?? { sessionId, streamIndex: 0 },
 					initialEvents: events as UseEveAgentOptions["initialEvents"],
 					resume: true,
 				}
 			: {}),
+		// Follow the stream only while there is something to see: a turn running or
+		// waiting on the user. An idle chat closes it (on Vercel an open stream is a
+		// running function); eve reopens it on the next send, answer or resume.
+		followWhile: (view) =>
+			activeTurn(view) !== undefined || openInteractions(view).length > 0,
 		onSessionChange: (session) => {
 			const id = chatIdRef.current;
 			const sid = session?.sessionId;
@@ -119,9 +151,13 @@ export function Chat({
 		},
 	});
 	const [input, setInput] = useState("");
-	const [model, setModel] = useState(defaultModelId);
+	const [model, setModel] = useStored("k4.model", defaultModelId, (v) =>
+		models.some((m) => m.id === v),
+	);
 	const [effort, setEffort] = useState<Effort>();
-	const [mode, setMode] = useState(defaultMode);
+	const [mode, setMode] = useStored("k4.mode", defaultMode, (v) =>
+		MODES.includes(v),
+	);
 	const formRef = useRef<HTMLFormElement>(null);
 
 	const resuming = agent.status === "resuming";
@@ -141,6 +177,17 @@ export function Chat({
 		setMemoryBusy(savingMemory);
 		return () => setMemoryBusy(false);
 	}, [savingMemory]);
+
+	// Cache the chat in this browser whenever it settles (a turn done, or waiting on
+	// the user), so reopening it reads nothing from Neon. Not while streaming.
+	useEffect(() => {
+		const id = chatIdRef.current;
+		if (!id || !agent.session || agent.status !== "idle") return;
+		void putCachedChat(id, {
+			session: agent.session,
+			events: recorded(agent.events),
+		});
+	}, [agent.status, agent.session, agent.events]);
 
 	async function send(text: string) {
 		const t = text.trim();
