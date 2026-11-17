@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { AppSidebar } from "@/components/app-sidebar";
-import { DashboardHeader } from "@/components/dashboard-header";
+import { DashboardShell } from "@/components/dashboard-shell";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { getSession } from "@/lib/session";
 
@@ -22,8 +22,7 @@ export default function DashboardLayout({
 				<UserSidebar />
 			</Suspense>
 			<SidebarInset className="min-w-0">
-				<DashboardHeader />
-				{children}
+				<DashboardShell>{children}</DashboardShell>
 			</SidebarInset>
 		</SidebarProvider>
 	);
