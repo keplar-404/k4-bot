@@ -39,6 +39,9 @@ export const agentEvent = pgTable(
 		index: integer("index").notNull(),
 		userId: text("user_id"),
 		type: text("type").notNull(),
+		// The event's turn/run ids. Saved with type and data so the web app can hand
+		// these rows back to eve as initialEvents when a chat opens.
+		scope: jsonb("scope"),
 		data: jsonb("data"),
 		createdAt: timestamp("created_at").defaultNow().notNull(),
 	},

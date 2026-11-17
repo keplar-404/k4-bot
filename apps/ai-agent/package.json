@@ -9,7 +9,7 @@
 	"scripts": {
 		"build": "eve build",
 		"deploy": "eve deploy",
-		"dev": "eve dev",
+		"dev:tui": "eve dev",
 		"eval": "eve eval",
 		"start": "eve start",
 		"test": "bun test",

@@ -23,8 +23,15 @@ async function SavedChat({ params }: { params: Promise<{ id: string }> }) {
 	if (res.status === 404) redirect("/dashboard/chat?notfound=1");
 	const body = await res.json();
 	if (!("chat" in body)) throw new Error("Could not load the chat");
-	const { chat } = body;
-	return <Chat key={chat.id} chatId={chat.id} sessionId={chat.eveSessionId} />;
+	const { chat, events } = body;
+	return (
+		<Chat
+			key={chat.id}
+			chatId={chat.id}
+			sessionId={chat.eveSessionId}
+			events={events}
+		/>
+	);
 }
 
 export default function ChatPage({

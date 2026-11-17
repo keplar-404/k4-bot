@@ -1,6 +1,8 @@
 import { userFromBearer } from "@repo/shared/auth";
 import { findModel, pickEffort } from "@repo/shared/models";
 import { overLimit } from "@repo/shared/rate-limit";
+import { agentEvent } from "@repo/shared/schema";
+import { and, eq, isNotNull } from "drizzle-orm";
 import { type AuthFn, ForbiddenError, localDev } from "eve/channels/auth";
 import { defaultEveAuth, eveChannel } from "eve/channels/eve";
 import { sessions } from "eve/server";
@@ -9,9 +11,34 @@ import { assertSessionOwner } from "../lib/owner";
 
 const MODES = ["ask", "plan", "full"] as const;
 
-// The user who started a session: the principal on its first admitted delivery.
-// eve docs: route auth doesn't check who may use a session, so we do.
+// A session's owner never changes, so one answer per session is enough.
+// ponytail: unbounded per-process map; it grows by one short entry per chat.
+const owners = new Map<string, string>();
+
+// The user who started a session. Only this agent writes agent_event (hooks/
+// persist.ts), with the session starter as user_id, and its primary key starts
+// with session_id, so one row answers it. Not `chat`: a browser could save another
+// user's session id there. Reading the session stream instead loads every stored
+// chunk (world-postgres has no limit): seconds on long chats.
 async function sessionOwner(sessionId: string): Promise<string | null> {
+	const cached = owners.get(sessionId);
+	if (cached) return cached;
+	const [row] = await db()
+		.select({ userId: agentEvent.userId })
+		.from(agentEvent)
+		.where(
+			and(eq(agentEvent.sessionId, sessionId), isNotNull(agentEvent.userId)),
+		)
+		.limit(1);
+	const owner = row?.userId ?? (await ownerFromStream(sessionId));
+	if (owner) owners.set(sessionId, owner);
+	return owner;
+}
+
+// Fallback while a new session has no agent_event row yet: the principal on
+// the session's first admitted delivery.
+// eve docs: route auth doesn't check who may use a session, so we do.
+async function ownerFromStream(sessionId: string): Promise<string | null> {
 	const controller = new AbortController();
 	try {
 		const events = sessions
@@ -39,15 +66,14 @@ const appSession: AuthFn<Request> = async (request) => {
 	const sessionId = /\/session\/([^/?]+)/.exec(
 		new URL(request.url).pathname,
 	)?.[1];
-	if (sessionId) {
-		await assertSessionOwner(() => sessionOwner(sessionId), user.id);
-	}
 	// Each user has their own counter. Only POSTs (messages, approvals) count;
-	// reads and stream reconnects are free.
-	if (
+	// reads and stream reconnects are free. Runs alongside the owner check.
+	const [, limited] = await Promise.all([
+		sessionId && assertSessionOwner(() => sessionOwner(sessionId), user.id),
 		request.method === "POST" &&
-		(await overLimit(db(), `agent:${user.id}`, 60, 60_000))
-	) {
+			overLimit(db(), `agent:${user.id}`, 60, 60_000),
+	]);
+	if (limited) {
 		throw new ForbiddenError({
 			code: "rate_limited",
 			message: "Too many messages. Wait a minute and try again.",

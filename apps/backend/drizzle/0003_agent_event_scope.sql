@@ -1,0 +1,1 @@
+ALTER TABLE "agent_event" ADD COLUMN "scope" jsonb;

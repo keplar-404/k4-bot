@@ -2,6 +2,7 @@
 
 import { findModel } from "@repo/shared/models";
 import { runs, type SessionView, turns, usage } from "eve/events";
+import { FootprintsIcon, LayersIcon } from "lucide-react";
 
 const fmt = new Intl.NumberFormat("en", { notation: "compact" });
 
@@ -24,22 +25,41 @@ export function ChatStats({ view }: { view: SessionView }) {
 	const tokens = total.inputTokens + total.outputTokens;
 	return (
 		<p className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs text-muted-foreground tabular-nums">
-			<span>
+			<span className="flex items-center gap-1">
+				<FootprintsIcon aria-hidden className="size-3" />
 				{turns(view).length} turns · {all.length} steps
 				{tps > 0 && ` · ${Math.round(tps)} tok/s`}
 			</span>
-			<span>
+			<span className="flex items-center gap-1">
+				<LayersIcon aria-hidden className="size-3" />
 				{fmt.format(tokens)} tok
 				{total.inputTokens > 0 &&
 					` · cache ${Math.round((total.cacheReadTokens / total.inputTokens) * 100)}%`}
 			</span>
 			{context !== undefined && (
-				<span className="flex items-center gap-1.5">
-					<meter
-						aria-label="Context used"
-						value={Math.min(context, 1)}
-						className="h-1.5 w-16 appearance-none overflow-hidden rounded-full bg-muted [&::-moz-meter-bar]:bg-primary [&::-webkit-meter-bar]:bg-muted [&::-webkit-meter-optimum-value]:bg-primary"
-					/>
+				<span className="flex items-center gap-1" title="Context used">
+					{/* A ring that fills with the context used; pathLength makes the dash a percent. */}
+					<svg aria-hidden viewBox="0 0 16 16" className="size-3 -rotate-90">
+						<circle
+							cx="8"
+							cy="8"
+							r="6.5"
+							fill="none"
+							strokeWidth="2.5"
+							className="stroke-muted"
+						/>
+						<circle
+							cx="8"
+							cy="8"
+							r="6.5"
+							fill="none"
+							strokeWidth="2.5"
+							pathLength={100}
+							strokeDasharray={`${Math.min(context, 1) * 100} 100`}
+							className="stroke-current"
+						/>
+					</svg>
+					<span className="sr-only">Context used</span>
 					{Math.round(context * 100)}%
 				</span>
 			)}

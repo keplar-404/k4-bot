@@ -2,7 +2,7 @@
 
 import { defaultModelId, type Effort } from "@repo/shared/models";
 import { activeTurn } from "eve/events";
-import { useEveAgent } from "eve/react";
+import { type UseEveAgentOptions, useEveAgent } from "eve/react";
 import { ArrowUpIcon, MessageCircleDashedIcon, SquareIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -85,9 +85,12 @@ async function saveSession(id: string, eveSessionId: string) {
 export function Chat({
 	chatId: savedChatId,
 	sessionId,
+	events,
 }: {
 	chatId?: string;
 	sessionId?: string | null;
+	/** Saved events of this session (backend GET /api/chats/:id), shown before catch-up. */
+	events?: unknown[];
 }) {
 	const chatIdRef = useRef(savedChatId);
 	const savedSessionRef = useRef(sessionId ?? undefined);
@@ -95,7 +98,11 @@ export function Chat({
 		// The agent checks this token on every request; it is re-read each time.
 		auth: { bearer: async () => (await getToken()) ?? "" },
 		...(sessionId
-			? { initialSession: { sessionId, streamIndex: 0 }, resume: true }
+			? {
+					initialSession: { sessionId, streamIndex: 0 },
+					initialEvents: events as UseEveAgentOptions["initialEvents"],
+					resume: true,
+				}
 			: {}),
 		onSessionChange: (session) => {
 			const id = chatIdRef.current;
@@ -235,11 +242,10 @@ export function Chat({
 					<OpenRequests
 						view={agent.view}
 						onAnswer={(answers) =>
-							agent
-								.respond(answers)
-								.catch(() =>
-									toast.error("Could not send your answer. Try again."),
-								)
+							agent.respond(answers).catch((error: unknown) => {
+								toast.error("Could not send your answer. Try again.");
+								throw error; // the card re-enables its Send button
+							})
 						}
 					/>
 				)}

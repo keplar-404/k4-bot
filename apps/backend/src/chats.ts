@@ -52,7 +52,32 @@ export const chats = new Hono<Env>()
 				),
 			);
 		if (!row) return c.json({ error: "Not found" }, 404);
-		return c.json({ chat: row }, 200);
+		// The session's saved events, for eve's initialEvents (eve docs: Resume a saved
+		// session): the page shows them at once and eve only catches up after them.
+		// Token deltas aren't saved; eve rebuilds the same state without them.
+		const rows = row.eveSessionId
+			? await db
+					.select()
+					.from(agentEvent)
+					.where(eq(agentEvent.sessionId, row.eveSessionId))
+					.orderBy(agentEvent.line, agentEvent.index)
+			: [];
+		// Rows saved before `scope` existed can't rebuild the view: replay as before.
+		const events = rows.every((e) => e.scope !== null)
+			? rows.map((e, i) => ({
+					type: e.type,
+					scope: e.scope,
+					data: e.data,
+					meta: {
+						position: { line: e.line, index: e.index },
+						at: e.createdAt.toISOString(),
+						// eve treats a line as done after an event without this, so every
+						// event but a line's last says more of its line follows.
+						...(rows[i + 1]?.line === e.line ? { endOfLine: false } : {}),
+					},
+				}))
+			: [];
+		return c.json({ chat: row, events }, 200);
 	})
 	.patch(
 		"/:id",

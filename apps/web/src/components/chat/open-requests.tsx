@@ -3,6 +3,7 @@
 import type { Interaction, SessionView } from "eve/events";
 import { openInteractions } from "eve/events";
 import type { UseEveAgentReturn } from "eve/react";
+import { LoaderCircleIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,7 +21,8 @@ import {
 import { api } from "@/lib/api";
 
 type Answers = Parameters<UseEveAgentReturn["respond"]>[0];
-type Answer = (answers: Answers) => void;
+// Rejects when eve refused the answer, so the card can be answered again.
+type Answer = (answers: Answers) => Promise<unknown> | undefined;
 
 // What the agent is waiting on (eve human-in-the-loop: approvals, questions, budget
 // prompts, sign-ins), pinned above the prompt bar. eve owns the state: a request
@@ -60,6 +62,9 @@ function Question({
 }) {
 	const options = request.options ?? [];
 	const freeform = request.allowFreeform || options.length === 0;
+	// The card stays until eve settles the request on the stream, which can lag;
+	// meanwhile show that the answer is on its way and block a second send.
+	const [sending, setSending] = useState(false);
 	return (
 		<Questionnaire
 			className="rounded-lg border bg-card p-4"
@@ -74,11 +79,13 @@ function Question({
 				e.preventDefault();
 				const value = String(new FormData(e.currentTarget).get("answer") ?? "");
 				const picked = options.some((o) => o.id === value);
+				if (sending) return;
+				setSending(true);
 				onAnswer([
 					picked
 						? { interactionId, optionId: value }
 						: { interactionId, text: value },
-				]);
+				])?.catch(() => setSending(false));
 			}}
 		>
 			<QuestionnaireItem name="answer" required>
@@ -108,7 +115,10 @@ function Question({
 				</QuestionnaireChoices>
 			</QuestionnaireItem>
 			<QuestionnaireActions>
-				<QuestionnaireSubmit>Send</QuestionnaireSubmit>
+				<QuestionnaireSubmit disabled={sending}>
+					{sending && <LoaderCircleIcon className="animate-spin" />}
+					{sending ? "Sending…" : "Send"}
+				</QuestionnaireSubmit>
 			</QuestionnaireActions>
 		</Questionnaire>
 	);
@@ -159,7 +169,9 @@ function ConnectApp({
 	const answer = (optionId: "connected" | "cancel") => {
 		if (answered.current) return;
 		answered.current = true;
-		onAnswer([{ interactionId, optionId }]);
+		onAnswer([{ interactionId, optionId }])?.catch(() => {
+			answered.current = false; // refused: allow another try
+		});
 	};
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: check once per request
