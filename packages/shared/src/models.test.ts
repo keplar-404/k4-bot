@@ -7,6 +7,14 @@ test("unknown model falls back to the free default", () => {
 	expect(findModel(undefined).id).toBe(defaultModelId);
 });
 
+// eve compacts at this size; a missing or tiny value would throw history away.
+test("every model has a real context window", () => {
+	expect(findModel(defaultModelId).contextWindow).toBe(128_000);
+	expect(findModel("anthropic/claude-sonnet-5.5").contextWindow).toBe(
+		1_000_000,
+	);
+});
+
 test("effort must be one the model supports", () => {
 	const sonnet = findModel("anthropic/claude-sonnet-5.5");
 	expect(pickEffort(sonnet, "low")).toBe("low");

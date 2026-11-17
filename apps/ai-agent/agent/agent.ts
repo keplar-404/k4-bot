@@ -15,8 +15,8 @@ export default defineAgent({
 		return {
 			model: openrouter(model.id),
 			reasoning: pickEffort(model, attrs.reasoning) ?? "provider-default",
-			// OpenRouter models are not in the AI Gateway catalog; stay conservative.
-			modelContextWindowTokens: 128_000,
+			// OpenRouter models are not in the AI Gateway catalog, so eve needs the window.
+			modelContextWindowTokens: model.contextWindow,
 		};
 	}),
 	// eve docs, Human in the Loop > "Gate every call from one policy".
