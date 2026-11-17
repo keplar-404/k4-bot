@@ -7,6 +7,7 @@ import { ArrowUpIcon, MessageCircleDashedIcon, SquareIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { MessagesSkeleton } from "@/components/chat/chat-skeleton";
+import { ChatStats } from "@/components/chat/chat-stats";
 import {
 	AssistantMessage,
 	PendingAssistant,
@@ -308,6 +309,7 @@ export function Chat({
 						</InputGroupAddon>
 					</InputGroup>
 				</form>
+				<ChatStats view={agent.view} />
 			</div>
 		</MessageScrollerProvider>
 	);
