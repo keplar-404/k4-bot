@@ -26,6 +26,7 @@ import {
 	SidebarMenuSkeleton,
 } from "@/components/ui/sidebar";
 import { api, CHATS_CHANGED } from "@/lib/api";
+import { dropCachedChat, getCachedList, putCachedList } from "@/lib/chat-cache";
 
 type Chat = { id: string; title: string };
 
@@ -39,15 +40,32 @@ export function ChatHistory() {
 	const router = useRouter();
 
 	useEffect(() => {
+		// This browser's saved list shows at once; the API's answer replaces it.
+		let fresh = false;
+		void getCachedList().then((list) => {
+			if (list && !fresh) {
+				setChats(list);
+				setLoading(false);
+			}
+		});
 		const load = async () => {
-			const res = await api.api.chats.$get();
-			if (res.ok) setChats((await res.json()).chats);
+			const res = await api.api.chats.$get().catch(() => undefined);
+			if (res?.ok) {
+				fresh = true;
+				setChats((await res.json()).chats);
+			}
 			setLoading(false);
 		};
 		void load();
 		window.addEventListener(CHATS_CHANGED, load);
 		return () => window.removeEventListener(CHATS_CHANGED, load);
 	}, []);
+
+	// Save every change (load, create, delete) for the next page load.
+	useEffect(() => {
+		if (!loading)
+			void putCachedList(chats.map(({ id, title }) => ({ id, title })));
+	}, [chats, loading]);
 
 	async function remove(chat: Chat) {
 		setDeleting((s) => new Set(s).add(chat.id));
@@ -60,6 +78,7 @@ export function ChatHistory() {
 			return next;
 		});
 		if (!res?.ok) return;
+		void dropCachedChat(chat.id);
 		setChats((c) => c.filter((x) => x.id !== chat.id));
 		if (pathname === `/dashboard/chat/${chat.id}`)
 			router.push("/dashboard/chat");

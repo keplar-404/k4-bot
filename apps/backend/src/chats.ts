@@ -79,6 +79,9 @@ export const chats = new Hono<Env>()
 						.where(
 							and(
 								eq(agentEvent.sessionId, row.eveSessionId),
+								// PATCH lets a user set any eveSessionId on their chat: only
+								// their own events may come back.
+								eq(agentEvent.userId, c.get("user").id),
 								gt(agentEvent.line, after),
 							),
 						)
@@ -147,7 +150,8 @@ export const chats = new Hono<Env>()
 						signal: AbortSignal.timeout(10_000),
 					},
 				);
-				if (!res.ok && res.status !== 409 && res.status !== 404) {
+				// 404/410: the session is already gone or expired; 409: already ending.
+				if (!res.ok && ![404, 409, 410].includes(res.status)) {
 					console.error("end session failed", row.eveSessionId, res.status);
 				}
 			} catch (error) {

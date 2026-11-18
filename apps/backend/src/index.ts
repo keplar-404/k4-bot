@@ -8,6 +8,7 @@ import { requestId } from "hono/request-id";
 import { secureHeaders } from "hono/secure-headers";
 import { isDev, webUrl } from "./auth";
 import { chats } from "./chats";
+import { files } from "./files";
 import { me } from "./me";
 
 const isLocal = (o: string) =>
@@ -42,10 +43,13 @@ const app = base
 		"*",
 		cors({
 			origin: (o) => (o === webUrl || (isDev && isLocal(o)) ? o : null),
+			// The browser reuses one preflight for 2h (Chrome's cap) instead of one per call.
+			maxAge: 7200,
 		}),
 	)
 	.route("/api/chats", chats)
 	.route("/api/me", me)
+	.route("/api/files", files)
 	.get("/", (c) => c.text("ok"))
 	// Always JSON, never a stack trace; the request id in the log matches X-Request-Id.
 	.notFound((c) => c.json({ error: "Not found" }, 404))

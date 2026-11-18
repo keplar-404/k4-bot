@@ -1,7 +1,7 @@
 "use client";
 
 import { defaultModelId, type Effort, models } from "@repo/shared/models";
-import type { ClientSessionState } from "eve/client";
+import { ClientError, type ClientSessionState } from "eve/client";
 import { activeTurn, openInteractions } from "eve/events";
 import { type UseEveAgentOptions, useEveAgent } from "eve/react";
 import { ArrowUpIcon, MessageCircleDashedIcon, SquareIcon } from "lucide-react";
@@ -55,7 +55,7 @@ const SUGGESTIONS = [
 ];
 
 // Talks to the eve agent in apps/ai-agent through /eve/v1/* (see next.config.ts).
-// The agent checks the Better Auth session cookie against apps/backend.
+// Every request carries the user's Neon Auth token, which the agent checks.
 // Saved chats follow eve's Next.js guide: create the chat record before the
 // first message, save the session id from onSessionChange, reopen with
 // initialSession + resume, and switch the URL with History.replaceState.
@@ -90,6 +90,21 @@ function useStored(key: string, initial: string, ok: (v: string) => boolean) {
 		} catch {}
 	};
 	return [value, set] as const;
+}
+
+// The session can't continue: missing from this World (404), deleted after it
+// ended (410 session_expired), its deployment is gone (409 session_stranded), or
+// a send found it ended or missing (409 session_not_active).
+// The next message starts a new session instead of showing an error.
+const DEAD = new Set([
+	"session_expired",
+	"session_stranded",
+	"session_not_active",
+]);
+function isDeadSession(error: unknown) {
+	if (ClientError.is(error) && error.status === 404) return true;
+	const code = (error as { code?: unknown } | undefined)?.code;
+	return typeof code === "string" && DEAD.has(code);
 }
 
 async function saveSession(id: string, eveSessionId: string) {
@@ -128,7 +143,6 @@ export function Chat({
 			? {
 					initialSession: session ?? { sessionId, streamIndex: 0 },
 					initialEvents: events as UseEveAgentOptions["initialEvents"],
-					resume: true,
 				}
 			: {}),
 		// Follow the stream only while there is something to see: a turn running or
@@ -160,9 +174,34 @@ export function Chat({
 	);
 	const formRef = useRef<HTMLFormElement>(null);
 
-	const resuming = agent.status === "resuming";
+	const dead = isDeadSession(agent.error);
+	// A dead session's resume can retry for a long time; the next send replaces
+	// the session, so the composer stays usable.
+	const resuming = agent.status === "resuming" && !dead;
+
+	// The saved events already show the whole chat, so an idle chat makes no
+	// request to eve when it opens (no stream, no retries on a dead session).
+	// Only a turn still running or waiting on the user is resumed.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: once, on open
+	useEffect(() => {
+		if (
+			sessionId &&
+			(activeTurn(agent.view) || openInteractions(agent.view).length > 0)
+		)
+			void agent.resume().catch(() => {});
+	}, []);
 	// Real start order of every part, so parallel steps render as produced.
 	const order = startOrder(agent.events);
+	// Turns of earlier sessions of this chat, shown above the live one. The new
+	// session repeats them as imported history; those copies are hidden.
+	const [past, setPast] = useState<{
+		messages: typeof agent.messages;
+		order: typeof order;
+	}>({ messages: [], order: new Map() });
+	const live = past.messages.length
+		? agent.messages.filter((m) => !m.metadata?.imported)
+		: agent.messages;
+	const empty = past.messages.length === 0 && live.length === 0;
 	const running = activeTurn(agent.view) !== undefined;
 	const busy = agent.status === "busy" || running;
 	const savingMemory = agent.messages.some((m) =>
@@ -189,24 +228,42 @@ export function Chat({
 		});
 	}, [agent.status, agent.session, agent.events]);
 
-	async function send(text: string) {
+	async function send(text: string, dead_ = dead) {
 		const t = text.trim();
 		if (!t || resuming) return;
 		setInput("");
+		// The old session is gone: keep its turns on screen, start a new session, and
+		// let the agent load the conversation from Neon for it.
+		const reseed = dead_ && chatIdRef.current;
+		if (reseed) {
+			setPast({ messages: [...past.messages, ...live], order });
+			agent.newSession();
+		}
 		if (!chatIdRef.current) {
-			const res = await api.api.chats.$post({
-				json: { title: t.slice(0, 80) },
-			});
-			if (!res.ok) return setInput(t);
+			const res = await api.api.chats
+				.$post({ json: { title: t.slice(0, 80) } })
+				.catch(() => undefined);
+			if (!res?.ok) return setInput(t); // offline too: keep what they typed
 			const { id } = await res.json();
 			chatIdRef.current = id;
 			setUrl(`/dashboard/chat/${encodeURIComponent(id)}`);
 			notifyChatsChanged();
 		}
 		// Sent while running, the message steers the current turn.
-		await agent.send(t, {
-			clientContext: { model, reasoning: effort ?? null, mode },
-		});
+		try {
+			await agent.send(t, {
+				clientContext: {
+					model,
+					reasoning: effort ?? null,
+					mode,
+					...(reseed ? { reseed } : {}),
+				},
+			});
+		} catch (error) {
+			// Found out only now that the session is gone: send again on a new one.
+			if (!reseed && isDeadSession(error)) return send(t, true);
+			setInput(t);
+		}
 	}
 
 	return (
@@ -214,9 +271,9 @@ export function Chat({
 			<div className="flex h-[calc(100dvh-4rem)] min-h-0 w-full flex-col gap-2 px-3 pb-3 *:mx-auto *:w-full *:max-w-4xl sm:px-6 sm:pb-4">
 				{/* full width so the empty side space scrolls the chat too */}
 				<div className="min-h-0 flex-1 max-w-none!">
-					{resuming && agent.messages.length === 0 ? (
+					{resuming && empty ? (
 						<MessagesSkeleton />
-					) : agent.messages.length === 0 ? (
+					) : empty ? (
 						<Empty className="h-full">
 							<EmptyHeader>
 								<EmptyMedia variant="icon">
@@ -235,20 +292,27 @@ export function Chat({
 									aria-busy={busy}
 									className="mx-auto max-w-4xl gap-6"
 								>
-									{agent.messages.map((m) => (
-										<MessageScrollerItem key={m.id} messageId={m.id}>
+									{[
+										// Each session numbers its turns from 0, so earlier sessions'
+										// ids repeat: prefix them with their position.
+										...past.messages.map(
+											(m, i) => [m, past.order, `p${i}:${m.id}`] as const,
+										),
+										...live.map((m) => [m, order, m.id] as const),
+									].map(([m, o, key]) => (
+										<MessageScrollerItem key={key} messageId={key}>
 											{m.role === "user" ? (
 												<UserMessage message={m} />
 											) : (
 												<AssistantMessage
 													message={m}
 													streaming={m.metadata?.status === "streaming"}
-													order={order}
+													order={o}
 												/>
 											)}
 										</MessageScrollerItem>
 									))}
-									{busy && agent.messages.at(-1)?.role === "user" && (
+									{busy && live.at(-1)?.role === "user" && (
 										<MessageScrollerItem messageId="pending">
 											<PendingAssistant />
 										</MessageScrollerItem>
@@ -260,7 +324,7 @@ export function Chat({
 					)}
 				</div>
 
-				{!busy && !resuming && agent.messages.length === 0 && (
+				{!busy && !resuming && empty && (
 					<div className="flex gap-2 overflow-x-auto pb-1 sm:flex-wrap">
 						{SUGGESTIONS.map((s) => (
 							<Button
@@ -277,7 +341,7 @@ export function Chat({
 				)}
 
 				{/* Next to the input, under the turn that failed, so it reads as that turn's result. */}
-				{agent.error && !busy && (
+				{agent.error && !busy && !dead && (
 					<p role="alert" className="text-sm text-destructive">
 						{agent.error.message}
 					</p>

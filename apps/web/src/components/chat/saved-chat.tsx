@@ -43,9 +43,29 @@ export function SavedChat({ id }: { id: string }) {
 			}
 			const body = await res.json();
 			if (!("chat" in body)) throw new Error("Could not load the chat");
-			// With a cache, eve's resume brings any newer turns itself.
-			if (!cached && live)
-				setSaved({ sessionId: body.chat.eveSessionId, events: body.events });
+			const sid = body.chat.eveSessionId;
+			if (cached && (!sid || cached.session.sessionId === sid)) {
+				// Same session: add the turns made since (another tab or device), if any.
+				if (body.events.length && live)
+					setSaved({
+						sessionId: sid,
+						events: [...cached.events, ...body.events],
+					});
+				return;
+			}
+			// No cache, or the chat moved on to a new session elsewhere.
+			let { events } = body;
+			// The cache's `after` cut the new session's events short: read them all.
+			if (cached) {
+				const all = await api.api.chats[":id"].$get({
+					param: { id },
+					query: {},
+				});
+				const full = await all.json();
+				if (!("chat" in full)) throw new Error("Could not load the chat");
+				events = full.events;
+			}
+			if (live) setSaved({ sessionId: body.chat.eveSessionId, events });
 		})().catch(() => live && setFailed(true));
 		return () => {
 			live = false;
@@ -56,6 +76,7 @@ export function SavedChat({ id }: { id: string }) {
 	if (!saved) return <ChatSkeleton />;
 	return (
 		<Chat
+			key={`${saved.sessionId}:${saved.events.length}`}
 			chatId={id}
 			sessionId={saved.sessionId}
 			session={saved.session}

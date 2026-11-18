@@ -1,6 +1,6 @@
 // The signed-in user's connected apps through Composio Platform (the Composio user is
 // the Neon Auth user id). eve docs: connections > Dynamic connections. Composio docs:
-// sessions-via-mcp, configuring-sessions (sandbox off; E2B does code execution here).
+// sessions-via-mcp, configuring-sessions (sandbox off: this agent runs no code).
 import { defineDynamic, defineMcpClientConnection } from "eve/connections";
 import { appUserId } from "../lib/db";
 

@@ -20,7 +20,8 @@ export default defineAgent({
 		};
 	}),
 	// eve docs, Human in the Loop > "Gate every call from one policy".
-	// Plan: web search only. Ask and Full: no tool here changes anything, so no prompts.
+	// Plan: web search only. Ask and Full: no prompts here (memory writes ask through
+	// their own approval). shortcut: Ask doesn't gate Composio actions yet.
 	approval: ({ session, toolName }) => {
 		// A request with no valid mode counts as Ask, never as Full.
 		const sent = session.auth.current?.attributes.mode;
@@ -33,11 +34,14 @@ export default defineAgent({
 	// No Workflow world set (eve docs, Workflow worlds): `eve dev` keeps runs in local
 	// files (.eve/), and Vercel uses Vercel Workflow. The Postgres world on Neon polled
 	// and re-read every stream chunk over the internet, using up Neon's network transfer.
-	// No 30-day idle timeout: an ended session's history is deleted (private sessions
-	// use zero retention outside dev), so old chats would open empty. Deleting a chat
-	// still ends its session and deletes its history.
+	// A chat's session ends after 7 idle days and the World deletes its run data
+	// (retention 0; set explicitly, because the Sentry trace policy keeps content and
+	// would otherwise keep the World's default). Old chats still open from
+	// agent_event, and the next message starts a new session seeded with the
+	// conversation (channels/eve.ts). Sentry traces are not deleted.
+	experimental: { workflow: { retention: 0 } },
 	limits: {
-		sessionTimeoutMs: false,
+		sessionTimeoutMs: 7 * 24 * 60 * 60_000,
 		// Budget prompt (eve docs: agent-config > Runtime limits): the user is asked to
 		// Continue or Stop at 200k new input tokens, then at 400k, 800k and so on.
 		// shortcut: per chat, not per user per day; add a per-user spend limit before launch.

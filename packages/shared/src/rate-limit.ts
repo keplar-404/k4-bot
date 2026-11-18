@@ -17,7 +17,7 @@ export async function overLimit(
 	const expired = sql`${rateLimit.lastRequest} < ${now - windowMs}`;
 	const [row] = await db
 		.insert(rateLimit)
-		.values({ id: crypto.randomUUID(), key, count: 1, lastRequest: now })
+		.values({ key, count: 1, lastRequest: now })
 		.onConflictDoUpdate({
 			target: rateLimit.key,
 			set: {

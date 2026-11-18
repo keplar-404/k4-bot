@@ -58,6 +58,14 @@ export const dropCachedChat = (id: string) =>
 
 export const clearChatCache = () => run("readwrite", (s) => s.clear());
 
+// The sidebar's chat list, kept beside the chats so it shows before the API answers.
+const LIST = "__list";
+export type CachedListItem = { id: string; title: string };
+export const getCachedList = () =>
+	run<CachedListItem[]>("readonly", (s) => s.get(LIST));
+export const putCachedList = (list: CachedListItem[]) =>
+	run("readwrite", (s) => s.put(list, LIST));
+
 /** Wipes the cache when it belongs to someone else, then marks it as this user's. */
 export function claimChatCache(userId: string) {
 	const previous = claimed;

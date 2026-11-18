@@ -19,10 +19,16 @@ Sentry.init({
 	replaysSessionSampleRate: 0,
 	replaysOnErrorSampleRate: 1,
 	integrations: [
-		Sentry.replayIntegration(),
 		Sentry.consoleLoggingIntegration({ levels: ["warn", "error"] }),
 	],
 });
+
+// Replay loads from Sentry's CDN after start (Sentry docs: APIs > lazyLoadIntegration),
+// so it isn't in every page's first load. ponytail: errors in the first moments
+// before it loads get no replay; import it eagerly again if those matter.
+Sentry.lazyLoadIntegration("replayIntegration")
+	.then((replay) => Sentry.addIntegration(replay()))
+	.catch(() => {});
 
 // Traces client-side navigations (sidebar chat switches).
 export const onRouterTransitionStart = Sentry.captureRouterTransitionStart;

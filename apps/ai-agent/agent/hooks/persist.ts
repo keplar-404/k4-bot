@@ -7,32 +7,59 @@ import { defineHook } from "eve/hooks";
 import { appUserId, db } from "../lib/db";
 import { withoutPageText } from "../lib/page-text";
 
+type Row = typeof agentEvent.$inferInsert;
+
+// Rows wait here and go to Neon in one insert: about 2-4 requests per reply
+// instead of one per event (about 11). Neon bills transfer and compute, so
+// fewer round trips cost less.
+let rows: Row[] = [];
+let timer: ReturnType<typeof setTimeout> | undefined;
+
+function flush() {
+	clearTimeout(timer);
+	timer = undefined;
+	const batch = rows;
+	rows = [];
+	if (batch.length === 0) return Promise.resolve();
+	return db()
+		.insert(agentEvent)
+		.values(batch)
+		.onConflictDoNothing()
+		.then(
+			() => {},
+			// A missed copy must not break the chat, so failures are only logged.
+			(error: unknown) =>
+				console.error("agent_event insert failed", batch.length, error),
+		);
+}
+
+// Where the turn ends or waits on the user: write now, and the turn waits for it
+// (eve docs, Hooks > Execution order), so a finished turn is always saved.
+const SETTLED = new Set([
+	"turn.settled",
+	"turn.paused",
+	"interaction.opened",
+	"session.ended",
+]);
+
 export default defineHook({
 	events: {
 		"*"(event, ctx) {
-			// eve docs (Hooks > Execution order): the turn waits for each line's hooks.
-			// This copy isn't needed to continue, so it is not awaited: the turn
-			// doesn't pay a database round trip per event. A missed copy must not
-			// break the chat, so failures are only logged.
-			// ponytail: a process crash can drop the copies still in flight.
 			// Read ctx now: it isn't valid after the handler returns.
-			const sessionId = ctx.session.id;
-			db()
-				.insert(agentEvent)
-				.values({
-					sessionId,
-					line: ctx.position.line,
-					index: ctx.position.index,
-					userId: appUserId(ctx.session.auth.initiator),
-					type: event.type,
-					// {} for session-level events: null marks rows saved before scope existed.
-					scope: ("scope" in event ? event.scope : undefined) ?? {},
-					data: withoutPageText(event.data) ?? null,
-				})
-				.onConflictDoNothing()
-				.catch((error: unknown) =>
-					console.error("agent_event insert failed", sessionId, error),
-				);
+			rows.push({
+				sessionId: ctx.session.id,
+				line: ctx.position.line,
+				index: ctx.position.index,
+				userId: appUserId(ctx.session.auth.initiator),
+				type: event.type,
+				// {} for session-level events: null marks rows saved before scope existed.
+				scope: ("scope" in event ? event.scope : undefined) ?? {},
+				data: withoutPageText(event.data) ?? null,
+			});
+			if (SETTLED.has(event.type) || rows.length >= 100) return flush();
+			// Mid-turn events are not awaited, so the reply never waits on Neon.
+			// ponytail: a crash loses at most the last second of a running turn.
+			timer ??= setTimeout(flush, 1000);
 		},
 	},
 });

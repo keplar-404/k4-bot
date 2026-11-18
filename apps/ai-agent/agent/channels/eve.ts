@@ -1,10 +1,11 @@
 import { userFromBearer } from "@repo/shared/auth";
 import { findModel, pickEffort } from "@repo/shared/models";
 import { overLimit } from "@repo/shared/rate-limit";
-import { agentEvent } from "@repo/shared/schema";
-import { and, eq, isNotNull } from "drizzle-orm";
+import { agentEvent, chat } from "@repo/shared/schema";
+import { and, eq, inArray, isNotNull } from "drizzle-orm";
 import { type AuthFn, ForbiddenError, localDev } from "eve/channels/auth";
 import { defaultEveAuth, eveChannel } from "eve/channels/eve";
+import { type SessionStreamEvent, transcriptOf } from "eve/client";
 import { sessions } from "eve/server";
 import { db } from "../lib/db";
 import { assertSessionOwner } from "../lib/owner";
@@ -57,6 +58,49 @@ async function ownerFromStream(sessionId: string): Promise<string | null> {
 	}
 }
 
+// The text of a chat's current session, from our agent_event copy: only the
+// caller's own chat, and only the event types that hold text (not tool output).
+// ponytail: last 50 messages; summarize older ones if long chats lose context.
+async function chatHistory(chatId: string, userId: string) {
+	if (chatId.length > 100) return undefined;
+	const rows = await db()
+		.select({
+			type: agentEvent.type,
+			scope: agentEvent.scope,
+			data: agentEvent.data,
+			line: agentEvent.line,
+			index: agentEvent.index,
+		})
+		.from(agentEvent)
+		.innerJoin(chat, eq(chat.eveSessionId, agentEvent.sessionId))
+		.where(
+			and(
+				eq(chat.id, chatId),
+				eq(chat.userId, userId),
+				inArray(agentEvent.type, TEXT_EVENTS),
+			),
+		)
+		.orderBy(agentEvent.line, agentEvent.index);
+	const events = rows.map((r) => ({
+		type: r.type,
+		scope: r.scope ?? {},
+		data: r.data,
+		meta: { position: { line: r.line, index: r.index }, at: "" },
+	})) as unknown as SessionStreamEvent[];
+	return transcriptOf(events, { maxMessages: 50 }).messages.map((m) => ({
+		role: m.role,
+		text: m.text,
+	}));
+}
+const TEXT_EVENTS = [
+	"delivery.consumed",
+	"content.completed",
+	"turn.started",
+	"turn.settled",
+	"context.settled",
+	"session.ended",
+];
+
 // Browser requests carry the signed-in user's Neon Auth token (Authorization: Bearer).
 // It is checked locally against Neon's public keys, then the session must be theirs.
 const appSession: AuthFn<Request> = async (request) => {
@@ -92,7 +136,7 @@ export default eveChannel({
 	auth: [appSession, localDev()],
 	// The web app sends { model, reasoning, mode } as clientContext. Validate it and
 	// hand it to agent.ts (model, approval policy) through the turn's auth.
-	onMessage(ctx) {
+	async onMessage(ctx) {
 		const auth = defaultEveAuth(ctx);
 		const sent = ctx.eve.clientContext;
 		if (!auth || !sent || typeof sent !== "object" || Array.isArray(sent)) {
@@ -102,8 +146,15 @@ export default eveChannel({
 			model: modelId,
 			reasoning,
 			mode,
+			reseed,
 			...rest
 		} = sent as Record<string, unknown>;
+		// A new session for a chat whose old session ended or is gone: the model
+		// gets the old conversation back (eve docs: Start from prior history).
+		const history =
+			!ctx.eve.sessionId && typeof reseed === "string" && auth.principalId
+				? await chatHistory(reseed, auth.principalId)
+				: undefined;
 		const model = findModel(modelId);
 		const effort = pickEffort(model, reasoning);
 		const safeMode = MODES.find((m) => m === mode) ?? "ask";
@@ -119,6 +170,7 @@ export default eveChannel({
 			},
 			// The model still sees the mode, so it can explain what it may do.
 			clientContext: JSON.stringify({ mode: safeMode, ...rest }),
+			...(history?.length ? { history } : {}),
 		};
 	},
 });

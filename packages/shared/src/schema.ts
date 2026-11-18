@@ -45,10 +45,8 @@ export const agentEvent = pgTable(
 		data: jsonb("data"),
 		createdAt: timestamp("created_at").defaultNow().notNull(),
 	},
-	(t) => [
-		primaryKey({ columns: [t.sessionId, t.line, t.index] }),
-		index("agent_event_userId_idx").on(t.userId),
-	],
+	// Every query starts with session_id, so the primary key serves them all.
+	(t) => [primaryKey({ columns: [t.sessionId, t.line, t.index] })],
 );
 
 // What the agent remembers about each user: plain text, one fact per line. The
@@ -63,10 +61,21 @@ export const agentMemory = pgTable("agent_memory", {
 		.notNull(),
 });
 
+// A user's uploaded file: the bytes live in Neon Object Storage under `key`
+// (apps/backend/src/files.ts), this row says whose it is and what it is.
+// Read by id (+ owner check) only, so no user_id index.
+export const file = pgTable("file", {
+	id: text("id").primaryKey(),
+	userId: text("user_id").notNull(),
+	key: text("key").notNull(),
+	name: text("name").notNull(),
+	type: text("type").notNull(),
+	createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Per-user request counters (see rate-limit.ts in this package).
 export const rateLimit = pgTable("rate_limit", {
-	id: text("id").primaryKey(),
-	key: text("key").notNull().unique(),
+	key: text("key").primaryKey(),
 	count: integer("count").notNull(),
 	lastRequest: bigint("last_request", { mode: "number" }).notNull(),
 });
