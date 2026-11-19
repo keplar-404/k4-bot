@@ -28,3 +28,16 @@ test("stored web_fetch content is capped; other data is unchanged", () => {
 	expect(withoutPageText(null)).toBeNull();
 	expect(withoutPageText({ output: "plain" })).toEqual({ output: "plain" });
 });
+
+test("stored computer tool output is capped; exit code is kept", () => {
+	const out = withoutPageText({
+		output: {
+			exitCode: 0,
+			stdout: "o".repeat(12_000),
+			stderr: "e".repeat(4_000),
+		},
+	}) as { output: { exitCode: number; stdout: string; stderr: string } };
+	expect(out.output.exitCode).toBe(0);
+	expect(out.output.stdout.length).toBeLessThan(2020);
+	expect(out.output.stderr.length).toBeLessThan(1020);
+});

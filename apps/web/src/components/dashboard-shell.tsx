@@ -3,6 +3,7 @@
 import { PanelRightIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { usePanelRef } from "react-resizable-panels";
+import { ComputerPanel } from "@/components/computer-panel";
 import { Button } from "@/components/ui/button";
 import {
 	ResizableHandle,
@@ -16,10 +17,11 @@ import {
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useComputerBusy } from "@/lib/chat-ui";
 
 // Header + [page | right panel]. The right panel is always rendered and only
-// collapsed, so the page (the chat and its eve stream) never remounts.
-// Empty for now: its features come later.
+// collapsed, so the page (the chat and its eve stream) never remounts. It shows the
+// user's computer, mounted only while open; it opens when the agent starts using it.
 export function DashboardShell({ children }: { children: React.ReactNode }) {
 	const panel = usePanelRef();
 	const [open, setOpen] = useState(false);
@@ -28,6 +30,11 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 	useEffect(() => {
 		if (isMobile) panel.current?.collapse();
 	}, [isMobile, panel]);
+	const computerBusy = useComputerBusy();
+	useEffect(() => {
+		if (computerBusy && !isMobile && panel.current?.isCollapsed())
+			panel.current.resize("40%");
+	}, [computerBusy, isMobile, panel]);
 	const toggle = () =>
 		panel.current?.isCollapsed()
 			? panel.current.expand()
@@ -45,7 +52,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 									variant="ghost"
 									size="icon-sm"
 									className="ml-auto -mr-1"
-									aria-label={open ? "Close panel" : "Open panel"}
+									aria-label={open ? "Close computer" : "Open computer"}
 									aria-pressed={open}
 									onClick={toggle}
 								/>
@@ -54,7 +61,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 							<PanelRightIcon />
 						</TooltipTrigger>
 						<TooltipContent>
-							{open ? "Close panel" : "Open panel"}
+							{open ? "Close computer" : "Open computer"}
 						</TooltipContent>
 					</Tooltip>
 				)}
@@ -74,7 +81,9 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 					maxSize="50%"
 					onResize={(size) => setOpen(size.asPercentage > 0)}
 				>
-					<aside aria-label="Side panel" className="h-full" />
+					<aside aria-label="Your computer" className="h-full">
+						{open && <ComputerPanel />}
+					</aside>
 				</ResizablePanel>
 			</ResizablePanelGroup>
 		</>

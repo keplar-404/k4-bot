@@ -61,15 +61,16 @@ export const agentMemory = pgTable("agent_memory", {
 		.notNull(),
 });
 
-// A user's uploaded file: the bytes live in Neon Object Storage under `key`
-// (apps/backend/src/files.ts), this row says whose it is and what it is.
-// Read by id (+ owner check) only, so no user_id index.
-export const file = pgTable("file", {
-	id: text("id").primaryKey(),
-	userId: text("user_id").notNull(),
-	key: text("key").notNull(),
-	name: text("name").notNull(),
-	type: text("type").notNull(),
+// Each user's one cloud computer (an E2B desktop), shared by all their chats and
+// agents. Paused when idle; E2B resumes it when any tool connects again.
+export const userComputer = pgTable("user_computer", {
+	userId: text("user_id").primaryKey(),
+	sandboxId: text("sandbox_id").notNull(),
+	// The live view's VNC password: only GET /api/me/computer hands it out, to the owner.
+	streamPassword: text("stream_password").notNull(),
+	// Signs the live view's short tokens (websockify JWTTokenApi in the computer).
+	// Never leaves the backend. Null on computers made before the direct stream.
+	streamKey: text("stream_key"),
 	createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

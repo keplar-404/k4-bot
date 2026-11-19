@@ -1,0 +1,278 @@
+// Each user's one cloud computer: an E2B desktop (template `k4-desktop`, built by
+// scripts/computer-template.ts) shared by all their chats. Every agent (eve session)
+// works as its own Linux user on its own desktop (scripts/k4-agent.sh), so agents
+// never type into each other's windows. The user's own desktop is display :0.
+// E2B is imported inside the functions, so code that never touches the computer
+// (every normal chat turn) never loads the SDK.
+import { createHash, randomBytes } from "node:crypto";
+import { eq } from "drizzle-orm";
+import type { Db } from "./db";
+import { userComputer } from "./schema";
+
+export const COMPUTER_TEMPLATE = "k4-desktop";
+// Idle time before E2B pauses the computer (free while paused). Every use resets it.
+const IDLE_MS = 10 * 60_000;
+// One websockify serves noVNC and every screen: a signed token (streamToken) names the
+// VNC port it may open, so the browser connects to the computer directly.
+const WEBSOCKIFY =
+	"cd /opt/noVNC/utils/websockify && exec python3 -m websockify --web /opt/noVNC --token-plugin JWTTokenApi --token-source /etc/k4/stream-key 6080 > /tmp/websockify.log 2>&1";
+// The computer's ports are public (E2B only takes its access token as a header, which
+// an <iframe> can't send), so the computer closes them itself: from outside, only the
+// stream (6080) and E2B's envd (49983, which has its own token) are reachable; Chrome's
+// control ports and raw VNC are not. Loopback and replies stay open (E2B firewall docs).
+const FIREWALL = [
+	"iptables -F INPUT",
+	"iptables -A INPUT -i lo -j ACCEPT",
+	"iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT",
+	"iptables -A INPUT -p tcp --dport 49983 -j ACCEPT",
+	"iptables -A INPUT -p tcp --dport 6080 -j ACCEPT",
+	"iptables -A INPUT -p tcp -j DROP",
+].join(" && ");
+
+type Desktop = import("@e2b/desktop").Sandbox;
+
+/** The Linux user name of the agent working in an eve session. */
+export const agentName = (sessionId: string) =>
+	`a${createHash("sha256").update(sessionId).digest("hex").slice(0, 10)}`;
+
+// The live view: x11vnc on the user's own desktop (agents' screens run their own,
+// k4-agent.sh), websockify checking tokens, and the firewall. All survive pause and
+// resume (memory snapshot); this redoes only what is missing. The VNC password file
+// it writes is also the one every agent desktop copies.
+async function ensureStream(sbx: Desktop, password: string, streamKey: string) {
+	const up = await sbx.commands
+		.run(
+			"pgrep -x x11vnc >/dev/null && pgrep -f '[t]oken-plugin JWTTokenApi' >/dev/null && iptables -C INPUT -p tcp -j DROP",
+			{ user: "root" },
+		)
+		.then(() => true)
+		.catch(() => false);
+	if (up) return;
+	await sbx.files.write("/etc/k4/stream-key", streamKey, { user: "root" });
+	await sbx.commands.run(
+		`chmod 600 /etc/k4/stream-key && pkill -f '[n]ovnc_proxy'; pkill -f '[w]ebsockify'; ${FIREWALL}`,
+		{ user: "root" },
+	);
+	await sbx.commands.run(
+		`mkdir -p ~/.vnc && x11vnc -storepasswd ${password} ~/.vnc/passwd >/dev/null 2>&1; pgrep -u user -x x11vnc >/dev/null || x11vnc -bg -display :0 -forever -wait 50 -shared -rfbport 5900 -usepw 2>/tmp/x11vnc_stderr.log`,
+	);
+	await sbx.commands.run(WEBSOCKIFY, {
+		user: "root",
+		background: true,
+		timeoutMs: 0,
+	});
+	await sbx.waitAndVerify(
+		"netstat -tuln | grep ':6080 '",
+		(r) => r.stdout.trim() !== "",
+	);
+}
+
+/**
+ * A short token for one screen's live view (VNC port 5900 for the user's desktop,
+ * 5900+N for agent N). websockify checks it once, when the stream connects; noVNC's
+ * reconnects reuse it, so it lasts 15 minutes.
+ */
+export async function streamToken(streamKey: string, vncPort: number) {
+	const { SignJWT } = await import("jose");
+	return new SignJWT({ host: "localhost", port: vncPort })
+		.setProtectedHeader({ alg: "HS256" })
+		.setExpirationTime("15m")
+		.sign(Buffer.from(streamKey, "base64url"));
+}
+
+async function create(db: Db, userId: string) {
+	const { Sandbox } = await import("@e2b/desktop");
+	const sbx = await Sandbox.create(COMPUTER_TEMPLATE, {
+		resolution: [1280, 800],
+		timeoutMs: IDLE_MS,
+		lifecycle: { onTimeout: "pause", autoResume: true },
+		// Public so the browser can stream directly; the computer's firewall and the
+		// stream token are the locks (see FIREWALL).
+		network: { allowPublicTraffic: true },
+		metadata: { userId },
+	});
+	const streamPassword = randomBytes(12).toString("base64url");
+	const streamKey = randomBytes(32).toString("base64url");
+	const [row] = await db
+		.insert(userComputer)
+		.values({ userId, sandboxId: sbx.sandboxId, streamPassword, streamKey })
+		.onConflictDoNothing()
+		.returning();
+	// Another request made this user's computer first: use theirs, drop ours.
+	if (!row) {
+		await sbx.kill().catch(() => {});
+		return null;
+	}
+	return { sbx, streamPassword, streamKey };
+}
+
+/** The user's computer, resumed or created, with its live view and firewall up. */
+export async function userDesktop(db: Db, userId: string) {
+	const { Sandbox, NotFoundError } = await Promise.all([
+		import("@e2b/desktop"),
+		import("e2b"),
+	]).then(([d, e]) => ({ Sandbox: d.Sandbox, NotFoundError: e.NotFoundError }));
+	for (let attempt = 0; attempt < 3; attempt++) {
+		const [row] = await db
+			.select()
+			.from(userComputer)
+			.where(eq(userComputer.userId, userId));
+		let got: {
+			sbx: Desktop;
+			streamPassword: string;
+			streamKey: string;
+		} | null = null;
+		// Made before the direct stream: private, and no key. Replace it once.
+		if (row && !row.streamKey) {
+			const { Sandbox: Base } = await import("e2b");
+			await Base.kill(row.sandboxId).catch(() => {});
+			await db.delete(userComputer).where(eq(userComputer.userId, userId));
+			continue;
+		}
+		if (row?.streamKey) {
+			try {
+				// connect resumes a paused computer and resets its idle timer.
+				const sbx = await Sandbox.connect(row.sandboxId, {
+					timeoutMs: IDLE_MS,
+				});
+				got = {
+					sbx,
+					streamPassword: row.streamPassword,
+					streamKey: row.streamKey,
+				};
+			} catch (error) {
+				if (!(error instanceof NotFoundError)) throw error;
+				// Deleted on E2B's side (e.g. from the console): start a new one.
+				await db.delete(userComputer).where(eq(userComputer.userId, userId));
+			}
+		}
+		got ??= await create(db, userId);
+		if (!got) continue;
+		await ensureStream(got.sbx, got.streamPassword, got.streamKey);
+		return got;
+	}
+	throw new Error("Could not start the computer.");
+}
+
+/**
+ * The display number of a session's agent desktop, or null when that agent hasn't
+ * used the computer (or gave its slot to a newer agent). Starts nothing.
+ */
+export async function agentDisplay(sbx: Desktop, sessionId: string) {
+	const r = await sbx.commands
+		.run(`k4-agent --peek ${agentName(sessionId)}`, { user: "root" })
+		.catch(() => null);
+	const n = Number(r?.stdout.trim());
+	return r?.stdout.trim() && Number.isInteger(n) ? n : null;
+}
+
+const tail = (s: string, max: number) =>
+	s.length > max ? `…(earlier output trimmed)\n${s.slice(-max)}` : s;
+
+// A computer this process connected to recently, per user, and when each agent's
+// desktop was last confirmed. Reused for FRESH_MS, so a burst of tool calls costs one
+// write and one run each instead of a database read, a connect and two checks.
+// Capped at MAX_WARM users (oldest dropped). Reconnecting (userDesktop) also resets
+// the computer's idle timer, which a warm call skips: FRESH_MS is far below IDLE_MS.
+const FRESH_MS = 60_000;
+const MAX_WARM = 50;
+const warm = new Map<
+	string,
+	{ sbx: Desktop; at: number; agents: Map<string, number> }
+>();
+
+async function warmDesktop(db: Db, userId: string) {
+	const now = Date.now();
+	const hit = warm.get(userId);
+	if (hit && now - hit.at < FRESH_MS) return hit;
+	const { sbx } = await userDesktop(db, userId);
+	const entry = {
+		sbx,
+		at: now,
+		agents: hit?.agents ?? new Map<string, number>(),
+	};
+	warm.delete(userId);
+	if (warm.size >= MAX_WARM) {
+		const oldest = warm.keys().next().value;
+		if (oldest !== undefined) warm.delete(oldest);
+	}
+	warm.set(userId, entry);
+	return entry;
+}
+
+/**
+ * Runs a shell command as a session's agent, on its own desktop (started on first
+ * use). Cua Driver and the Browser Use harness are on its PATH, set up for that
+ * desktop. A failing command comes back as output, so the agent can read and retry.
+ */
+export async function runOnComputer(
+	db: Db,
+	userId: string,
+	sessionId: string,
+	command: string,
+	opts: { timeoutMs?: number; signal?: AbortSignal; stdin?: string } = {},
+) {
+	const { CommandExitError } = await import("e2b");
+	const name = agentName(sessionId);
+	const result = (r: { exitCode: number; stdout: string; stderr: string }) => ({
+		exitCode: r.exitCode,
+		stdout: tail(r.stdout, 12_000),
+		stderr: tail(r.stderr, 4_000),
+	});
+	for (let attempt = 0; ; attempt++) {
+		// Command and input in one file, run as the agent itself: one write, one run, no
+		// shell quoting. The input goes in as a heredoc with a random end marker.
+		const id = crypto.randomUUID().replaceAll("-", "");
+		const path = `/tmp/k4-${id}.sh`;
+		const script = `. /home/${name}/.k4env\n{\n${command}\n} <<'K4_${id}'\n${opts.stdin ?? ""}\nK4_${id}\n`;
+		const w = await warmDesktop(db, userId);
+		try {
+			if ((w.agents.get(name) ?? 0) < Date.now() - FRESH_MS) {
+				await w.sbx.commands.run(`k4-agent ${name}`, {
+					user: "root",
+					timeoutMs: 120_000,
+				});
+				w.agents.set(name, Date.now());
+			}
+			await w.sbx.files.write(path, script, { user: name });
+			return result(
+				await w.sbx.commands.run(`bash ${path}; s=$?; rm -f ${path}; exit $s`, {
+					user: name,
+					// E2B starts in the default user's home otherwise, which agents may not enter.
+					cwd: `/home/${name}`,
+					timeoutMs: opts.timeoutMs ?? 120_000,
+					signal: opts.signal,
+				}),
+			);
+		} catch (error) {
+			if (error instanceof CommandExitError) return result(error);
+			// The computer paused, was replaced, or the connection broke: start over once.
+			warm.delete(userId);
+			if (attempt > 0 || opts.signal?.aborted) throw error;
+		}
+	}
+}
+
+/**
+ * Pauses the user's computer now: billing stops, and files, apps, logins and open
+ * windows are kept. Any later use (the panel or an agent) resumes it. False when the
+ * user has no computer.
+ */
+export async function pauseComputer(db: Db, userId: string) {
+	const [row] = await db
+		.select({ sandboxId: userComputer.sandboxId })
+		.from(userComputer)
+		.where(eq(userComputer.userId, userId));
+	if (!row) return false;
+	const { Sandbox, ServiceBusyError } = await import("e2b");
+	// E2B can refuse a pause for a moment with 503 ServiceBusyError: retry.
+	for (let attempt = 1; ; attempt++) {
+		try {
+			await Sandbox.pause(row.sandboxId);
+			return true;
+		} catch (error) {
+			if (!(error instanceof ServiceBusyError) || attempt === 3) throw error;
+			await new Promise((r) => setTimeout(r, 1000 * attempt));
+		}
+	}
+}

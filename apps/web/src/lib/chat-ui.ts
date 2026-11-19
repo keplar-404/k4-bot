@@ -3,9 +3,17 @@ import { create } from "zustand";
 // Open/closed choices the person made on Steps blocks and rows, by id. Kept
 // outside the components so they survive a remount (placeholder -> real message,
 // reopening a chat). The conversation itself stays in eve's useEveAgent store.
-const useStore = create<{ open: Record<string, boolean>; memoryBusy: boolean }>(
-	() => ({ open: {}, memoryBusy: false }),
-);
+const useStore = create<{
+	open: Record<string, boolean>;
+	memoryBusy: boolean;
+	computerBusy: boolean;
+	computerSession: string | undefined;
+}>(() => ({
+	open: {},
+	memoryBusy: false,
+	computerBusy: false,
+	computerSession: undefined,
+}));
 
 export function useManualOpen(key: string) {
 	const value = useStore((s) => s.open[key]);
@@ -20,3 +28,14 @@ export function useManualOpen(key: string) {
 export const useMemoryBusy = () => useStore((s) => s.memoryBusy);
 export const setMemoryBusy = (memoryBusy: boolean) =>
 	useStore.setState({ memoryBusy });
+
+// True while this tab's chat runs a computer_* tool: the dashboard opens the
+// Computer panel so the user sees the agent work.
+export const useComputerBusy = () => useStore((s) => s.computerBusy);
+export const setComputerBusy = (computerBusy: boolean) =>
+	useStore.setState({ computerBusy });
+
+// The open chat's eve session: the Computer panel shows that chat's agent desktop.
+export const useComputerSession = () => useStore((s) => s.computerSession);
+export const setComputerSession = (computerSession: string | undefined) =>
+	useStore.setState({ computerSession });

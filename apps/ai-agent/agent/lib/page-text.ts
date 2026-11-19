@@ -18,5 +18,8 @@ export function withoutPageText(data: unknown): unknown {
 		}));
 	// web_fetch and similar: page text in `content`.
 	if (typeof slim.content === "string") slim.content = cap(slim.content, 2000);
+	// computer_* tools: command output (the model already read up to 12 KB of it).
+	if (typeof slim.stdout === "string") slim.stdout = cap(slim.stdout, 2000);
+	if (typeof slim.stderr === "string") slim.stderr = cap(slim.stderr, 1000);
 	return { ...(data as object), output: slim };
 }

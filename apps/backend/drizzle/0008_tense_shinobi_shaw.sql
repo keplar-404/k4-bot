@@ -1,0 +1,1 @@
+ALTER TABLE "user_computer" ADD COLUMN "stream_key" text;

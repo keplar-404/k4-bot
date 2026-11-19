@@ -59,3 +59,12 @@ test("CORS only answers the web app's origin", async () => {
 		),
 	).toBeNull();
 });
+
+test("the computer is only for the signed-in user", async () => {
+	expect((await call("/api/me/computer")).status).toBe(401);
+	expect(
+		(await call("/api/me/computer/pause", { method: "POST" })).status,
+	).toBe(401);
+	// The old relay is gone: the stream goes straight to the computer.
+	expect((await call("/api/computer/anything/vnc.html")).status).toBe(404);
+});

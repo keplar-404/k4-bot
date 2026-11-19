@@ -8,7 +8,7 @@ import { requestId } from "hono/request-id";
 import { secureHeaders } from "hono/secure-headers";
 import { isDev, webUrl } from "./auth";
 import { chats } from "./chats";
-import { files } from "./files";
+import { myComputer } from "./computer";
 import { me } from "./me";
 
 const isLocal = (o: string) =>
@@ -48,8 +48,8 @@ const app = base
 		}),
 	)
 	.route("/api/chats", chats)
+	.route("/api/me/computer", myComputer)
 	.route("/api/me", me)
-	.route("/api/files", files)
 	.get("/", (c) => c.text("ok"))
 	// Always JSON, never a stack trace; the request id in the log matches X-Request-Id.
 	.notFound((c) => c.json({ error: "Not found" }, 404))
@@ -61,4 +61,7 @@ const app = base
 
 export type AppType = typeof app;
 
-export default { port: Number(process.env.PORT ?? 8787), fetch: app.fetch };
+export default {
+	port: Number(process.env.PORT ?? 8787),
+	fetch: app.fetch,
+};

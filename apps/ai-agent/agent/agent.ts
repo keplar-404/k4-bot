@@ -5,6 +5,8 @@ import { defineAgent, defineDynamic } from "eve";
 const openrouter = createOpenRouter({ apiKey: process.env.OPENROUTER_API_KEY });
 
 const MODES = new Set(["ask", "plan", "full"]);
+// The simple computer tools (tools/browser.ts, tools/app.ts): gated like computer_*.
+const COMPUTER_TOOLS = new Set(["browser", "app"]);
 
 export default defineAgent({
 	// The web picker's choice arrives as auth attributes set in channels/eve.ts.
@@ -29,6 +31,12 @@ export default defineAgent({
 		if (mode === "plan" && toolName !== "web_search") {
 			return { type: "denied", reason: "Plan mode only allows web_search." };
 		}
+		// The user's computer holds their files and logins: Ask mode confirms each action.
+		if (
+			mode === "ask" &&
+			(toolName.startsWith("computer_") || COMPUTER_TOOLS.has(toolName))
+		)
+			return "user-approval";
 		return undefined;
 	},
 	// No Workflow world set (eve docs, Workflow worlds): `eve dev` keeps runs in local

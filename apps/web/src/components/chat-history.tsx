@@ -26,7 +26,12 @@ import {
 	SidebarMenuSkeleton,
 } from "@/components/ui/sidebar";
 import { api, CHATS_CHANGED } from "@/lib/api";
-import { dropCachedChat, getCachedList, putCachedList } from "@/lib/chat-cache";
+import {
+	dropCachedChat,
+	forgetChatCheck,
+	getCachedList,
+	putCachedList,
+} from "@/lib/chat-cache";
 
 type Chat = { id: string; title: string };
 
@@ -79,6 +84,7 @@ export function ChatHistory() {
 		});
 		if (!res?.ok) return;
 		void dropCachedChat(chat.id);
+		forgetChatCheck(chat.id);
 		setChats((c) => c.filter((x) => x.id !== chat.id));
 		if (pathname === `/dashboard/chat/${chat.id}`)
 			router.push("/dashboard/chat");

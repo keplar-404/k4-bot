@@ -4,6 +4,7 @@
 // the cache is wiped when another user signs in or this one signs out.
 // Every call fails soft: no IndexedDB (private mode, quota) just means no cache.
 import type { ClientSessionState, SessionStreamEvent } from "eve/client";
+import { api } from "@/lib/api";
 
 export type CachedChat = {
 	session: ClientSessionState;
@@ -88,3 +89,41 @@ export const lastLine = (events: SessionStreamEvent[]) =>
 const PROGRESS = new Set(["content.delta", "call.input", "call.progress"]);
 export const recorded = (events: readonly SessionStreamEvent[]) =>
 	events.filter((e) => !PROGRESS.has(e.type));
+
+// One backend check per chat (and cached position) per 5 minutes, shared by every
+// caller: reopening a chat soon after, or React running the effect twice, reuses it.
+// shortcut: a chat changed on another device shows its new turns up to 5 minutes late.
+const RECHECK_MS = 5 * 60_000;
+const checks = new Map<string, { at: number; res: Promise<ChatResponse> }>();
+type ChatResponse = Awaited<
+	ReturnType<(typeof api.api.chats)[":id"]["$get"]>
+>["json"] extends () => Promise<infer B>
+	? { status: number; body: B }
+	: never;
+
+/** Forget cached checks for a chat (it was deleted here). */
+export const forgetChatCheck = (id: string) => {
+	for (const k of checks.keys()) if (k.startsWith(`${id}:`)) checks.delete(k);
+};
+
+export function checkChat(id: string, after?: number): Promise<ChatResponse> {
+	const key = `${id}:${after ?? "all"}`;
+	const now = Date.now();
+	for (const [k, c] of checks) if (now - c.at > RECHECK_MS) checks.delete(k);
+	const hit = checks.get(key);
+	if (hit) return hit.res;
+	const res = api.api.chats[":id"]
+		.$get({
+			param: { id },
+			query: after === undefined ? {} : { after: String(after) },
+		})
+		.then(
+			async (r) => ({ status: r.status, body: await r.json() }) as ChatResponse,
+		);
+	checks.set(key, { at: now, res });
+	res.catch(() => checks.delete(key)); // a failure is retried next time
+	return res;
+}
+
+/** Forget every cached check (a chat turned out missing). */
+export const clearChatChecks = () => checks.clear();

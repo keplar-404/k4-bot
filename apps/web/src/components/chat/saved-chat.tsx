@@ -5,8 +5,13 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Chat } from "@/components/chat/chat";
 import { ChatSkeleton } from "@/components/chat/chat-skeleton";
-import { api } from "@/lib/api";
-import { dropCachedChat, getCachedChat, lastLine } from "@/lib/chat-cache";
+import {
+	checkChat,
+	clearChatChecks,
+	dropCachedChat,
+	getCachedChat,
+	lastLine,
+} from "@/lib/chat-cache";
 
 type Saved = {
 	sessionId: string | null;
@@ -32,16 +37,17 @@ export function SavedChat({ id }: { id: string }) {
 					session: cached.session,
 					events: cached.events,
 				});
-			const res = await api.api.chats[":id"].$get({
-				param: { id },
-				query: cached ? { after: String(lastLine(cached.events)) } : {},
-			});
+			const res = await checkChat(
+				id,
+				cached ? lastLine(cached.events) : undefined,
+			);
 			// Missing, or another user's chat: back to a new chat, which shows a toast.
 			if (res.status === 404) {
+				clearChatChecks();
 				await dropCachedChat(id);
 				return router.replace("/dashboard/chat?notfound=1");
 			}
-			const body = await res.json();
+			const { body } = res;
 			if (!("chat" in body)) throw new Error("Could not load the chat");
 			const sid = body.chat.eveSessionId;
 			if (cached && (!sid || cached.session.sessionId === sid)) {
@@ -57,11 +63,7 @@ export function SavedChat({ id }: { id: string }) {
 			let { events } = body;
 			// The cache's `after` cut the new session's events short: read them all.
 			if (cached) {
-				const all = await api.api.chats[":id"].$get({
-					param: { id },
-					query: {},
-				});
-				const full = await all.json();
+				const { body: full } = await checkChat(id);
 				if (!("chat" in full)) throw new Error("Could not load the chat");
 				events = full.events;
 			}

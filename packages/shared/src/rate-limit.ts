@@ -28,3 +28,26 @@ export async function overLimit(
 		.returning({ count: rateLimit.count });
 	return Number(row?.count) > max;
 }
+
+// In-process fixed windows for cheap, frequent calls (reads): no database write per
+// request. Each instance counts on its own, so the real limit is max × instances.
+// The map is capped: when full, the oldest entries (insertion order) are dropped.
+const windows = new Map<string, { count: number; start: number }>();
+const MAX_KEYS = 10_000;
+
+/** Like overLimit, but counted in memory on this instance only. */
+export function overLimitInMemory(key: string, max: number, windowMs: number) {
+	const now = Date.now();
+	const w = windows.get(key);
+	if (!w || now - w.start >= windowMs) {
+		windows.delete(key);
+		if (windows.size >= MAX_KEYS) {
+			const oldest = windows.keys().next().value;
+			if (oldest !== undefined) windows.delete(oldest);
+		}
+		windows.set(key, { count: 1, start: now });
+		return false;
+	}
+	w.count += 1;
+	return w.count > max;
+}

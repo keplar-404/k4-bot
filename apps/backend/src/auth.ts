@@ -1,5 +1,5 @@
 import { type AppUser, userFromBearer } from "@repo/shared/auth";
-import { overLimit } from "@repo/shared/rate-limit";
+import { overLimit, overLimitInMemory } from "@repo/shared/rate-limit";
 import { createMiddleware } from "hono/factory";
 import { db } from "./db";
 
@@ -13,8 +13,13 @@ export type Env = { Variables: { user: AppUser } };
 export const requireUser = createMiddleware<Env>(async (c, next) => {
 	const user = await userFromBearer(c.req.header("authorization"));
 	if (!user) return c.json({ error: "Unauthorized" }, 401);
-	// Each user has their own counter, so one heavy user never blocks another.
-	if (await overLimit(db, `api:${user.id}`, 120, 60_000)) {
+	// Each user has their own counter, so one heavy user never blocks another. Reads
+	// count in memory (no Neon write per request); writes use the shared Neon counter.
+	const read = c.req.method === "GET" || c.req.method === "HEAD";
+	const limited = read
+		? overLimitInMemory(`api:${user.id}`, 240, 60_000)
+		: await overLimit(db, `api-write:${user.id}`, 60, 60_000);
+	if (limited) {
 		return c.json({ error: "Too many requests" }, 429);
 	}
 	c.set("user", user);

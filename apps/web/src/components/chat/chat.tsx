@@ -43,11 +43,16 @@ import {
 	MessageScrollerItem,
 	MessageScrollerProvider,
 	MessageScrollerViewport,
+	useMessageScrollerScrollable,
 } from "@/components/ui/message-scroller";
 import { api, notifyChatsChanged } from "@/lib/api";
 import { getToken } from "@/lib/auth-client";
 import { putCachedChat, recorded } from "@/lib/chat-cache";
-import { setMemoryBusy } from "@/lib/chat-ui";
+import {
+	setComputerBusy,
+	setComputerSession,
+	setMemoryBusy,
+} from "@/lib/chat-ui";
 
 const SUGGESTIONS = [
 	"Search the web for this week's top AI news.",
@@ -119,6 +124,35 @@ async function saveSession(id: string, eveSessionId: string) {
 		await new Promise((r) => setTimeout(r, 1000 * (i + 1)));
 	}
 	return false;
+}
+
+// Long chats draw only their newest messages; reaching the top (or the button, for
+// keyboard users) adds older ones. eve still holds every event: this only limits
+// rendering. The scroller keeps the reading position when older items are added.
+const PAGE = 50;
+function OlderMessages({
+	hidden,
+	onMore,
+}: {
+	hidden: number;
+	onMore: () => void;
+}) {
+	const { start } = useMessageScrollerScrollable();
+	// biome-ignore lint/correctness/useExhaustiveDependencies: load when the top is reached
+	useEffect(() => {
+		if (hidden > 0 && !start) onMore();
+	}, [hidden, start]);
+	if (hidden === 0) return null;
+	return (
+		<Button
+			variant="outline"
+			size="xs"
+			className="absolute top-2 left-1/2 z-10 -translate-x-1/2"
+			onClick={onMore}
+		>
+			Show {Math.min(hidden, PAGE)} earlier messages
+		</Button>
+	);
 }
 
 export function Chat({
@@ -202,20 +236,44 @@ export function Chat({
 		? agent.messages.filter((m) => !m.metadata?.imported)
 		: agent.messages;
 	const empty = past.messages.length === 0 && live.length === 0;
+	const [shown, setShown] = useState(PAGE);
+	const rows = [
+		// Each session numbers its turns from 0, so earlier sessions'
+		// ids repeat: prefix them with their position.
+		...past.messages.map((m, i) => [m, past.order, `p${i}:${m.id}`] as const),
+		...live.map((m) => [m, order, m.id] as const),
+	];
+	const hidden = Math.max(0, rows.length - shown);
 	const running = activeTurn(agent.view) !== undefined;
 	const busy = agent.status === "busy" || running;
-	const savingMemory = agent.messages.some((m) =>
-		m.parts.some(
-			(p) =>
-				p.type === "tool" &&
-				p.name.startsWith("profile__") &&
-				RUNNING.has(p.state),
-		),
-	);
+	// Tools running right now, in one pass: memory edits lock Settings > Memory,
+	// computer tools open the Computer panel.
+	let savingMemory = false;
+	let usingComputer = false;
+	for (const m of agent.messages)
+		for (const p of m.parts)
+			if (p.type === "tool" && RUNNING.has(p.state)) {
+				if (p.name.startsWith("profile__")) savingMemory = true;
+				if (
+					p.name.startsWith("computer_") ||
+					p.name === "browser" ||
+					p.name === "app"
+				)
+					usingComputer = true;
+			}
 	useEffect(() => {
 		setMemoryBusy(savingMemory);
 		return () => setMemoryBusy(false);
 	}, [savingMemory]);
+	useEffect(() => {
+		setComputerBusy(usingComputer);
+		return () => setComputerBusy(false);
+	}, [usingComputer]);
+	const eveSession = agent.session?.sessionId;
+	useEffect(() => {
+		setComputerSession(eveSession);
+		return () => setComputerSession(undefined);
+	}, [eveSession]);
 
 	// Cache the chat in this browser whenever it settles (a turn done, or waiting on
 	// the user), so reopening it reads nothing from Neon. Not while streaming.
@@ -292,14 +350,7 @@ export function Chat({
 									aria-busy={busy}
 									className="mx-auto max-w-4xl gap-6"
 								>
-									{[
-										// Each session numbers its turns from 0, so earlier sessions'
-										// ids repeat: prefix them with their position.
-										...past.messages.map(
-											(m, i) => [m, past.order, `p${i}:${m.id}`] as const,
-										),
-										...live.map((m) => [m, order, m.id] as const),
-									].map(([m, o, key]) => (
+									{rows.slice(hidden).map(([m, o, key]) => (
 										<MessageScrollerItem key={key} messageId={key}>
 											{m.role === "user" ? (
 												<UserMessage message={m} />
@@ -319,6 +370,10 @@ export function Chat({
 									)}
 								</MessageScrollerContent>
 							</MessageScrollerViewport>
+							<OlderMessages
+								hidden={hidden}
+								onMore={() => setShown((n) => n + PAGE)}
+							/>
 							<MessageScrollerButton />
 						</MessageScroller>
 					)}

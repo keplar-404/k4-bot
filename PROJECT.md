@@ -1,6 +1,6 @@
 # Project Overview
 
-**K4** is a personal AI assistant. Each signed-in user chats with an agent that can search the web. Chats and the agent's memory of the user are saved per user. The agent can also act in the user's own apps through Composio (Gmail, Sheets, Slack, ...). The user picks the model, the reasoning effort and a mode (Ask, Plan: web search only, Full).
+**K4** is a personal AI assistant. Each signed-in user chats with an agent that can search the web and work on the user's own cloud computer (section 9). Chats and the agent's memory of the user are saved per user. The agent can also act in the user's own apps through Composio (Gmail, Sheets, Slack, ...). The user picks the model, the reasoning effort and a mode (Ask, Plan: web search only, Full).
 
 Turborepo monorepo (bun workspaces): Next.js web UI, Hono API backend, Neon Auth (Managed Better Auth) for login, Neon Postgres, and an `eve` agent.
 
@@ -127,3 +127,34 @@ eve's documented way (`guides/frontend/nextjs.mdx`, "Resume a saved session"): t
 - Each row becomes `{ type, scope, data, meta: { position: { line, index }, at } }`, and every event except the last of its line gets `meta.endOfLine: false`; without it eve throws "Saved events overlap source lines already covered".
 - eve's Postgres world still loads the whole stream on the server for the catch-up read; the browser only receives the lines after the saved ones.
 - While catching up, `status` is `resuming` and the composer is disabled (eve's rule); with saved events the history is already on screen.
+
+## 9. The user's computer (E2B desktop, agent desktops, live view)
+
+**What it is.** Each user has one cloud computer: an E2B desktop from the template `k4-desktop` (Ubuntu 22.04 + XFCE, Chrome, LibreOffice, GIMP, Cua Driver 0.54.0, Browser Use harness 1.0.6; built by `packages/shared/scripts/computer-template.ts`, 4 vCPU / 8 GB). Its id and live-view password are in the `user_computer` table. It pauses after 10 idle minutes (free) and resumes when used.
+
+**One Linux user and desktop per agent.** Each chat's agent (eve session) gets its own Linux user `a<10 hex>`, X display `:N`, XFCE on its own D-Bus, Chrome (CDP port 9222+N, its own profile), Cua Driver daemon, and VNC on 5900+N. `packages/shared/scripts/k4-agent.sh` (installed as `/usr/local/bin/k4-agent`) sets this up. Every agent home (and the user's) is readable by all agents (group `k4`, `750`), writable only by its owner; `~/Shared` is writable by all. Agents may `sudo apt-get update/install` and nothing else as root. At most 4 agent desktops run at once; the least recently used one gives up its slot (its files stay). The user's own desktop is `:0`.
+
+**Agent tools** (`apps/ai-agent/agent/tools/`, all through `runOnComputer` in `packages/shared/src/computer.ts`):
+- `browser` (simple, for small models): `open`, `read` (page text + numbered links/buttons/fields), `click`, `type`, `back`.
+- `app` (simple): `open` an app, `read` its window (numbered accessibility tree), `click` (one number or a list in order), `type`.
+- `computer_shell` (bash as the agent), `computer_browser` (raw Browser Use harness Python), `computer_app` (one raw Cua Driver call). Skills `browser-use` and `cua-driver` are in `agent/skills/`.
+- Browser calls go through `agent/lib/browser.ts`: each parallel call takes a free slot (own harness daemon and tab, up to 4); the agent's Chrome loads the shared cookie jar (`/home/shared/.k4/cookies.json`) before a script and merges its cookies back after (newest wins, file lock), so a login made by one agent reaches every agent, even running Chromes; the worked tab is brought to the front.
+- Speed: a warm computer (connected in the last 60 s, per user, max 50) skips the database read, connect and checks: a call is one file write and one run (~0.7 s instead of ~2-3 s). Commands run as the agent user (`cwd` = its home).
+- Ask mode asks before each computer action (`computer_*`, `browser`, `app`); Plan mode blocks them.
+- Measured with the free router: a browser task (open, click, read heading) 28 s / 3 steps; a calculator task 44 s / 5 steps / 20K tokens (was 144 s / 24 steps / 179K before multi-click).
+
+**Live view (direct).** The stream goes **E2B → browser**; the backend only signs a token. `GET /api/me/computer?session=<eve session>` (signed in) returns a noVNC URL on the computer itself (`6080-<sandbox>.e2b.app`) whose `path` carries a JWT (HS256, 15 min) naming one screen's VNC port (5900 = the user's, 5900+N = agent N). Inside the computer, one websockify with its `JWTTokenApi` plugin checks the token (per-computer key in `user_computer.stream_key`, never sent to the browser). The computer is created with public traffic (E2B only takes its own token as a header, which an iframe can't send), so it locks itself with `iptables`: from outside only 6080 (stream) and 49983 (E2B's envd, which has its own token) answer; Chrome's control ports and raw VNC don't. Tested: valid token streams; no, forged or expired token is refused; ports 9222+/5900+ unreachable from the internet. Computers made before this (private, no key) are replaced once on next use. The web's `ComputerPanel` mounts only while open, opens by itself when a computer tool starts, is view-only until **Take control** (for captchas, sign-ins, 2FA; the agent is told to hand these to the user), and noVNC reconnects by itself while the token is valid. Its **Stop** button pauses the computer at once (`POST /api/me/computer/pause`; billing stops, everything is kept); **Start computer**, or any agent's next computer call, resumes it. The stream is dropped before pausing, because E2B auto-resumes a paused computer when traffic reaches it. Agents have no stop tool on purpose: one chat could pause the computer under another chat's running agent.
+
+**Where to host what**
+
+| Part | Host | Why |
+|---|---|---|
+| `apps/web` (Next.js) | Vercel | Native Next.js host. |
+| `apps/ai-agent` (eve) | Vercel (`eve deploy`) | eve's documented target; runs on Vercel Workflow. |
+| `apps/backend` (Hono on Bun) | Vercel | The live view no longer passes through it (direct E2B → browser), so it needs no WebSockets or long connections. |
+| Computers | E2B (Pro for real users) | Hobby caps a running computer at 1 hour (pausing resets it) and has 10 concurrent sandboxes; Pro allows 24 hours and 100. |
+| Database | Neon | Unchanged. |
+
+Rebuild the template after changing `computer-template.ts` or `k4-agent.sh`: `cd packages/shared && bun --env-file=../../apps/ai-agent/.env scripts/computer-template.ts`. Existing computers keep their old image; delete their `user_computer` row (and the E2B sandbox) to give a user a fresh one.
+
+**Known limits.** Each agent runs its own Chrome process (a profile can't be shared by two running Chromes: Chromium's `SingletonLock`), so logins are shared by syncing cookies (above); passwords saved in Chrome and other apps' settings are not synced. Screenshots don't reach the model (eve stores returned images in its own sandbox, which this agent doesn't have), so the agent works from the accessibility tree and page text. Live view is noVNC, not Cua's H.264 stream (unmeasured; would need a custom player).
