@@ -68,3 +68,18 @@ test("the computer is only for the signed-in user", async () => {
 	// The old relay is gone: the stream goes straight to the computer.
 	expect((await call("/api/computer/anything/vnc.html")).status).toBe(404);
 });
+
+test("file links and uploads are only for the signed-in user", async () => {
+	expect((await call("/api/files?key=u/x/c/y/z")).status).toBe(401);
+	const upload = await call("/api/files/upload", {
+		method: "POST",
+		headers: { "content-type": "application/json" },
+		body: JSON.stringify({
+			chatId: crypto.randomUUID(),
+			name: "a.txt",
+			type: "text/plain",
+			size: 1,
+		}),
+	});
+	expect(upload.status).toBe(401);
+});

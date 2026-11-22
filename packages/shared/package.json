@@ -13,9 +13,13 @@
 		"./rate-limit": "./src/rate-limit.ts",
 		"./memory": "./src/memory.ts",
 		"./tools": "./src/tools.ts",
-		"./computer": "./src/computer.ts"
+		"./computer": "./src/computer.ts",
+		"./files": "./src/files.ts",
+		"./r2": "./src/r2.ts"
 	},
 	"dependencies": {
+		"@aws-sdk/client-s3": "^3.1171.0",
+		"@aws-sdk/s3-request-presigner": "3.1171.0",
 		"@e2b/desktop": "^2.5.0",
 		"drizzle-orm": "^0.45.4",
 		"e2b": "^2.64.0",

@@ -6,6 +6,7 @@ import type { UseEveAgentReturn } from "eve/react";
 import { LoaderCircleIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { CodeBlock, CodeBlockContent } from "@/components/ui/code-block";
 import {
 	Questionnaire,
 	QuestionnaireActions,
@@ -54,7 +55,7 @@ export function OpenRequests({
 // Approvals, questions and budget prompts all carry a prompt and options, so one
 // shadcn Questionnaire renders them. A typed answer goes as text when allowed.
 function Question({
-	request: { interactionId, request },
+	request: { interactionId, request, call },
 	onAnswer,
 }: {
 	request: Interaction;
@@ -94,6 +95,14 @@ function Question({
 				</QuestionnaireTitle>
 				{request.title && (
 					<QuestionnaireDescription>{request.prompt}</QuestionnaireDescription>
+				)}
+				{/* eve's approval text is only "Approve <tool>?": show what the call would do. */}
+				{call?.input != null && (
+					<CodeBlock size="sm">
+						<CodeBlockContent wrap className="max-h-64">
+							{JSON.stringify(call.input, null, 2)}
+						</CodeBlockContent>
+					</CodeBlock>
 				)}
 				<QuestionnaireChoices>
 					{options.map((o) => (

@@ -1,9 +1,10 @@
 // The everyday browser tool, made for small models: a few plain actions on the agent's
 // own Chrome, and plain-text results with numbered elements to act on. Built on the
 // Browser Use harness (lib/browser.ts); computer_browser stays for anything else.
-import { defineTool } from "eve/tools";
+import { defineDynamic, defineTool } from "eve/tools";
 import { z } from "zod";
 import { runBrowser } from "../lib/browser";
+import { notInPlan } from "../lib/mode";
 
 // Page text plus every visible link, button and field, numbered. The numbers are
 // written into the page (data-k4) so click/type find the same element afterwards.
@@ -66,7 +67,7 @@ js("history.back()")
 __k4_read()`,
 } as const;
 
-export default defineTool({
+const tool = defineTool({
 	description:
 		"Use Chrome on the user's computer, step by step: `open` a URL, `read` the page (text plus numbered links, buttons and fields), `click` an element by its number, `type` text into a field by its number (submit: true presses Enter), or go `back`. Each action returns the page again. The user watches live; for a captcha or sign-in, ask the user to take control.",
 	inputSchema: z.object({
@@ -106,3 +107,5 @@ export default defineTool({
 		return runBrowser(ctx, READ + ACTIONS[input.action](input));
 	},
 });
+
+export default defineDynamic(notInPlan(tool));

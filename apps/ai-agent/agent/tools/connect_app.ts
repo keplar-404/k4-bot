@@ -1,11 +1,12 @@
 // Human in the loop for connected apps (eve docs: tools/workflows > Ask a human:
 // ctx.ask). The turn pauses until the user connects the app or cancels; the web app
 // shows the question as a Connect card and answers it.
-import { defineWorkflowTool } from "eve/tools";
+import { defineDynamic, defineWorkflowTool } from "eve/tools";
 import { z } from "zod";
 import { appUserId } from "../lib/db";
+import { notInPlan } from "../lib/mode";
 
-export default defineWorkflowTool({
+const tool = defineWorkflowTool({
 	description:
 		"Ask the user to connect an app (a Composio toolkit slug such as gmail) and wait until it is connected. Call it whenever an app has no active connection, then retry the task.",
 	inputSchema: z.object({ app: z.string().min(1).max(100) }),
@@ -31,6 +32,8 @@ export default defineWorkflowTool({
 		return { app, connected: false, reason: "It is still not connected." };
 	},
 });
+
+export default defineDynamic(notInPlan(tool));
 
 // Composio docs: configuring-sessions > toolkits(). A session enabled for one toolkit
 // lists only it, with its connection.

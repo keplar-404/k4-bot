@@ -12,9 +12,10 @@ import { assertSessionOwner } from "../lib/owner";
 
 const MODES = ["ask", "plan", "full"] as const;
 
-// A session's owner never changes, so one answer per session is enough.
-// ponytail: unbounded per-process map; it grows by one short entry per chat.
+// A session's owner never changes, so one answer per session is enough. Capped:
+// when full, the oldest entry goes (insertion order), as in rate-limit.ts.
 const owners = new Map<string, string>();
+const MAX_OWNERS = 10_000;
 
 // The user who started a session. Only this agent writes agent_event (hooks/
 // persist.ts), with the session starter as user_id, and its primary key starts
@@ -32,7 +33,11 @@ async function sessionOwner(sessionId: string): Promise<string | null> {
 		)
 		.limit(1);
 	const owner = row?.userId ?? (await ownerFromStream(sessionId));
-	if (owner) owners.set(sessionId, owner);
+	if (owner) {
+		if (owners.size >= MAX_OWNERS)
+			owners.delete(owners.keys().next().value ?? "");
+		owners.set(sessionId, owner);
+	}
 	return owner;
 }
 

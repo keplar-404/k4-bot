@@ -1,12 +1,13 @@
 // Cua Driver on the user's computer: desktop apps through the accessibility tree
 // (element tokens, background input), not screenshots.
-import { defineTool } from "eve/tools";
+import { defineDynamic, defineTool } from "eve/tools";
 import { z } from "zod";
-import { onComputer } from "../lib/computer";
+import { onComputer, oneAtATime } from "../lib/computer";
+import { notInPlan } from "../lib/mode";
 
-export default defineTool({
+const tool = defineTool({
 	description:
-		"Operate desktop apps (LibreOffice, GIMP, file manager…) on the user's computer with Cua Driver: call one driver tool such as list_windows, launch_app, get_window_state, run_steps, click, type_text, invoke_menu or verify_state with its JSON args. Load the `cua-driver` skill first for the loop and rules. The user watches the desktop live.",
+		"Operate desktop apps (LibreOffice, GIMP, file manager…) on the user's computer with Cua Driver: call one driver tool such as list_windows, launch_app, get_window_state, run_steps, click, type_text, invoke_menu or verify_state with its JSON args. Load the `cua-driver` skill first for the loop and rules. Desktop steps run one at a time per agent. The user watches the desktop live.",
 	inputSchema: z.object({
 		tool: z
 			.string()
@@ -24,10 +25,12 @@ export default defineTool({
 		};
 		// Text only: screenshots can't reach the model here, and the tree is the point.
 		if (tool === "get_window_state") input.include_screenshot ??= false;
-		return onComputer(ctx, `cua-driver call ${tool}`, {
+		return onComputer(ctx, oneAtATime(`cua-driver call ${tool}`), {
 			stdin: JSON.stringify(input),
 			timeoutMs: 120_000,
 			signal: ctx.abortSignal,
 		});
 	},
 });
+
+export default defineDynamic(notInPlan(tool));

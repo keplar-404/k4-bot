@@ -3,9 +3,10 @@
 // tree, background input); computer_app stays for everything else. The current window
 // and snapshot live in a small file in the agent's home, so numbers stay valid across
 // calls even when another server instance runs the next one.
-import { defineTool } from "eve/tools";
+import { defineDynamic, defineTool } from "eve/tools";
 import { z } from "zod";
-import { onComputer } from "../lib/computer";
+import { onComputer, oneAtATime } from "../lib/computer";
+import { notInPlan } from "../lib/mode";
 
 const HELPER = `import json, os, subprocess, sys, time
 SESSION = os.environ["K4_SESSION"]
@@ -96,9 +97,9 @@ time.sleep(0.5)
 read()`,
 } as const;
 
-export default defineTool({
+const tool = defineTool({
 	description:
-		"Use desktop apps on the user's computer (LibreOffice, GIMP, text editor, file manager, calculator…), step by step: `open` an app by name, `read` its window (a numbered list of buttons, fields, menus and text), `click` an item by its number (or several in order with `elements`, e.g. a whole calculation), `type` into a field by its number (submit: true presses Enter). Each action returns the window again. The user watches live.",
+		"Use desktop apps on the user's computer (LibreOffice, GIMP, text editor, file manager, calculator…), step by step: `open` an app by name, `read` its window (a numbered list of buttons, fields, menus and text), `click` an item by its number (or several in order with `elements`, e.g. a whole calculation), `type` into a field by its number (submit: true presses Enter). Each action returns the window again. Desktop steps run one at a time per agent. The user watches live.",
 	inputSchema: z.object({
 		action: z.enum(["open", "read", "click", "type"]),
 		name: z
@@ -152,7 +153,9 @@ export default defineTool({
 		return onComputer(
 			ctx,
 			// One Cua Driver session per chat, as computer_app uses.
-			`K4_SESSION=${JSON.stringify(`k4-${ctx.session.id}`)} python3 -`,
+			oneAtATime(
+				`env K4_SESSION=${JSON.stringify(`k4-${ctx.session.id}`)} python3 -`,
+			),
 			{
 				stdin: HELPER + ACTION[input.action](input),
 				timeoutMs: 120_000,
@@ -161,3 +164,5 @@ export default defineTool({
 		);
 	},
 });
+
+export default defineDynamic(notInPlan(tool));

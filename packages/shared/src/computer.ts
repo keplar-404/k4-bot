@@ -29,6 +29,21 @@ const FIREWALL = [
 	"iptables -A INPUT -p tcp -j DROP",
 ].join(" && ");
 
+// Agents' only root access: install Ubuntu packages by name. `apt-get install *` in
+// sudoers also allowed `-o` options and local .debs, which run any command as root.
+// sudo resets the environment, so only these names reach apt-get.
+const K4_INSTALL = `#!/bin/bash
+set -euo pipefail
+[ $# -gt 0 ] || { echo "usage: sudo k4-install PKG..." >&2; exit 2; }
+for p in "$@"; do [[ "$p" =~ ^[a-z0-9][a-z0-9+.-]+$ ]] || { echo "not a package name: $p" >&2; exit 2; }; done
+apt-get update -qq
+DEBIAN_FRONTEND=noninteractive exec apt-get install -y --no-install-recommends -- "$@"
+`;
+const SUDOERS = "%k4 ALL=(root) NOPASSWD: /usr/local/bin/k4-install\n";
+const sha = (s: string) => createHash("sha256").update(s).digest("hex");
+// Fails when either file is missing or changed, so ensureStream rewrites both.
+const LOCKED = `echo '${sha(K4_INSTALL)}  /usr/local/bin/k4-install' | sha256sum -c --status && echo '${sha(SUDOERS)}  /etc/sudoers.d/k4-agents' | sha256sum -c --status`;
+
 type Desktop = import("@e2b/desktop").Sandbox;
 
 /** The Linux user name of the agent working in an eve session. */
@@ -42,15 +57,20 @@ export const agentName = (sessionId: string) =>
 async function ensureStream(sbx: Desktop, password: string, streamKey: string) {
 	const up = await sbx.commands
 		.run(
-			"pgrep -x x11vnc >/dev/null && pgrep -f '[t]oken-plugin JWTTokenApi' >/dev/null && iptables -C INPUT -p tcp -j DROP",
+			`pgrep -x x11vnc >/dev/null && pgrep -f '[t]oken-plugin JWTTokenApi' >/dev/null && iptables -C INPUT -p tcp -j DROP && ${LOCKED}`,
 			{ user: "root" },
 		)
 		.then(() => true)
 		.catch(() => false);
 	if (up) return;
 	await sbx.files.write("/etc/k4/stream-key", streamKey, { user: "root" });
+	await sbx.files.write("/usr/local/bin/k4-install", K4_INSTALL, {
+		user: "root",
+	});
+	await sbx.files.write("/etc/k4/sudoers", SUDOERS, { user: "root" });
+	// A rule that fails visudo is removed, so agents lose sudo rather than keep the old one.
 	await sbx.commands.run(
-		`chmod 600 /etc/k4/stream-key && pkill -f '[n]ovnc_proxy'; pkill -f '[w]ebsockify'; ${FIREWALL}`,
+		`chmod 600 /etc/k4/stream-key && pkill -f '[n]ovnc_proxy'; pkill -f '[w]ebsockify'; ${FIREWALL} && chmod 755 /usr/local/bin/k4-install && chmod 440 /etc/k4/sudoers && { { visudo -cf /etc/k4/sudoers && mv /etc/k4/sudoers /etc/sudoers.d/k4-agents; } || rm -f /etc/sudoers.d/k4-agents; }`,
 		{ user: "root" },
 	);
 	await sbx.commands.run(

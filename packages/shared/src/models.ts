@@ -88,3 +88,31 @@ export function pickEffort(
 ): Effort | undefined {
 	return model.efforts.find((e) => e === effort) ?? model.defaultEffort;
 }
+
+/**
+ * Media models for the agent's `media` tool, the first is the
+ * default (free when one exists). From OpenRouter's live list (2026-11-21).
+ */
+export const mediaModels = {
+	image: [
+		{ id: "recraft/recraft-v4.1-flash-v2:free" },
+		{ id: "bytedance-seed/seedream-5-5" },
+	],
+	// The free HeyGen voice returns raw PCM only, which a browser can't play.
+	speech: [
+		{
+			id: "mistralai/voxtral-mini-tts-3-0",
+			voice: "en_paul_neutral",
+		},
+	],
+	transcribe: [{ id: "nvidia/nemotron-3.5-transcribe" }],
+};
+
+/** The requested media model if allowed, else that kind's default. */
+export function pickMediaModel<K extends keyof typeof mediaModels>(
+	kind: K,
+	id?: string,
+): (typeof mediaModels)[K][number] {
+	const list: readonly (typeof mediaModels)[K][number][] = mediaModels[kind];
+	return list.find((m) => m.id === id) ?? list[0];
+}

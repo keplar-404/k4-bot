@@ -16,11 +16,10 @@
 		"typecheck": "tsc"
 	},
 	"dependencies": {
-		"@composio/core": "^0.29.0",
+		"@composio/core": "^0.31.0",
 		"@neondatabase/serverless": "^1.2.1",
 		"@openrouter/ai-sdk-provider": "^3.1.0",
 		"@repo/shared": "workspace:*",
-		"@sentry/node": "^11.13.0",
 		"ai": "^7.0.172",
 		"drizzle-orm": "^0.45.4",
 		"eve": "^1.0.0-rc.18",

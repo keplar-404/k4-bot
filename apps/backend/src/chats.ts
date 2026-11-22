@@ -1,4 +1,6 @@
 import { zValidator } from "@hono/zod-validator";
+import { chatPrefix } from "@repo/shared/files";
+import { deletePrefix } from "@repo/shared/r2";
 import { agentEvent, chat } from "@repo/shared/schema";
 import { and, desc, eq, gt } from "drizzle-orm";
 import { Hono } from "hono";
@@ -158,6 +160,15 @@ export const chats = new Hono<Env>()
 				console.error("end session failed", row.eveSessionId, error);
 			}
 		}
+		// The chat's shared files and media in R2. Like ending the session, a failure
+		// must not block deleting the user's data: it is logged and the objects stay.
+		const chatId = c.req.valid("param").id;
+		await deletePrefix(chatPrefix(userId, chatId))
+			.then(({ failed }) => {
+				if (failed.length)
+					console.error("chat files not deleted", chatId, failed.length);
+			})
+			.catch((error) => console.error("chat files not deleted", chatId, error));
 		// drizzle skill: multi-step writes that must succeed together go in a transaction.
 		await db.transaction(async (tx) => {
 			if (row.eveSessionId) {

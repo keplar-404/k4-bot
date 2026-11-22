@@ -31,9 +31,14 @@ else
 		grep -qsx "$i" "$state"/a* || { n=$i; break; }
 	done
 	if [ -z "$n" ]; then
-		# All slots taken: stop the least recently used agent's desktop and reuse its
-		# display. Its Linux user and files stay; its desktop restarts when next used.
-		old=$(ls -tr "$state"/a* | head -1)
+		# All slots taken: stop the least recently used idle agent's desktop and reuse
+		# its display. Its Linux user and files stay; its desktop restarts when next
+		# used. An agent with a command running (runOnComputer's /tmp/k4-*.sh) is busy.
+		old=""
+		for f in $(ls -tr "$state"/a*); do
+			pgrep -u "$(basename "$f")" -f '^bash /tmp/k4-' >/dev/null || { old=$f; break; }
+		done
+		[ -n "$old" ] || { echo "All $max agent desktops are busy. Try again in a moment." >&2; exit 75; }
 		n=$(cat "$old")
 		pkill -u "$(basename "$old")" || true
 		rm -f "$old" "/tmp/.X11-unix/X$n" "/tmp/.X$n-lock"

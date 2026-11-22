@@ -14,7 +14,7 @@ const template = Template({ fileContextPath: import.meta.dir })
 		[
 			"apt-get update",
 			"wget -q -O /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb",
-			"DEBIAN_FRONTEND=noninteractive apt-get install -y /tmp/chrome.deb gimp ristretto file-roller fonts-noto-core fonts-noto-color-emoji",
+			"DEBIAN_FRONTEND=noninteractive apt-get install -y /tmp/chrome.deb gimp ristretto file-roller fonts-noto-core fonts-noto-color-emoji ffmpeg poppler-utils",
 			"rm -f /tmp/chrome.deb",
 			"apt-get clean && rm -rf /var/lib/apt/lists/*",
 		],
@@ -39,11 +39,12 @@ const template = Template({ fileContextPath: import.meta.dir })
 		[
 			"install -m 755 /home/user/.local/bin/cua-driver /usr/local/bin/cua-driver",
 			"mkdir -p /opt/uv && UV_TOOL_DIR=/opt/uv/tools UV_TOOL_BIN_DIR=/usr/local/bin UV_PYTHON_INSTALL_DIR=/opt/uv/python /home/user/.local/bin/uv tool install 'browser-use==1.0.6'",
+			// yt-dlp from apt (Ubuntu 22.04) is too old for today's sites.
+			"UV_TOOL_DIR=/opt/uv/tools UV_TOOL_BIN_DIR=/usr/local/bin UV_PYTHON_INSTALL_DIR=/opt/uv/python /home/user/.local/bin/uv tool install yt-dlp",
 			"groupadd -f k4 && usermod -aG k4 user && install -d -m 2775 -g k4 /home/shared && ln -sfn /home/shared /home/user/Shared",
-			// Agents may install apps (system-wide), but nothing else as root: full sudo
-			// would let one agent read another's home.
-			"echo '%k4 ALL=(root) NOPASSWD: /usr/bin/apt-get update, /usr/bin/apt-get install *' > /etc/sudoers.d/k4-agents && chmod 440 /etc/sudoers.d/k4-agents && visudo -cf /etc/sudoers.d/k4-agents",
-			"/usr/local/bin/browser-use --version && /usr/local/bin/cua-driver --version",
+			// Agents' only sudo (`k4-install PKG`) is written on every start by
+			// src/computer.ts ensureStream, so old images get the same rule.
+			"/usr/local/bin/browser-use --version && /usr/local/bin/cua-driver --version && yt-dlp --version && ffmpeg -version && pdftotext -v",
 		],
 		{ user: "root" },
 	)

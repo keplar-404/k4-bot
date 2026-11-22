@@ -5,23 +5,25 @@ import { rateLimit } from "./schema";
 /**
  * Per-key fixed-window counter in the rate_limit table, shared by every instance.
  * Use the user id in the key, so one user's traffic never counts against another's.
- * Returns true when the caller is over `max` in the window.
+ * Returns true when the caller is over `max` in the window. `by` adds more than one
+ * (seconds of audio); `by: 0` only reads the count.
  */
 export async function overLimit(
 	db: Db,
 	key: string,
 	max: number,
 	windowMs: number,
+	by = 1,
 ) {
 	const now = Date.now();
 	const expired = sql`${rateLimit.lastRequest} < ${now - windowMs}`;
 	const [row] = await db
 		.insert(rateLimit)
-		.values({ key, count: 1, lastRequest: now })
+		.values({ key, count: by, lastRequest: now })
 		.onConflictDoUpdate({
 			target: rateLimit.key,
 			set: {
-				count: sql`case when ${expired} then 1 else ${rateLimit.count} + 1 end`,
+				count: sql`case when ${expired} then ${by} else ${rateLimit.count} + ${by} end`,
 				lastRequest: sql`case when ${expired} then ${now} else ${rateLimit.lastRequest} end`,
 			},
 		})
@@ -51,3 +53,5 @@ export function overLimitInMemory(key: string, max: number, windowMs: number) {
 	w.count += 1;
 	return w.count > max;
 }
+
+export const DAY_MS = 24 * 60 * 60_000;

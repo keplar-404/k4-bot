@@ -1,12 +1,22 @@
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { findModel, pickEffort } from "@repo/shared/models";
 import { defineAgent, defineDynamic } from "eve";
+import { modeOf } from "./lib/mode";
 
 const openrouter = createOpenRouter({ apiKey: process.env.OPENROUTER_API_KEY });
 
-const MODES = new Set(["ask", "plan", "full"]);
-// The simple computer tools (tools/browser.ts, tools/app.ts): gated like computer_*.
-const COMPUTER_TOOLS = new Set(["browser", "app"]);
+// Plan mode reads the web only; lib/mode.ts hides every other tool from the model.
+// ask_question changes nothing, and eve's built-in workflow tools must stay static.
+const PLAN_TOOLS = new Set(["web_search", "web_fetch", "ask_question"]);
+// Tools that change something: Ask mode confirms each call.
+const WRITE_TOOLS = new Set([
+	"browser",
+	"app",
+	"share_file",
+	"download_file",
+	"delete_file",
+	"media",
+]);
 
 export default defineAgent({
 	// The web picker's choice arrives as auth attributes set in channels/eve.ts.
@@ -22,19 +32,23 @@ export default defineAgent({
 		};
 	}),
 	// eve docs, Human in the Loop > "Gate every call from one policy".
-	// Plan: web search only. Ask and Full: no prompts here (memory writes ask through
-	// their own approval). shortcut: Ask doesn't gate Composio actions yet.
+	// Ask: confirm every write. Full: no prompts here (memory writes ask through their
+	// own approval). Plan: tools are already hidden; this denial is the backstop.
 	approval: ({ session, toolName }) => {
-		// A request with no valid mode counts as Ask, never as Full.
-		const sent = session.auth.current?.attributes.mode;
-		const mode = typeof sent === "string" && MODES.has(sent) ? sent : "ask";
-		if (mode === "plan" && toolName !== "web_search") {
-			return { type: "denied", reason: "Plan mode only allows web_search." };
+		const mode = modeOf(session);
+		if (
+			mode === "plan" &&
+			!PLAN_TOOLS.has(toolName) &&
+			!toolName.startsWith("eve__")
+		) {
+			return { type: "denied", reason: "Plan mode only reads the web." };
 		}
-		// The user's computer holds their files and logins: Ask mode confirms each action.
 		if (
 			mode === "ask" &&
-			(toolName.startsWith("computer_") || COMPUTER_TOOLS.has(toolName))
+			(toolName.startsWith("computer_") ||
+				WRITE_TOOLS.has(toolName) ||
+				// eve names connection tools `<connection>__<tool>` (docs: connections/mcp).
+				toolName.endsWith("COMPOSIO_MULTI_EXECUTE_TOOL"))
 		)
 			return "user-approval";
 		return undefined;
@@ -43,10 +57,9 @@ export default defineAgent({
 	// files (.eve/), and Vercel uses Vercel Workflow. The Postgres world on Neon polled
 	// and re-read every stream chunk over the internet, using up Neon's network transfer.
 	// A chat's session ends after 7 idle days and the World deletes its run data
-	// (retention 0; set explicitly, because the Sentry trace policy keeps content and
-	// would otherwise keep the World's default). Old chats still open from
-	// agent_event, and the next message starts a new session seeded with the
-	// conversation (channels/eve.ts). Sentry traces are not deleted.
+	// (retention 0, set explicitly rather than using the World's default). Old chats
+	// still open from agent_event, and the next message starts a new session seeded
+	// with the conversation (channels/eve.ts).
 	experimental: { workflow: { retention: 0 } },
 	limits: {
 		sessionTimeoutMs: 7 * 24 * 60 * 60_000,

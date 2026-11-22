@@ -148,5 +148,11 @@ describe.skipIf(!dbUrl)("routes (TEST_DATABASE_URL)", async () => {
 		expect(await overLimit(db, key, 2, 60_000)).toBe(false);
 		expect(await overLimit(db, key, 2, 60_000)).toBe(true);
 		expect(await overLimit(db, `test:${users[1]}`, 2, 60_000)).toBe(false);
+		// `by` adds an amount (seconds of audio); `by: 0` reads without counting.
+		const amount = `by-test:${users[0]}`;
+		expect(await overLimit(db, amount, 1000, 60_000, 900)).toBe(false);
+		expect(await overLimit(db, amount, 1000, 60_000, 0)).toBe(false);
+		expect(await overLimit(db, amount, 1000, 60_000, 200)).toBe(true);
+		expect(await overLimit(db, amount, 1000, 60_000, 0)).toBe(true);
 	});
 });

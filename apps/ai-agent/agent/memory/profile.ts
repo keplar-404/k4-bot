@@ -12,6 +12,7 @@ import { defineTool } from "eve/tools";
 import { always } from "eve/tools/approval";
 import { z } from "zod";
 import { appUserId, db } from "../lib/db";
+import { modeOf } from "../lib/mode";
 
 type Auth = Parameters<typeof appUserId>[0];
 const userOf = (ctx: { session: { auth: { current: Auth } } }) =>
@@ -39,7 +40,8 @@ const profileMemory = defineMemoryProvider({
 	},
 	async tools(ctx) {
 		const userId = userOf(ctx);
-		if (!userId) return null;
+		// Plan mode only reads the web; memory is still recalled above.
+		if (!userId || modeOf(ctx.session) === "plan") return null;
 		return {
 			// The only memory write: rewrites everything, so the user approves every call (eve docs: Human
 			// in the Loop > Approvals). A tricked model can't wipe memory unseen.

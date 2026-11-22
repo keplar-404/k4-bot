@@ -8,6 +8,12 @@ type Ctx = {
 	session: { id: string; auth: { current: Parameters<typeof appUserId>[0] } };
 };
 
+// Desktop steps share one screen and one state file per agent, so they run one at a
+// time (Cua: "keep one controller for a shared desktop"). The 30 s wait plus a
+// step's 90 s stays under the tools' 120 s timeout.
+export const oneAtATime = (command: string) =>
+	`flock -w 30 -E 75 /tmp/k4-app-$USER.lock ${command} || { s=$?; [ $s = 75 ] && echo "Another desktop step of yours is still running. Try again in a moment." >&2; exit $s; }`;
+
 export function onComputer(
 	ctx: Ctx,
 	command: string,

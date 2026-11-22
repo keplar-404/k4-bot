@@ -6,6 +6,8 @@ import {
 	BrainIcon,
 	CheckIcon,
 	CopyIcon,
+	DownloadIcon,
+	FileIcon,
 	GlobeIcon,
 	LoaderCircleIcon,
 	MessageSquareTextIcon,
@@ -16,6 +18,16 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Streamdown } from "streamdown";
+import {
+	Attachment,
+	AttachmentAction,
+	AttachmentActions,
+	AttachmentContent,
+	AttachmentDescription,
+	AttachmentGroup,
+	AttachmentMedia,
+	AttachmentTitle,
+} from "@/components/ui/attachment";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
 import { Button } from "@/components/ui/button";
 import { CodeBlock, CodeBlockContent } from "@/components/ui/code-block";
@@ -39,6 +51,7 @@ import {
 	TraceLine,
 	TraceTitle,
 } from "@/components/ui/trace";
+import { api } from "@/lib/api";
 import { useManualOpen } from "@/lib/chat-ui";
 import { type StartOrder, type Step, splitTurn } from "./split-turn";
 
@@ -73,6 +86,26 @@ export function AssistantMessage({
 }) {
 	const { steps, reply } = splitTurn(message.parts, order);
 	const running = streaming || steps.some(isRunning);
+	// Files the agent gave the user (share_file) show under the reply, not in folded Steps.
+	const files = message.parts.flatMap((p) => {
+		const f = (
+			p.type === "tool" && p.name === "share_file" ? p.output : undefined
+		) as
+			| { key?: unknown; name?: unknown; size?: unknown; type?: unknown }
+			| undefined;
+		return typeof f?.key === "string" &&
+			typeof f.name === "string" &&
+			typeof f.size === "number"
+			? [
+					{
+						key: f.key,
+						name: f.name,
+						size: f.size,
+						type: typeof f.type === "string" ? f.type : undefined,
+					},
+				]
+			: [];
+	});
 	return (
 		<Message>
 			<MessageContent className="gap-3">
@@ -86,6 +119,13 @@ export function AssistantMessage({
 					>
 						{reply}
 					</Streamdown>
+				)}
+				{files.length > 0 && (
+					<AttachmentGroup>
+						{files.map((f) => (
+							<FileCard key={f.key} file={f} />
+						))}
+					</AttachmentGroup>
 				)}
 				{!streaming && reply && (
 					<MessageFooter>
@@ -333,6 +373,66 @@ function ToolInput({ part }: { part: EveToolPart }) {
 	if (!input || Object.keys(input).length === 0) return null;
 	return <Terminal text={JSON.stringify(input, null, 2)} />;
 }
+
+// A file the agent shared or made (share_file, media): a fresh 5-minute link per click.
+function FileCard({
+	file,
+}: {
+	file: { key: string; name: string; size: number; type?: string };
+}) {
+	const [state, setState] = useState<"done" | "processing" | "error">("done");
+	const link = () =>
+		api.api.files
+			.$get({ query: { key: file.key } })
+			.then(async (r) => (r.ok ? (await r.json()).url : null))
+			.catch(() => null);
+	// Images show a preview (a 5-minute link, fetched when the card appears).
+	const image = file.type?.startsWith("image/");
+	const [preview, setPreview] = useState<string | null>(null);
+	// biome-ignore lint/correctness/useExhaustiveDependencies: once per file
+	useEffect(() => {
+		if (image) void link().then(setPreview);
+	}, [file.key]);
+	async function download() {
+		setState("processing");
+		const url = await link();
+		if (!url) return setState("error");
+		window.location.assign(url);
+		setState("done");
+	}
+	return (
+		<Attachment state={state} orientation={image ? "vertical" : "horizontal"}>
+			<AttachmentMedia variant={preview ? "image" : "icon"}>
+				{preview ? (
+					// biome-ignore lint/performance/noImgElement: a signed R2 link, not a static asset
+					<img src={preview} alt={file.name} />
+				) : (
+					<FileIcon />
+				)}
+			</AttachmentMedia>
+			<AttachmentContent>
+				<AttachmentTitle>{file.name}</AttachmentTitle>
+				<AttachmentDescription>
+					{state === "error" ? "Download failed" : bytes.format(file.size)}
+				</AttachmentDescription>
+			</AttachmentContent>
+			<AttachmentActions>
+				<AttachmentAction
+					aria-label={`Download ${file.name}`}
+					onClick={download}
+				>
+					<DownloadIcon />
+				</AttachmentAction>
+			</AttachmentActions>
+		</Attachment>
+	);
+}
+const bytes = new Intl.NumberFormat("en", {
+	notation: "compact",
+	style: "unit",
+	unit: "byte",
+	unitDisplay: "narrow",
+});
 
 function ToolDetail({ part }: { part: EveToolPart }) {
 	const out = part.output;

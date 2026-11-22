@@ -3,10 +3,11 @@
 // sessions-via-mcp, configuring-sessions (sandbox off: this agent runs no code).
 import { defineDynamic, defineMcpClientConnection } from "eve/connections";
 import { appUserId } from "../lib/db";
+import { modeOf } from "../lib/mode";
 
 export default defineDynamic(async (ctx) => {
 	const userId = appUserId(ctx.session.auth.current);
-	if (!userId) return null;
+	if (!userId || modeOf(ctx.session) === "plan") return null;
 	// One Composio session per chat; the memo keeps only its URL, never the key.
 	const { url } = await ctx.memo(userId, async () => {
 		const { Composio } = await import("@composio/core");

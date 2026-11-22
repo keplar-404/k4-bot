@@ -29,7 +29,7 @@ metadata:
     homepage: https://cua.ai/docs/cua-driver
 ---
 
-> **In K4:** call driver tools with the `computer_app` tool (`tool` = the driver tool name, `args` = its JSON arguments), not the CLI or MCP. The daemon already runs on the user's computer: Ubuntu 22.04, XFCE on X11 display `:0`, so read [LINUX.md](LINUX.md). The user is watching this desktop live. Other chats may use the same desktop at the same time, so prefer background element actions and never use foreground or desktop-scope input unless nothing else works.
+> **In K4:** call driver tools with the `computer_app` tool (`tool` = the driver tool name, `args` = its JSON arguments), not the CLI or MCP. The daemon already runs on the user's computer: Ubuntu 22.04, XFCE on your own X11 display (each chat's agent has its own Linux user and screen), so read [LINUX.md](LINUX.md). The user is watching this desktop live. Your desktop steps run one at a time; prefer background element actions and never use foreground or desktop-scope input unless nothing else works.
 
 # cua-driver
 

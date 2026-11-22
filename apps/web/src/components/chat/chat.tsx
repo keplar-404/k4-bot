@@ -4,7 +4,13 @@ import { defaultModelId, type Effort, models } from "@repo/shared/models";
 import { ClientError, type ClientSessionState } from "eve/client";
 import { activeTurn, openInteractions } from "eve/events";
 import { type UseEveAgentOptions, useEveAgent } from "eve/react";
-import { ArrowUpIcon, MessageCircleDashedIcon, SquareIcon } from "lucide-react";
+import {
+	ArrowUpIcon,
+	MessageCircleDashedIcon,
+	PaperclipIcon,
+	SquareIcon,
+	XIcon,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { MessagesSkeleton } from "@/components/chat/chat-skeleton";
@@ -22,6 +28,15 @@ import {
 	ModePicker,
 } from "@/components/chat/pickers";
 import { startOrder } from "@/components/chat/split-turn";
+import {
+	Attachment,
+	AttachmentAction,
+	AttachmentActions,
+	AttachmentContent,
+	AttachmentDescription,
+	AttachmentMedia,
+	AttachmentTitle,
+} from "@/components/ui/attachment";
 import { Button } from "@/components/ui/button";
 import {
 	Empty,
@@ -207,6 +222,40 @@ export function Chat({
 		MODES.includes(v),
 	);
 	const formRef = useRef<HTMLFormElement>(null);
+	const fileRef = useRef<HTMLInputElement>(null);
+	const [upload, setUpload] = useState<{
+		name: string;
+		type?: string;
+		key?: string;
+		read?: string;
+		state: "uploading" | "done" | "error";
+	}>();
+
+	// A file goes from this browser straight to R2 (backend POST /api/files/upload signs
+	// a 60 s link for its exact size and type). The message carries the file itself, so
+	// the model reads it, and its id, so the agent can copy it to its computer.
+	async function attach(file: File) {
+		const chatId = chatIdRef.current;
+		if (!chatId) return;
+		const type = file.type || "application/octet-stream";
+		setUpload({ name: file.name, state: "uploading" });
+		try {
+			const res = await api.api.files.upload.$post({
+				json: { chatId, name: file.name, type, size: file.size },
+			});
+			if (!res.ok) throw new Error(String(res.status));
+			const { key, name, put, read } = await res.json();
+			const sent = await fetch(put, {
+				method: "PUT",
+				headers: { "content-type": type },
+				body: file,
+			});
+			if (!sent.ok) throw new Error(String(sent.status));
+			setUpload({ name, type, key, read, state: "done" });
+		} catch {
+			setUpload({ name: file.name, state: "error" });
+		}
+	}
 
 	const dead = isDeadSession(agent.error);
 	// A dead session's resume can retry for a long time; the next send replaces
@@ -248,19 +297,26 @@ export function Chat({
 	const busy = agent.status === "busy" || running;
 	// Tools running right now, in one pass: memory edits lock Settings > Memory,
 	// computer tools open the Computer panel.
+	// A question the agent asks after using the computer (a captcha or sign-in to do
+	// by hand) opens the panel too.
 	let savingMemory = false;
 	let usingComputer = false;
+	let usedComputer = false;
+	let asking = false;
 	for (const m of agent.messages)
-		for (const p of m.parts)
-			if (p.type === "tool" && RUNNING.has(p.state)) {
-				if (p.name.startsWith("profile__")) savingMemory = true;
-				if (
-					p.name.startsWith("computer_") ||
-					p.name === "browser" ||
-					p.name === "app"
-				)
-					usingComputer = true;
-			}
+		for (const p of m.parts) {
+			if (p.type !== "tool") continue;
+			const computer =
+				p.name.startsWith("computer_") ||
+				p.name === "browser" ||
+				p.name === "app";
+			if (computer) usedComputer = true;
+			if (!RUNNING.has(p.state)) continue;
+			if (p.name.startsWith("profile__")) savingMemory = true;
+			if (computer) usingComputer = true;
+			if (p.name === "ask_question") asking = true;
+		}
+	if (asking && usedComputer) usingComputer = true;
 	useEffect(() => {
 		setMemoryBusy(savingMemory);
 		return () => setMemoryBusy(false);
@@ -309,7 +365,24 @@ export function Chat({
 		}
 		// Sent while running, the message steers the current turn.
 		try {
-			await agent.send(t, {
+			// The agent finds an uploaded file on its computer by this path.
+			const file = upload?.state === "done" ? upload : undefined;
+			const message =
+				file?.read && file.type
+					? [
+							{
+								type: "text" as const,
+								text: `${t}\n\n(Attached ${file.name}, file id \`${file.key}\`.)`,
+							},
+							{
+								type: "file" as const,
+								data: file.read,
+								mediaType: file.type,
+								filename: file.name,
+							},
+						]
+					: t;
+			await agent.send(message, {
 				clientContext: {
 					model,
 					reasoning: effort ?? null,
@@ -317,6 +390,7 @@ export function Chat({
 					...(reseed ? { reseed } : {}),
 				},
 			});
+			if (file) setUpload(undefined);
 		} catch (error) {
 			// Found out only now that the session is gone: send again on a new one.
 			if (!reseed && isDeadSession(error)) return send(t, true);
@@ -424,6 +498,31 @@ export function Chat({
 					}}
 				>
 					<InputGroup>
+						{upload && (
+							<InputGroupAddon align="block-start">
+								<Attachment size="xs" state={upload.state}>
+									<AttachmentMedia>
+										<PaperclipIcon />
+									</AttachmentMedia>
+									<AttachmentContent>
+										<AttachmentTitle>{upload.name}</AttachmentTitle>
+										{upload.state === "error" && (
+											<AttachmentDescription>
+												Upload failed
+											</AttachmentDescription>
+										)}
+									</AttachmentContent>
+									<AttachmentActions>
+										<AttachmentAction
+											aria-label="Remove file"
+											onClick={() => setUpload(undefined)}
+										>
+											<XIcon />
+										</AttachmentAction>
+									</AttachmentActions>
+								</Attachment>
+							</InputGroupAddon>
+						)}
 						<InputGroupTextarea
 							value={input}
 							onChange={(e) => setInput(e.target.value)}
@@ -445,6 +544,31 @@ export function Chat({
 							}}
 						/>
 						<InputGroupAddon align="block-end" className="pt-1">
+							{/* Files go to this chat's agent, so the chat needs its session first. */}
+							{agent.session && (
+								<>
+									<input
+										ref={fileRef}
+										type="file"
+										hidden
+										onChange={(e) => {
+											const f = e.target.files?.[0];
+											e.target.value = "";
+											if (f) void attach(f);
+										}}
+									/>
+									<InputGroupButton
+										type="button"
+										size="icon-sm"
+										variant="ghost"
+										aria-label="Attach a file"
+										disabled={upload?.state === "uploading"}
+										onClick={() => fileRef.current?.click()}
+									>
+										<PaperclipIcon />
+									</InputGroupButton>
+								</>
+							)}
 							<ModelPicker
 								model={model}
 								effort={effort}

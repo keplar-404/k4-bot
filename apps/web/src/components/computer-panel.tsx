@@ -6,7 +6,7 @@ import {
 	MousePointerClickIcon,
 	PowerIcon,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
@@ -30,6 +30,15 @@ export function ComputerPanel() {
 	const [control, setControl] = useState(false);
 	const [attempt, setAttempt] = useState(0);
 	const [paused, setPaused] = useState(false);
+	// Re-asks after the agent started: its desktop is made inside its first computer call.
+	const retries = useRef(0);
+
+	// A new chat never shows the previous chat's screen.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: reset when the chat changes
+	useEffect(() => {
+		setView(undefined);
+		retries.current = 0;
+	}, [session]);
 
 	// Again when the chat changes, or its agent starts (it may have just made its desktop).
 	// biome-ignore lint/correctness/useExhaustiveDependencies: `attempt` and `busy` are triggers
@@ -40,17 +49,35 @@ export function ComputerPanel() {
 		// Already showing this chat's agent desktop: keep the stream, no new link.
 		if (view?.desktop === "agent" && view.session === session) return;
 		let live = true;
+		let timer: ReturnType<typeof setTimeout> | undefined;
 		setError(false);
 		api.api.me.computer
 			.$get({ query: session ? { session } : {} })
 			.then(async (res) => {
 				if (!res.ok) throw new Error(String(res.status));
 				const next = await res.json();
-				if (live) setView({ ...next, session });
+				if (!live) return;
+				// Same screen as shown: keep it, so the stream doesn't reload.
+				setView((v) =>
+					v?.desktop === next.desktop && v.session === session
+						? v
+						: { ...next, session },
+				);
+				// The agent's desktop may still be starting: ask again, 15 times at most.
+				if (
+					next.desktop === "yours" &&
+					session &&
+					(busy || retries.current > 0) &&
+					retries.current < 15
+				) {
+					retries.current++;
+					timer = setTimeout(() => setAttempt((a) => a + 1), 2000);
+				}
 			})
 			.catch(() => live && setError(true));
 		return () => {
 			live = false;
+			clearTimeout(timer);
 		};
 	}, [attempt, session, busy]);
 
