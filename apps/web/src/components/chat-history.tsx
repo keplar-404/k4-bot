@@ -1,21 +1,9 @@
 "use client";
 
-import {
-	LoaderCircleIcon,
-	MessageSquareIcon,
-	MoreHorizontalIcon,
-	PlusIcon,
-	Trash2Icon,
-} from "lucide-react";
+import { LoaderCircleIcon, Trash2Icon } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuItem,
-	DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
 	SidebarGroup,
 	SidebarGroupLabel,
@@ -91,24 +79,15 @@ export function ChatHistory() {
 	}
 
 	return (
-		<SidebarGroup>
-			<SidebarMenu>
-				<SidebarMenuItem>
-					<SidebarMenuButton
-						tooltip="New chat"
-						render={<Link href="/dashboard/chat" />}
-					>
-						<PlusIcon />
-						<span>New chat</span>
-					</SidebarMenuButton>
-				</SidebarMenuItem>
-			</SidebarMenu>
-			<SidebarGroupLabel>History</SidebarGroupLabel>
+		<SidebarGroup className="group-data-[collapsible=icon]:hidden">
+			<SidebarGroupLabel className="text-[11px] tracking-wider uppercase">
+				Recent
+			</SidebarGroupLabel>
 			<SidebarMenu>
 				{loading &&
 					[0, 1, 2, 3, 4].map((i) => (
 						<SidebarMenuItem key={i}>
-							<SidebarMenuSkeleton showIcon />
+							<SidebarMenuSkeleton />
 						</SidebarMenuItem>
 					))}
 				{chats.map((chat) => (
@@ -117,7 +96,6 @@ export function ChatHistory() {
 							isActive={pathname === `/dashboard/chat/${chat.id}`}
 							render={<Link href={`/dashboard/chat/${chat.id}`} />}
 						>
-							<MessageSquareIcon />
 							<span className={deleting.has(chat.id) ? "shimmer" : undefined}>
 								{chat.title}
 							</span>
@@ -127,27 +105,14 @@ export function ChatHistory() {
 								<LoaderCircleIcon className="animate-spin" />
 							</SidebarMenuAction>
 						) : (
-							<DropdownMenu>
-								<DropdownMenuTrigger
-									render={
-										<SidebarMenuAction
-											showOnHover
-											aria-label={`More for ${chat.title}`}
-										/>
-									}
-								>
-									<MoreHorizontalIcon />
-								</DropdownMenuTrigger>
-								<DropdownMenuContent side="right" align="start">
-									<DropdownMenuItem
-										variant="destructive"
-										onClick={() => void remove(chat)}
-									>
-										<Trash2Icon />
-										Delete
-									</DropdownMenuItem>
-								</DropdownMenuContent>
-							</DropdownMenu>
+							<SidebarMenuAction
+								showOnHover
+								aria-label={`Delete ${chat.title}`}
+								className="hover:text-destructive"
+								onClick={() => void remove(chat)}
+							>
+								<Trash2Icon />
+							</SidebarMenuAction>
 						)}
 					</SidebarMenuItem>
 				))}
