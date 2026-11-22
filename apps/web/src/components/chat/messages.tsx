@@ -14,10 +14,12 @@ import {
 	SparklesIcon,
 	ThumbsDownIcon,
 	ThumbsUpIcon,
+	Volume2Icon,
 	WrenchIcon,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Streamdown } from "streamdown";
+import { speak, stopSpeaking } from "@/components/chat/voice";
 import {
 	Attachment,
 	AttachmentAction,
@@ -386,12 +388,16 @@ function FileCard({
 			.$get({ query: { key: file.key } })
 			.then(async (r) => (r.ok ? (await r.json()).url : null))
 			.catch(() => null);
-	// Images show a preview (a 5-minute link, fetched when the card appears).
-	const image = file.type?.startsWith("image/");
+	// Images, audio and video show a preview or player (a 5-minute link, fetched when
+	// the card appears). ponytail: a long video seeked after 5 minutes needs a reload.
+	const kind = file.type?.split("/")[0];
+	const image = kind === "image";
+	const tall = image || kind === "video";
 	const [preview, setPreview] = useState<string | null>(null);
 	// biome-ignore lint/correctness/useExhaustiveDependencies: once per file
 	useEffect(() => {
-		if (image) void link().then(setPreview);
+		if (image || kind === "audio" || kind === "video")
+			void link().then(setPreview);
 	}, [file.key]);
 	async function download() {
 		setState("processing");
@@ -401,11 +407,19 @@ function FileCard({
 		setState("done");
 	}
 	return (
-		<Attachment state={state} orientation={image ? "vertical" : "horizontal"}>
-			<AttachmentMedia variant={preview ? "image" : "icon"}>
-				{preview ? (
+		<Attachment state={state} orientation={tall ? "vertical" : "horizontal"}>
+			<AttachmentMedia variant={preview && image ? "image" : "icon"}>
+				{preview && image ? (
 					// biome-ignore lint/performance/noImgElement: a signed R2 link, not a static asset
 					<img src={preview} alt={file.name} />
+				) : preview && kind === "video" ? (
+					// biome-ignore lint/a11y/useMediaCaption: generated video, no captions exist
+					<video
+						src={preview}
+						controls
+						preload="metadata"
+						className="size-full object-contain"
+					/>
 				) : (
 					<FileIcon />
 				)}
@@ -415,6 +429,15 @@ function FileCard({
 				<AttachmentDescription>
 					{state === "error" ? "Download failed" : bytes.format(file.size)}
 				</AttachmentDescription>
+				{preview && kind === "audio" && (
+					// biome-ignore lint/a11y/useMediaCaption: generated audio, no captions exist
+					<audio
+						src={preview}
+						controls
+						preload="metadata"
+						className="mt-1.5 h-8 w-full min-w-48"
+					/>
+				)}
 			</AttachmentContent>
 			<AttachmentActions>
 				<AttachmentAction
@@ -506,6 +529,10 @@ function Actions({ text }: { text: string }) {
 					setCopied(true);
 					setTimeout(() => setCopied(false), 2000);
 				},
+			})}
+			{btn("Read aloud", <Volume2Icon />, {
+				onClick: () =>
+					speechSynthesis.speaking ? stopSpeaking() : speak(text),
 			})}
 			{btn("Good response", <ThumbsUpIcon />, {
 				"aria-pressed": vote === "up",

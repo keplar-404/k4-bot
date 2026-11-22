@@ -7,6 +7,7 @@ import { type UseEveAgentOptions, useEveAgent } from "eve/react";
 import {
 	ArrowUpIcon,
 	MessageCircleDashedIcon,
+	MicIcon,
 	PaperclipIcon,
 	SquareIcon,
 	XIcon,
@@ -27,7 +28,8 @@ import {
 	ModelPicker,
 	ModePicker,
 } from "@/components/chat/pickers";
-import { startOrder } from "@/components/chat/split-turn";
+import { splitTurn, startOrder } from "@/components/chat/split-turn";
+import { useVoice } from "@/components/chat/voice";
 import {
 	Attachment,
 	AttachmentAction,
@@ -295,6 +297,12 @@ export function Chat({
 	const hidden = Math.max(0, rows.length - shown);
 	const running = activeTurn(agent.view) !== undefined;
 	const busy = agent.status === "busy" || running;
+	const last = live.at(-1);
+	const voice = useVoice({
+		busy,
+		reply: last?.role === "assistant" ? splitTurn(last.parts).reply : undefined,
+		onHeard: (text) => void send(text),
+	});
 	// Tools running right now, in one pass: memory edits lock Settings > Memory,
 	// computer tools open the Computer panel.
 	// A question the agent asks after using the computer (a captcha or sign-in to do
@@ -568,6 +576,21 @@ export function Chat({
 										<PaperclipIcon />
 									</InputGroupButton>
 								</>
+							)}
+							{voice.supported && (
+								<InputGroupButton
+									type="button"
+									size="icon-sm"
+									variant={voice.on ? "default" : "ghost"}
+									aria-pressed={voice.on}
+									aria-label={voice.on ? "Stop voice mode" : "Voice mode"}
+									title={voice.on ? "Stop voice mode" : "Voice mode"}
+									onClick={voice.toggle}
+								>
+									<MicIcon
+										className={voice.listening ? "animate-pulse" : undefined}
+									/>
+								</InputGroupButton>
 							)}
 							<ModelPicker
 								model={model}

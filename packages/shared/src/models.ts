@@ -106,6 +106,19 @@ export const mediaModels = {
 		},
 	],
 	transcribe: [{ id: "nvidia/nemotron-3.5-transcribe" }],
+	// No free video model exists (GET /api/v1/videos/models, 2026-11-22). wan-3.0 is
+	// about $0.05 a second at 480p; the others for when the user asks for quality.
+	video: [
+		{ id: "alibaba/wan-3.0" },
+		{ id: "bytedance/seedance-2.0-mini" },
+		{ id: "google/veo-3.1-lite" },
+		{ id: "x-ai/grok-imagine-video-1.5-lite" },
+	],
+	// Lyria: a 30 s clip is $0.04, a full song $0.08 (OpenRouter model pages).
+	music: [
+		{ id: "google/lyria-3-clip-preview" },
+		{ id: "google/lyria-3-pro-preview" },
+	],
 };
 
 /** The requested media model if allowed, else that kind's default. */

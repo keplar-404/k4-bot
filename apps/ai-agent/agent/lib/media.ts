@@ -3,20 +3,20 @@
 import { DAY_MS, overLimit } from "@repo/shared/rate-limit";
 import { db } from "./db";
 
-/** POST to OpenRouter; 429 and 5xx are retried up to 3 tries with backoff. */
+/** POST to OpenRouter (GET without a body); 429 and 5xx are retried up to 3 tries with backoff. */
 export async function openrouter(
 	path: string,
-	body: unknown,
+	body?: unknown,
 	timeoutMs = 60_000,
 ) {
 	for (let attempt = 1; ; attempt++) {
 		const res = await fetch(`https://openrouter.ai/api/v1/${path}`, {
-			method: "POST",
+			method: body === undefined ? "GET" : "POST",
 			headers: {
 				authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
 				"content-type": "application/json",
 			},
-			body: JSON.stringify(body),
+			body: body === undefined ? undefined : JSON.stringify(body),
 			signal: AbortSignal.timeout(timeoutMs),
 		});
 		if (res.ok || attempt === 3 || (res.status !== 429 && res.status < 500))
@@ -25,8 +25,15 @@ export async function openrouter(
 	}
 }
 
-// Per user per day: images by count, speech and transcription by seconds.
-const QUOTA = { image: 20, speech: 30 * 60, transcribe: 60 * 60 };
+// Per user per day: images, videos and music by count, speech and transcription by
+// seconds (PLAN.md Phase D rule 3).
+const QUOTA = {
+	image: 20,
+	video: 3,
+	music: 10,
+	speech: 30 * 60,
+	transcribe: 60 * 60,
+};
 
 /** Counts `amount` now; true when that puts the user over today's quota. */
 export const overQuota = (

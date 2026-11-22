@@ -54,10 +54,66 @@ export const agentName = (sessionId: string) =>
 // k4-agent.sh), websockify checking tokens, and the firewall. All survive pause and
 // resume (memory snapshot); this redoes only what is missing. The VNC password file
 // it writes is also the one every agent desktop copies.
+/**
+ * Starts XFCE again on a desktop whose session was logged out, as the E2B Desktop SDK's
+ * startXfce4() does: a logout leaves `[xfce4-session] <defunct>`, which pgrep still
+ * counts, so only a live (non-zombie) session counts here. The logged-out session's
+ * window manager and desktop are cleared first, or the new session can't take the
+ * screen and the mouse and keyboard stop working.
+ */
+async function ensureXfce(sbx: Desktop, user: string, display: string) {
+	const alive = await sbx.commands
+		.run(
+			`ps -u ${user} -o stat=,comm= | grep -qE '^[^Z][^ ]* +xfce4-session$'`,
+			{
+				user: "root",
+			},
+		)
+		.then(() => true)
+		.catch(() => false);
+	if (alive) return;
+	await sbx.commands
+		.run(
+			`pkill -u ${user} -f '^(xfwm4|xfdesktop|xfce4-panel|xfsettingsd|Thunar)'`,
+			{ user: "root" },
+		)
+		.catch(() => {});
+	// Agents' sessions join their own D-Bus (.k4env, written by k4-agent).
+	const start =
+		user === "user"
+			? "startxfce4"
+			: `bash -c '. /home/${user}/.k4env; exec startxfce4'`;
+	const run = await sbx.commands.run(
+		`setsid ${start} </dev/null >/dev/null 2>&1`,
+		{
+			user,
+			envs: { DISPLAY: display },
+			background: true,
+			timeoutMs: 0,
+		},
+	);
+	await run.disconnect();
+	await sbx.waitAndVerify(
+		`pgrep -u ${user} -x xfwm4 >/dev/null && pgrep -u ${user} -x xfdesktop >/dev/null`,
+		(r) => r.exitCode === 0,
+		60,
+	);
+}
+
+// Logging out of the user's desktop also ends its x11vnc, so the open live view would
+// retry forever. This loop, on the computer, brings both back within seconds and
+// noVNC's own reconnect picks them up. It survives pause and resume like the rest.
+const KEEP = `while sleep 2; do
+pgrep -u user -x x11vnc >/dev/null || x11vnc -bg -display :0 -forever -wait 50 -shared -rfbport 5900 -usepw 2>>/tmp/x11vnc_stderr.log
+ps -u user -o stat=,comm= | grep -qE '^[^Z][^ ]* +xfce4-session$' || { pkill -u user -f '^(xfwm4|xfdesktop|xfce4-panel|xfsettingsd|Thunar)'; sleep 1; DISPLAY=:0 setsid startxfce4 </dev/null >/dev/null 2>&1 & sleep 10; }
+done
+`;
+
 async function ensureStream(sbx: Desktop, password: string, streamKey: string) {
+	await ensureXfce(sbx, "user", ":0");
 	const up = await sbx.commands
 		.run(
-			`pgrep -x x11vnc >/dev/null && pgrep -f '[t]oken-plugin JWTTokenApi' >/dev/null && iptables -C INPUT -p tcp -j DROP && ${LOCKED}`,
+			`pgrep -u user -x x11vnc >/dev/null && pgrep -fx 'bash /usr/local/bin/k4-keep' >/dev/null && pgrep -f '[t]oken-plugin JWTTokenApi' >/dev/null && iptables -C INPUT -p tcp -j DROP && ${LOCKED}`,
 			{ user: "root" },
 		)
 		.then(() => true)
@@ -76,6 +132,13 @@ async function ensureStream(sbx: Desktop, password: string, streamKey: string) {
 	await sbx.commands.run(
 		`mkdir -p ~/.vnc && x11vnc -storepasswd ${password} ~/.vnc/passwd >/dev/null 2>&1; pgrep -u user -x x11vnc >/dev/null || x11vnc -bg -display :0 -forever -wait 50 -shared -rfbport 5900 -usepw 2>/tmp/x11vnc_stderr.log`,
 	);
+	await sbx.files.write("/usr/local/bin/k4-keep", KEEP, { user: "root" });
+	await sbx.commands.run("chmod 755 /usr/local/bin/k4-keep", { user: "root" });
+	const keep = await sbx.commands.run(
+		"pgrep -fx 'bash /usr/local/bin/k4-keep' >/dev/null || setsid bash /usr/local/bin/k4-keep </dev/null >/dev/null 2>&1",
+		{ background: true, timeoutMs: 0 },
+	);
+	await keep.disconnect();
 	await sbx.commands.run(WEBSOCKIFY, {
 		user: "root",
 		background: true,
@@ -183,7 +246,16 @@ export async function agentDisplay(sbx: Desktop, sessionId: string) {
 		.run(`k4-agent --peek ${agentName(sessionId)}`, { user: "root" })
 		.catch(() => null);
 	const n = Number(r?.stdout.trim());
-	return r?.stdout.trim() && Number.isInteger(n) ? n : null;
+	if (!r?.stdout.trim() || !Number.isInteger(n)) return null;
+	// Restart whatever stopped, so the live view never points at a dead port: k4-agent
+	// brings back the screen, x11vnc, Chrome and Cua Driver; ensureXfce the desktop after
+	// a logout. Quick when everything is already up.
+	const name = agentName(sessionId);
+	await sbx.commands
+		.run(`k4-agent ${name}`, { user: "root", timeoutMs: 90_000 })
+		.catch(() => {});
+	await ensureXfce(sbx, name, `:${n}`).catch(() => {});
+	return n;
 }
 
 const tail = (s: string, max: number) =>

@@ -16,6 +16,7 @@ const WRITE_TOOLS = new Set([
 	"download_file",
 	"delete_file",
 	"media",
+	"video",
 ]);
 
 export default defineAgent({
