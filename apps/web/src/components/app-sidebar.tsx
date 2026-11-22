@@ -44,7 +44,6 @@ export function AppSidebar({
 					<SidebarMenuItem>
 						<SidebarMenuButton
 							variant="outline"
-							className="dark:bg-[#1B1C24]"
 							tooltip="New chat"
 							render={<Link href="/dashboard/chat" />}
 						>
@@ -60,7 +59,7 @@ export function AppSidebar({
 					<SidebarInput
 						placeholder="Search"
 						aria-label="Search chats"
-						className="px-8 dark:bg-[#16171E]"
+						className="px-8"
 					/>
 					<Kbd className="absolute top-1/2 right-1.5 -translate-y-1/2 font-mono">
 						/

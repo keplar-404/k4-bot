@@ -36,45 +36,65 @@ const GROUPS = [
 	{
 		name: "Launch day",
 		icon: CrownIcon,
-		tile: "bg-amber-950 text-amber-400",
+		tile: "bg-sidebar-accent text-sidebar-accent-foreground",
 		open: true,
 		items: [
-			{ name: "Landing page", icon: GlobeIcon, tile: "bg-red-500 text-white" },
+			{
+				name: "Landing page",
+				icon: GlobeIcon,
+				tile: "bg-sidebar-primary text-sidebar-primary-foreground",
+			},
 			{
 				name: "Store listing",
 				icon: ShoppingBagIcon,
-				tile: "bg-blue-600 text-white",
+				tile: "bg-sidebar-primary text-sidebar-primary-foreground",
 			},
 			{
 				name: "Launch posts",
 				icon: SparklesIcon,
-				tile: "bg-green-700 text-white",
+				tile: "bg-sidebar-primary text-sidebar-primary-foreground",
 			},
 		],
 	},
 	{
 		name: "Video making",
 		icon: VideoIcon,
-		tile: "bg-sky-950 text-sky-400",
+		tile: "bg-sidebar-accent text-sidebar-accent-foreground",
 		items: [
-			{ name: "Reel edit", icon: VideoIcon, tile: "bg-orange-500 text-white" },
-			{ name: "Shorts", icon: VideoIcon, tile: "bg-blue-600 text-white" },
+			{
+				name: "Reel edit",
+				icon: VideoIcon,
+				tile: "bg-sidebar-primary text-sidebar-primary-foreground",
+			},
+			{
+				name: "Shorts",
+				icon: VideoIcon,
+				tile: "bg-sidebar-primary text-sidebar-primary-foreground",
+			},
 		],
 	},
 	{
 		name: "Marketing",
 		icon: MegaphoneIcon,
-		tile: "bg-violet-950 text-violet-400",
+		tile: "bg-sidebar-accent text-sidebar-accent-foreground",
 		items: [
-			{ name: "SEO audit", icon: SearchIcon, tile: "bg-violet-600 text-white" },
+			{
+				name: "SEO audit",
+				icon: SearchIcon,
+				tile: "bg-sidebar-primary text-sidebar-primary-foreground",
+			},
 		],
 	},
 	{
 		name: "Docs",
 		icon: FileTextIcon,
-		tile: "bg-zinc-800 text-zinc-300",
+		tile: "bg-sidebar-accent text-sidebar-accent-foreground",
 		items: [
-			{ name: "Q3 report", icon: FileTextIcon, tile: "bg-zinc-600 text-white" },
+			{
+				name: "Q3 report",
+				icon: FileTextIcon,
+				tile: "bg-sidebar-primary text-sidebar-primary-foreground",
+			},
 		],
 	},
 ];
