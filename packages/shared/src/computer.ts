@@ -11,7 +11,7 @@ import { userComputer } from "./schema";
 
 export const COMPUTER_TEMPLATE = "k4-desktop";
 // Idle time before E2B pauses the computer (free while paused). Every use resets it.
-const IDLE_MS = 10 * 60_000;
+export const IDLE_MS = 5 * 60_000;
 // One websockify serves noVNC and every screen: a signed token (streamToken) names the
 // VNC port it may open, so the browser connects to the computer directly.
 const WEBSOCKIFY =
@@ -62,6 +62,13 @@ export const agentName = (sessionId: string) =>
  * screen and the mouse and keyboard stop working.
  */
 async function ensureXfce(sbx: Desktop, user: string, display: string) {
+	// XFCE's screensaver locks idle desktops, and an agent can't type the password back in.
+	await sbx.commands
+		.run(
+			`mkdir -p ~/.config/autostart; for f in xfce4-screensaver light-locker xscreensaver; do printf '[Desktop Entry]\\nHidden=true\\n' > ~/.config/autostart/$f.desktop; done; pkill -x 'xfce4-screensaver|light-locker|xscreensaver'; DISPLAY=${display} xset s off -dpms`,
+			{ user },
+		)
+		.catch(() => {});
 	const alive = await sbx.commands
 		.run(
 			`ps -u ${user} -o stat=,comm= | grep -qE '^[^Z][^ ]* +xfce4-session$'`,

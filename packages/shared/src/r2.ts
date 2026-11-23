@@ -154,7 +154,15 @@ export async function presignDownload(
 			Bucket: config().bucket,
 			Key: key,
 			ResponseContentDisposition: disposition(name, inline),
+			ResponseCacheControl: `private, max-age=${expiresIn}`,
 		}),
-		{ expiresIn },
+		// Signed at the start of the current window, so a file keeps the same URL for
+		// that window and the browser serves it from its cache. Still valid >= expiresIn.
+		{
+			signingDate: new Date(
+				Math.floor(Date.now() / (expiresIn * 1000)) * expiresIn * 1000,
+			),
+			expiresIn: expiresIn * 2,
+		},
 	);
 }

@@ -13,6 +13,8 @@ const useStore = create<{
 	computerSteps: EveToolPart[];
 	panelTab: string;
 	panelTabs: string[];
+	viewFile: ViewFile | undefined;
+	openFiles: Record<string, ViewFile>;
 }>(() => ({
 	open: {},
 	memoryBusy: false,
@@ -22,6 +24,8 @@ const useStore = create<{
 	computerSteps: [],
 	panelTab: "start",
 	panelTabs: ["start"],
+	viewFile: undefined,
+	openFiles: {},
 }));
 
 export function useManualOpen(key: string) {
@@ -74,5 +78,20 @@ export const closePanelTab = (id: string) =>
 		const panelTabs = left.length ? left : ["start"];
 		const panelTab =
 			s.panelTab === id ? panelTabs[panelTabs.length - 1] : s.panelTab;
-		return { panelTabs, panelTab };
+		const { [id]: _closed, ...openFiles } = s.openFiles;
+		return { panelTabs, panelTab, openFiles };
 	});
+
+// Files open in the right panel, one tab each, named after the file (a file card's
+// Open, the Files tab's eye). viewFile is the last one opened: the dashboard shows the panel.
+export type ViewFile = { key: string; name: string; type?: string };
+export const useViewFile = () => useStore((s) => s.viewFile);
+export const useOpenFiles = () => useStore((s) => s.openFiles);
+export const openFile = (viewFile: ViewFile) => {
+	const id = `file:${viewFile.key}`;
+	useStore.setState((s) => ({
+		viewFile,
+		openFiles: { ...s.openFiles, [id]: viewFile },
+	}));
+	openPanelTab(id);
+};

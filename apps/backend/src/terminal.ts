@@ -3,7 +3,7 @@
 // headers on a WebSocket, so the first message carries the token (never the URL, so
 // it stays out of logs); nothing reaches the computer before it checks out.
 import { userFromBearer } from "@repo/shared/auth";
-import { userDesktop } from "@repo/shared/computer";
+import { IDLE_MS, userDesktop } from "@repo/shared/computer";
 import { overLimit } from "@repo/shared/rate-limit";
 import { Hono } from "hono";
 import { upgradeWebSocket } from "hono/bun";
@@ -40,14 +40,18 @@ async function open(hello: string, ws: WSContext) {
 		timeoutMs: MAX_MS,
 		onData: (d) => ws.send(new Uint8Array(d)),
 	});
-	pty.wait().finally(() => ws.close());
+	// kill() is SIGKILL, so wait() rejects on every close; an uncaught rejection crashes Bun.
+	pty
+		.wait()
+		.catch(() => {})
+		.finally(() => ws.close());
 	// Typing keeps the computer on: E2B's pause timer restarts at most once a minute.
 	let awake = Date.now();
 	return {
 		send: (d: Uint8Array) => {
 			if (Date.now() - awake > 60_000) {
 				awake = Date.now();
-				sbx.setTimeout(10 * 60_000).catch(() => {});
+				sbx.setTimeout(IDLE_MS).catch(() => {});
 			}
 			return sbx.pty.sendInput(pty.pid, d);
 		},

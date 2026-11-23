@@ -70,7 +70,8 @@ export async function fromComputer(
 		return { error: "Files over 100 MB can't be shared." };
 	if (!ALLOWED_FILE_TYPES.has(type))
 		return { error: `${type} files can't be shared.` };
-	const key = fileKey(owner.userId, owner.chatId, name);
+	// The key keeps the path, so deleting the file in the app removes it here too.
+	const key = fileKey(owner.userId, owner.chatId, real);
 	// Signed for this exact size and type, for 60 s.
 	const url = await presignUpload(key, { name, type, size });
 	const sent = await onComputer(ctx, UPLOAD, {

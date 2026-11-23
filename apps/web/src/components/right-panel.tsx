@@ -1,18 +1,19 @@
 "use client";
 
+import { typeOf } from "@repo/shared/files";
 import {
 	CompassIcon,
-	DownloadIcon,
-	EyeIcon,
+	FileIcon,
 	FolderIcon,
 	MonitorIcon,
 	PlusIcon,
 	SquareTerminalIcon,
-	Trash2Icon,
 	XIcon,
 } from "lucide-react";
+import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { FileCard } from "@/components/chat/file-card";
 import { ComputerPanel } from "@/components/computer-panel";
 import { Button } from "@/components/ui/button";
 import {
@@ -31,6 +32,7 @@ import {
 	openPanelTab,
 	setPanelTab,
 	useChatId,
+	useOpenFiles,
 	usePanelTab,
 	usePanelTabs,
 } from "@/lib/chat-ui";
@@ -59,13 +61,21 @@ const TOOLS = {
 	},
 } as const;
 type Tool = keyof typeof TOOLS;
-const TAB = { start: { label: "Start", Icon: CompassIcon }, ...TOOLS };
+const TAB = {
+	start: { label: "Start", Icon: CompassIcon },
+	...TOOLS,
+};
+// Browser only (react-doc-viewer docs: Next.js guide).
+const FileViewer = dynamic(() => import("@/components/file-viewer"), {
+	ssr: false,
+});
 
 // The right panel: tabs open on demand (Start's cards, shortcuts, +) and close with ×.
 // Inactive tabs unmount (Base UI Tabs), so the computer streams and the terminal
 // connects only while their tab is shown.
 export function RightPanel() {
 	const tabs = usePanelTabs();
+	const openFiles = useOpenFiles();
 	useEffect(() => {
 		const onKey = (e: KeyboardEvent) => {
 			const hit = Object.entries(TOOLS).find(([, t]) => t.key === e.key);
@@ -85,7 +95,9 @@ export function RightPanel() {
 			<div className="flex h-16 shrink-0 items-center gap-1 border-b px-2 group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
 				<TabsList className="h-8! min-w-0 justify-start overflow-x-auto bg-transparent p-0 [scrollbar-width:none]">
 					{tabs.map((id) => {
-						const { label, Icon } = TAB[id as Tool | "start"];
+						const { label, Icon } = openFiles[id]
+							? { label: openFiles[id].name, Icon: FileIcon }
+							: TAB[id as Tool | "start"];
 						return (
 							// The pill is the wrapper, so × sits inside it without reserving space.
 							<span
@@ -97,7 +109,9 @@ export function RightPanel() {
 									className="flex-none border-0 bg-transparent! shadow-none! data-active:text-foreground/85!"
 								>
 									<Icon aria-hidden />
-									{label}
+									<span className="max-w-32 truncate" title={label}>
+										{label}
+									</span>
 								</TabsTrigger>
 								<button
 									type="button"
@@ -161,24 +175,22 @@ export function RightPanel() {
 			<TabsContent value="terminal" className="min-h-0">
 				<Terminal />
 			</TabsContent>
+			{Object.entries(openFiles).map(([id, file]) => (
+				<TabsContent key={id} value={id} className="flex min-h-0 overflow-auto">
+					<FileViewer file={file} />
+				</TabsContent>
+			))}
 		</Tabs>
 	);
 }
 
 type File = { key: string; name: string; size: number; at: string };
-const mb = new Intl.NumberFormat(undefined, {
-	style: "unit",
-	unit: "megabyte",
-	maximumFractionDigits: 1,
-});
 
 // This chat's files in R2: the user's uploads and what the agent shared.
 // Kept for the page's life, per chat: reopening the tab shows the list at once, and R2
-// is asked again only after FRESH_MS. Signed links (valid 5 min) are reused for 4.
-// File bytes never pass the backend: they go R2 → browser.
+// is asked again only after FRESH_MS.
 const FRESH_MS = 60_000;
 const lists = new Map<string, { files: File[]; at: number }>();
-const links = new Map<string, { url: string; at: number }>();
 
 function Files() {
 	const chatId = useChatId();
@@ -198,29 +210,6 @@ function Files() {
 			.catch(() => toast.error("Could not load files."));
 	}, [chatId]);
 
-	async function link(key: string, inline: boolean) {
-		const id = `${key}|${inline}`;
-		const hit = links.get(id);
-		if (hit && Date.now() - hit.at < 4 * 60_000) return hit.url;
-		const r = await api.api.files.$get({
-			query: inline ? { key, inline: "1" } : { key },
-		});
-		if (!r.ok) return null;
-		const { url } = await r.json();
-		links.set(id, { url, at: Date.now() });
-		return url;
-	}
-	async function preview(key: string) {
-		// Opened before the await, or the popup blocker stops it.
-		const w = window.open("", "_blank");
-		const url = await link(key, true);
-		if (w && url) w.location.href = url;
-		else w?.close();
-	}
-	async function download(key: string) {
-		const url = await link(key, false);
-		if (url) window.location.href = url; // attachment: downloads, no navigation
-	}
 	async function remove(key: string) {
 		const r = await api.api.files.$delete({ query: { key } });
 		if (!r.ok) return toast.error("Could not delete the file.");
@@ -244,45 +233,15 @@ function Files() {
 			</Empty>
 		);
 	return (
-		<ul className="flex flex-col gap-1">
+		<div className="flex flex-col gap-2">
 			{files?.map((f) => (
-				<li
+				<FileCard
 					key={f.key}
-					className="flex items-center gap-2 rounded-lg border p-2"
-				>
-					<span className="min-w-0 flex-1">
-						<span className="block truncate text-sm">{f.name}</span>
-						<span className="text-xs text-muted-foreground">
-							{mb.format(f.size / 1e6)}
-						</span>
-					</span>
-					<Button
-						size="icon-sm"
-						variant="ghost"
-						aria-label={`Preview ${f.name}`}
-						onClick={() => void preview(f.key)}
-					>
-						<EyeIcon />
-					</Button>
-					<Button
-						size="icon-sm"
-						variant="ghost"
-						aria-label={`Download ${f.name}`}
-						onClick={() => void download(f.key)}
-					>
-						<DownloadIcon />
-					</Button>
-					<Button
-						size="icon-sm"
-						variant="ghost"
-						aria-label={`Delete ${f.name}`}
-						onClick={() => void remove(f.key)}
-					>
-						<Trash2Icon />
-					</Button>
-				</li>
+					file={{ ...f, type: typeOf(f.name) }}
+					onDelete={() => void remove(f.key)}
+				/>
 			))}
-		</ul>
+		</div>
 	);
 }
 

@@ -1,6 +1,12 @@
 "use client";
 
-import { defaultModelId, type Effort, models } from "@repo/shared/models";
+import {
+	defaultModelId,
+	type Effort,
+	findModel,
+	models,
+	visionModels,
+} from "@repo/shared/models";
 import { ClientError, type ClientSessionState } from "eve/client";
 import { activeTurn, openInteractions } from "eve/events";
 import {
@@ -10,6 +16,7 @@ import {
 } from "eve/react";
 import {
 	ArrowUpIcon,
+	LoaderCircleIcon,
 	MessageCircleDashedIcon,
 	MicIcon,
 	PaperclipIcon,
@@ -31,9 +38,10 @@ import {
 	defaultMode,
 	ModelPicker,
 	ModePicker,
+	VisionPicker,
 } from "@/components/chat/pickers";
-import { splitTurn, startOrder } from "@/components/chat/split-turn";
-import { useVoice } from "@/components/chat/voice";
+import { startOrder } from "@/components/chat/split-turn";
+import { useDictation } from "@/components/chat/voice";
 import {
 	Attachment,
 	AttachmentAction,
@@ -225,6 +233,10 @@ export function Chat({
 		models.some((m) => m.id === v),
 	);
 	const [effort, setEffort] = useState<Effort>();
+	const [vision, setVision] = useStored("k4.vision", visionModels[0].id, (v) =>
+		visionModels.some((m) => m.id === v),
+	);
+	const textOnly = findModel(model).vision === false;
 	const [mode, setMode] = useStored("k4.mode", defaultMode, (v) =>
 		MODES.includes(v),
 	);
@@ -302,12 +314,11 @@ export function Chat({
 	const hidden = Math.max(0, rows.length - shown);
 	const running = activeTurn(agent.view) !== undefined;
 	const busy = agent.status === "busy" || running;
-	const last = live.at(-1);
-	const voice = useVoice({
-		busy,
-		reply: last?.role === "assistant" ? splitTurn(last.parts).reply : undefined,
-		onHeard: (text) => void send(text),
-	});
+	const _last = live.at(-1);
+	// The mic types into the prompt bar, after what is already there.
+	const voice = useDictation((text) =>
+		setInput((v) => (v.trim() ? `${v.trimEnd()} ${text}` : text)),
+	);
 	// Tools running right now, in one pass: memory edits lock Settings > Memory,
 	// computer tools open the Computer panel.
 	// A question the agent asks after using the computer (a captcha or sign-in to do
@@ -391,8 +402,10 @@ export function Chat({
 		try {
 			// The agent finds an uploaded file on its computer by this path.
 			const file = upload?.state === "done" ? upload : undefined;
+			// A text-only model can't take the file itself: it gets the id and calls
+			// view_file, where a vision model reads images for it.
 			const message =
-				file?.read && file.type
+				file?.read && file.type && !textOnly
 					? [
 							{
 								type: "text" as const,
@@ -405,12 +418,15 @@ export function Chat({
 								filename: file.name,
 							},
 						]
-					: t;
+					: file && textOnly
+						? `${t}\n\n(Attached ${file.name}, file id \`${file.key}\`.)`
+						: t;
 			await agent.send(message, {
 				clientContext: {
 					model,
 					reasoning: effort ?? null,
 					mode,
+					vision,
 					...(reseed ? { reseed } : {}),
 				},
 			});
@@ -446,7 +462,7 @@ export function Chat({
 							<MessageScrollerViewport className="scrollbar-none [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
 								<MessageScrollerContent
 									aria-busy={busy}
-									className="mx-auto max-w-4xl gap-6"
+									className="mx-auto max-w-4xl gap-6 pb-8"
 								>
 									{rows.slice(hidden).map(([m, o, key]) => (
 										<MessageScrollerItem key={key} messageId={key}>
@@ -597,15 +613,32 @@ export function Chat({
 								<InputGroupButton
 									type="button"
 									size="icon-sm"
-									variant={voice.on ? "default" : "ghost"}
-									aria-pressed={voice.on}
-									aria-label={voice.on ? "Stop voice mode" : "Voice mode"}
-									title={voice.on ? "Stop voice mode" : "Voice mode"}
+									variant={voice.state === "recording" ? "default" : "ghost"}
+									aria-pressed={voice.state === "recording"}
+									disabled={voice.state === "working"}
+									aria-label={
+										voice.state === "recording"
+											? "Stop and type what I said"
+											: "Voice typing"
+									}
+									title={
+										voice.state === "recording"
+											? "Stop and type what I said"
+											: "Voice typing"
+									}
 									onClick={voice.toggle}
 								>
-									<MicIcon
-										className={voice.listening ? "animate-pulse" : undefined}
-									/>
+									{voice.state === "working" ? (
+										<LoaderCircleIcon className="animate-spin" />
+									) : (
+										<MicIcon
+											className={
+												voice.state === "recording"
+													? "animate-pulse"
+													: undefined
+											}
+										/>
+									)}
 								</InputGroupButton>
 							)}
 							<ModelPicker
@@ -617,6 +650,7 @@ export function Chat({
 								}}
 								onEffort={setEffort}
 							/>
+							{textOnly && <VisionPicker value={vision} onChange={setVision} />}
 							<ModePicker value={mode} onChange={setMode} />
 							{running && !input.trim() ? (
 								<InputGroupButton

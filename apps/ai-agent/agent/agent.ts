@@ -26,7 +26,15 @@ export default defineAgent({
 		const attrs = ctx.session.auth.current?.attributes ?? {};
 		const model = findModel(attrs.model);
 		return {
-			model: openrouter(model.id),
+			model: openrouter(model.id, {
+				// OpenRouter docs (prompt caching): Claude caches only with a top-level
+				// cache_control (5 min, renewed on every hit); other providers cache on
+				// their own. session_id keeps a chat on one provider so its cache stays warm.
+				...(model.id.startsWith("anthropic/")
+					? { cache_control: { type: "ephemeral" as const } }
+					: {}),
+				extraBody: { session_id: ctx.session.id },
+			}),
 			reasoning: pickEffort(model, attrs.reasoning) ?? "provider-default",
 			// OpenRouter models are not in the AI Gateway catalog, so eve needs the window.
 			modelContextWindowTokens: model.contextWindow,

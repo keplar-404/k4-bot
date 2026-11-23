@@ -7,6 +7,7 @@
 //   GET  /api/files/list?chatId= -> the chat's files (right panel > Files)
 //   DELETE /api/files?key=  -> deletes one of the user's files
 import { zValidator } from "@hono/zod-validator";
+import { runOnComputer } from "@repo/shared/computer";
 import {
 	ALLOWED_FILE_TYPES,
 	chatPrefix,
@@ -31,6 +32,14 @@ import { db } from "./db";
 
 const SESSION_SECONDS = 7 * 24 * 60 * 60;
 
+// A key ends in its name, or for a file the agent shared, its path on the computer.
+const last = (key: string) => decodeURIComponent(key.split("/").pop() ?? "");
+const nameOf = (key: string) => cleanFileName(last(key)) ?? "file";
+// The path comes in on stdin, never inside the command, so it can't inject shell.
+// Run as the chat's agent: it can only remove what that agent could.
+const REMOVE =
+	'read -r p; case "$p" in /*) ;; *) p="$HOME/Uploads/$p";; esac; rm -f -- "$p"';
+
 export const files = new Hono<Env>()
 	.use(requireUser)
 	.post(
@@ -47,10 +56,12 @@ export const files = new Hono<Env>()
 		async (c) => {
 			const { chatId, type, size } = c.req.valid("json");
 			const userId = c.get("user").id;
-			const [own] = await db
-				.select({ id: chat.id })
-				.from(chat)
-				.where(and(eq(chat.id, chatId), eq(chat.userId, userId)));
+			const [own] = !/^[\w-]{36}$/.test(chatId ?? "")
+				? []
+				: await db
+						.select({ id: chat.id })
+						.from(chat)
+						.where(and(eq(chat.id, chatId), eq(chat.userId, userId)));
 			if (!own) return c.json({ error: "Not found" }, 404);
 			const name = cleanFileName(c.req.valid("json").name) ?? "file";
 			const key = fileKey(userId, chatId, name);
@@ -75,7 +86,7 @@ export const files = new Hono<Env>()
 			const { key, inline } = c.req.valid("query");
 			if (!ownsKey(c.get("user").id, key))
 				return c.json({ error: "Not found" }, 404);
-			const name = decodeURIComponent(key.split("/").pop() ?? "file");
+			const name = nameOf(key);
 			const url = await presignDownload(key, name, undefined, !!inline);
 			return c.json({ url }, 200);
 		},
@@ -93,7 +104,7 @@ export const files = new Hono<Env>()
 			const prefix = chatPrefix(userId, c.req.valid("query").chatId);
 			const files = (await listFiles(prefix)).map((f) => ({
 				...f,
-				name: decodeURIComponent(f.key.split("/").pop() ?? "file"),
+				name: nameOf(f.key),
 			}));
 			return c.json({ files }, 200);
 		},
@@ -106,6 +117,19 @@ export const files = new Hono<Env>()
 			if (!ownsKey(c.get("user").id, key))
 				return c.json({ error: "Not found" }, 404);
 			await deleteFile(key);
+			// Also the copy on the computer: an upload in ~/Uploads, a shared file at its path.
+			const [, , , chatId] = key.split("/");
+			const [own] = !/^[\w-]{36}$/.test(chatId ?? "")
+				? []
+				: await db
+						.select({ session: chat.eveSessionId })
+						.from(chat)
+						.where(and(eq(chat.id, chatId), eq(chat.userId, c.get("user").id)));
+			if (own?.session)
+				// Not awaited: waking a paused computer takes seconds; the R2 delete is done.
+				void runOnComputer(db, c.get("user").id, own.session, REMOVE, {
+					stdin: last(key),
+				}).catch((error) => console.error("computer delete failed", error));
 			return c.json({ ok: true }, 200);
 		},
 	);

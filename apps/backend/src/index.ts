@@ -12,15 +12,21 @@ import { myComputer } from "./computer";
 import { files } from "./files";
 import { me } from "./me";
 import { terminal } from "./terminal";
+import { transcribe } from "./transcribe";
 
 // Chained so the RPC client gets one inferred AppType (hono.dev/docs/guides/rpc).
 // Order follows the hono-middleware skill: id, log, security headers, CORS, routes.
+const small = bodyLimit({ maxSize: 64 * 1024 });
+
 const app = new Hono()
 	.use(requestId())
 	.use(logger())
 	.use(secureHeaders())
 	// The largest real body is an 8,000-character memory note; refuse anything far bigger.
-	.use(bodyLimit({ maxSize: 64 * 1024 }))
+	// Audio for the mic has its own 1 MB limit (transcribe.ts).
+	.use((c, next) =>
+		c.req.path === "/api/transcribe" ? next() : small(c, next),
+	)
 	.use(
 		"*",
 		cors({
@@ -34,6 +40,7 @@ const app = new Hono()
 	.route("/api/files", files)
 	.route("/api/me", me)
 	.route("/api/terminal", terminal)
+	.route("/api/transcribe", transcribe)
 	.get("/", (c) => c.text("ok"))
 	// Always JSON, never a stack trace; the request id in the log matches X-Request-Id.
 	.notFound((c) => c.json({ error: "Not found" }, 404))

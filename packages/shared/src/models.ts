@@ -14,6 +14,8 @@ export type ModelOption = {
 	defaultEffort?: Effort;
 	/** Tokens eve compacts against (OpenRouter `context_length`). */
 	contextWindow: number;
+	/** false: text only (OpenRouter `input_modalities`); a vision model reads images for it. */
+	vision?: false;
 };
 
 export const models: ModelOption[] = [
@@ -66,6 +68,15 @@ export const models: ModelOption[] = [
 		defaultEffort: "medium",
 	},
 	{
+		id: "z-ai/glm-5.3-prime",
+		contextWindow: 1_000_000,
+		name: "GLM 5.3 Prime",
+		provider: "Z.ai",
+		efforts: ["low", "high"],
+		defaultEffort: "high",
+		vision: false,
+	},
+	{
 		id: "deepseek/deepseek-v4.1-flash",
 		contextWindow: 1_048_576,
 		name: "DeepSeek V4.1 Flash",
@@ -76,6 +87,16 @@ export const models: ModelOption[] = [
 ];
 
 export const defaultModelId = models[0].id;
+
+/** Read images for a text-only model (view_file). The first is the default (free). */
+export const visionModels = [
+	{ id: "nvidia/nemotron-3.5-super-vl:free", name: "Nemotron 3.5 VL (free)" },
+	{ id: "google/gemma-4-31b-it:free", name: "Gemma 4 31B (free)" },
+	{ id: "openai/gpt-6-luna", name: "GPT-6 Luna" },
+	{ id: "google/gemini-3.8-flash", name: "Gemini 3.8 Flash" },
+];
+export const findVisionModel = (id: unknown) =>
+	visionModels.find((m) => m.id === id) ?? visionModels[0];
 
 export function findModel(id: unknown): ModelOption {
 	return models.find((m) => m.id === id) ?? models[0];

@@ -1,33 +1,13 @@
 "use client";
 
-// Voice mode with the browser's own speech (Web Speech API): no server, no model, no
-// cost. Listening works in Chrome, Edge and Safari (Chrome sends the audio to Google
-// to recognise it); speaking works everywhere. Without recognition the mic is hidden.
-// ponytail: browser voices sound robotic; the media tool's TTS model is the upgrade.
+// The prompt bar's mic: record with the browser's MediaRecorder, then on stop the
+// backend has OpenRouter's Whisper turn it into text (backend transcribe.ts), which
+// goes into the prompt bar to edit and send. Any language Whisper knows (99+).
+// Reading replies aloud uses the browser's own speech (speechSynthesis).
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-
-// Only what's used: TypeScript's DOM types have no SpeechRecognition constructor.
-type Recognition = {
-	lang: string;
-	interimResults: boolean;
-	continuous: boolean;
-	start(): void;
-	abort(): void;
-	onresult:
-		| ((e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void)
-		| null;
-	onerror: ((e: { error: string }) => void) | null;
-	onend: (() => void) | null;
-};
-type Ctor = new () => Recognition;
-const recognitionCtor = () => {
-	const w = window as unknown as {
-		SpeechRecognition?: Ctor;
-		webkitSpeechRecognition?: Ctor;
-	};
-	return w.SpeechRecognition ?? w.webkitSpeechRecognition;
-};
+import { API_URL } from "@/lib/api";
+import { getToken } from "@/lib/auth-client";
 
 /** Markdown read as plain words: no marks, links by their text, code skipped. */
 const plain = (md: string) =>
@@ -47,99 +27,73 @@ export function speak(text: string, onEnd?: () => void) {
 }
 export const stopSpeaking = () => speechSynthesis.cancel();
 
-/**
- * Voice mode: listen, send what was said, read the reply aloud when the turn ends,
- * then listen again, until turned off. Silence just restarts listening.
- */
-export function useVoice({
-	busy,
-	reply,
-	onHeard,
-}: {
-	busy: boolean;
-	/** The latest assistant reply, read when a turn ends. */
-	reply?: string;
-	onHeard: (text: string) => void;
-}) {
+// Chrome and Firefox record webm, Safari mp4.
+const TYPES = ["audio/webm", "audio/ogg", "audio/mp4"];
+
+/** Record on the first toggle; on the second, transcribe and hand the text over. */
+export function useDictation(onText: (text: string) => void) {
 	// Known only in the browser: false during the server render, then checked.
 	const [supported, setSupported] = useState(false);
-	const [on, setOn] = useState(false);
-	const [listening, setListening] = useState(false);
-	const live = useRef({ on: false, busy, onHeard });
-	const rec = useRef<Recognition>(undefined);
-	const wasBusy = useRef(busy);
-
+	const [state, setState] = useState<"idle" | "recording" | "working">("idle");
+	const rec = useRef<MediaRecorder>(undefined);
 	useEffect(() => {
-		setSupported(!!recognitionCtor() && "speechSynthesis" in window);
+		setSupported("MediaRecorder" in window && !!navigator.mediaDevices);
 	}, []);
-	useEffect(() => {
-		live.current.busy = busy;
-		live.current.onHeard = onHeard;
-	});
+	// Leaving the chat stops the mic.
+	useEffect(
+		() => () =>
+			rec.current?.stream.getTracks().forEach((t) => {
+				t.stop();
+			}),
+		[],
+	);
 
-	function stop() {
-		live.current.on = false;
-		setOn(false);
-		rec.current?.abort();
-		stopSpeaking();
-	}
-
-	function listen() {
-		const R = recognitionCtor();
-		if (!R || !live.current.on) return;
-		const r = new R();
-		r.lang = navigator.language;
-		r.interimResults = false;
-		r.continuous = false;
-		let heard = false;
-		r.onresult = (e) => {
-			const text = e.results[0]?.[0]?.transcript.trim();
-			if (!text) return;
-			heard = true;
-			live.current.onHeard(text);
-		};
-		r.onerror = (e) => {
-			// "no-speech" and "aborted" are normal; anything else (mic blocked, offline) stops.
-			if (e.error === "no-speech" || e.error === "aborted") return;
-			toast.error(
-				e.error === "not-allowed"
-					? "Allow the microphone to use voice mode."
-					: `Voice mode stopped (${e.error}).`,
-			);
-			stop();
-		};
-		r.onend = () => {
-			setListening(false);
-			if (!heard && live.current.on && !live.current.busy) listen();
+	async function start() {
+		let stream: MediaStream;
+		try {
+			stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+		} catch {
+			return toast.error("Allow the microphone to use voice typing.");
+		}
+		const r = new MediaRecorder(stream, {
+			mimeType: TYPES.find((t) => MediaRecorder.isTypeSupported(t)),
+		});
+		const chunks: Blob[] = [];
+		r.ondataavailable = (e) => chunks.push(e.data);
+		r.onstop = async () => {
+			stream.getTracks().forEach((t) => {
+				t.stop();
+			});
+			setState("working");
+			try {
+				const res = await fetch(`${API_URL}/api/transcribe`, {
+					method: "POST",
+					headers: {
+						authorization: `Bearer ${(await getToken()) ?? ""}`,
+						"content-type": r.mimeType.split(";")[0],
+					},
+					body: new Blob(chunks),
+				});
+				const data = (await res.json()) as { text?: string; error?: string };
+				if (!res.ok) toast.error(data.error ?? "Voice typing failed.");
+				else if (data.text) onText(data.text);
+			} catch {
+				toast.error("Voice typing failed.");
+			} finally {
+				setState("idle");
+			}
 		};
 		rec.current = r;
 		r.start();
-		setListening(true);
+		setState("recording");
 	}
-
-	// A turn just ended: read its reply, then listen for the next message.
-	// biome-ignore lint/correctness/useExhaustiveDependencies: runs on busy changes only
-	useEffect(() => {
-		const ended = wasBusy.current && !busy;
-		wasBusy.current = busy;
-		if (!ended || !live.current.on) return;
-		if (reply) speak(reply, listen);
-		else listen();
-	}, [busy]);
-
-	// Leaving the chat stops the mic and the voice.
-	// biome-ignore lint/correctness/useExhaustiveDependencies: on unmount only
-	useEffect(() => () => stop(), []);
 
 	return {
 		supported,
-		on,
-		listening,
+		state,
 		toggle() {
-			if (live.current.on) return stop();
-			live.current.on = true;
-			setOn(true);
-			listen();
+			if (state === "recording") rec.current?.stop();
+			else if (state === "idle") void start();
 		},
 	};
 }

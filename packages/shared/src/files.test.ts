@@ -27,5 +27,6 @@ test("a user can't reach another user's keys or climb out of their own", () => {
 test("file types come from the name, unknown ones are octet-stream", () => {
 	expect(typeOf("/home/a/Media/x-image.webp")).toBe("image/webp");
 	expect(typeOf("REPORT.PDF")).toBe("application/pdf");
+	expect(typeOf("logo.SVG")).toBe("image/svg+xml");
 	expect(typeOf("Makefile")).toBe("application/octet-stream");
 });

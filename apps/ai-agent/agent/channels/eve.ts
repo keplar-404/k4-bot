@@ -1,5 +1,5 @@
 import { userFromBearer } from "@repo/shared/auth";
-import { findModel, pickEffort } from "@repo/shared/models";
+import { findModel, findVisionModel, pickEffort } from "@repo/shared/models";
 import { overLimit } from "@repo/shared/rate-limit";
 import { agentEvent, chat } from "@repo/shared/schema";
 import { and, eq, inArray, isNotNull } from "drizzle-orm";
@@ -152,6 +152,7 @@ export default eveChannel({
 			reasoning,
 			mode,
 			reseed,
+			vision,
 			...rest
 		} = sent as Record<string, unknown>;
 		// A new session for a chat whose old session ended or is gone: the model
@@ -170,6 +171,7 @@ export default eveChannel({
 					...auth.attributes,
 					model: model.id,
 					mode: safeMode,
+					vision: findVisionModel(vision).id,
 					...(effort ? { reasoning: effort } : {}),
 				},
 			},

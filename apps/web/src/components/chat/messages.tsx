@@ -1,13 +1,12 @@
 "use client";
 
+import { typeOf } from "@repo/shared/files";
 import type { SearchOutput } from "@repo/shared/tools";
 import type { EveMessage, EveToolPart } from "eve/react";
 import {
 	BrainIcon,
 	CheckIcon,
 	CopyIcon,
-	DownloadIcon,
-	FileIcon,
 	GlobeIcon,
 	LoaderCircleIcon,
 	MessageSquareTextIcon,
@@ -19,17 +18,8 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Streamdown } from "streamdown";
+import { FileCard } from "@/components/chat/file-card";
 import { speak, stopSpeaking } from "@/components/chat/voice";
-import {
-	Attachment,
-	AttachmentAction,
-	AttachmentActions,
-	AttachmentContent,
-	AttachmentDescription,
-	AttachmentGroup,
-	AttachmentMedia,
-	AttachmentTitle,
-} from "@/components/ui/attachment";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
 import { Button } from "@/components/ui/button";
 import { CodeBlock, CodeBlockContent } from "@/components/ui/code-block";
@@ -53,19 +43,37 @@ import {
 	TraceLine,
 	TraceTitle,
 } from "@/components/ui/trace";
-import { api } from "@/lib/api";
 import { useManualOpen } from "@/lib/chat-ui";
 import { type StartOrder, type Step, splitTurn } from "./split-turn";
 
 const textOf = (m: EveMessage) =>
 	m.parts.flatMap((p) => (p.type === "text" ? [p.text] : [])).join("");
 
+// chat.tsx sends an upload's id inside the text for the agent; the user sees a card.
+// Until the server echoes the message, eve shows it as text with "[file: name]" after.
+const ATTACHED = /\n\n\(Attached .+, file id `([^`]+)`\.\)[\s\S]*$/;
+
 export function UserMessage({ message }: { message: EveMessage }) {
+	const text = textOf(message);
+	const key = ATTACHED.exec(text)?.[1];
+	const part = message.parts.find((p) => p.type === "file");
+	const name =
+		part?.filename ?? decodeURIComponent(key?.split("/").pop() ?? "");
+	const files = key
+		? [{ key, name, size: part?.size, type: part?.mediaType ?? typeOf(name) }]
+		: [];
 	return (
 		<Message align="end">
-			<MessageContent>
+			<MessageContent className="items-end gap-2">
+				{files.length > 0 && (
+					<div className="flex flex-wrap justify-end gap-2">
+						{files.map((f) => (
+							<FileCard key={f.key} file={f} compact />
+						))}
+					</div>
+				)}
 				<Bubble align="end" variant="muted">
-					<BubbleContent>{textOf(message)}</BubbleContent>
+					<BubbleContent>{text.replace(ATTACHED, "")}</BubbleContent>
 				</Bubble>
 			</MessageContent>
 		</Message>
@@ -123,11 +131,11 @@ export function AssistantMessage({
 					</Streamdown>
 				)}
 				{files.length > 0 && (
-					<AttachmentGroup>
+					<div className="grid gap-2 sm:grid-cols-2">
 						{files.map((f) => (
 							<FileCard key={f.key} file={f} />
 						))}
-					</AttachmentGroup>
+					</div>
 				)}
 				{!streaming && reply && (
 					<MessageFooter>
@@ -375,87 +383,6 @@ function ToolInput({ part }: { part: EveToolPart }) {
 	if (!input || Object.keys(input).length === 0) return null;
 	return <Terminal text={JSON.stringify(input, null, 2)} />;
 }
-
-// A file the agent shared or made (share_file, media): a fresh 5-minute link per click.
-function FileCard({
-	file,
-}: {
-	file: { key: string; name: string; size: number; type?: string };
-}) {
-	const [state, setState] = useState<"done" | "processing" | "error">("done");
-	const link = () =>
-		api.api.files
-			.$get({ query: { key: file.key } })
-			.then(async (r) => (r.ok ? (await r.json()).url : null))
-			.catch(() => null);
-	// Images, audio and video show a preview or player (a 5-minute link, fetched when
-	// the card appears). ponytail: a long video seeked after 5 minutes needs a reload.
-	const kind = file.type?.split("/")[0];
-	const image = kind === "image";
-	const tall = image || kind === "video";
-	const [preview, setPreview] = useState<string | null>(null);
-	// biome-ignore lint/correctness/useExhaustiveDependencies: once per file
-	useEffect(() => {
-		if (image || kind === "audio" || kind === "video")
-			void link().then(setPreview);
-	}, [file.key]);
-	async function download() {
-		setState("processing");
-		const url = await link();
-		if (!url) return setState("error");
-		window.location.assign(url);
-		setState("done");
-	}
-	return (
-		<Attachment state={state} orientation={tall ? "vertical" : "horizontal"}>
-			<AttachmentMedia variant={preview && image ? "image" : "icon"}>
-				{preview && image ? (
-					// biome-ignore lint/performance/noImgElement: a signed R2 link, not a static asset
-					<img src={preview} alt={file.name} />
-				) : preview && kind === "video" ? (
-					// biome-ignore lint/a11y/useMediaCaption: generated video, no captions exist
-					<video
-						src={preview}
-						controls
-						preload="metadata"
-						className="size-full object-contain"
-					/>
-				) : (
-					<FileIcon />
-				)}
-			</AttachmentMedia>
-			<AttachmentContent>
-				<AttachmentTitle>{file.name}</AttachmentTitle>
-				<AttachmentDescription>
-					{state === "error" ? "Download failed" : bytes.format(file.size)}
-				</AttachmentDescription>
-				{preview && kind === "audio" && (
-					// biome-ignore lint/a11y/useMediaCaption: generated audio, no captions exist
-					<audio
-						src={preview}
-						controls
-						preload="metadata"
-						className="mt-1.5 h-8 w-full min-w-48"
-					/>
-				)}
-			</AttachmentContent>
-			<AttachmentActions>
-				<AttachmentAction
-					aria-label={`Download ${file.name}`}
-					onClick={download}
-				>
-					<DownloadIcon />
-				</AttachmentAction>
-			</AttachmentActions>
-		</Attachment>
-	);
-}
-const bytes = new Intl.NumberFormat("en", {
-	notation: "compact",
-	style: "unit",
-	unit: "byte",
-	unitDisplay: "narrow",
-});
 
 function ToolDetail({ part }: { part: EveToolPart }) {
 	const out = part.output;

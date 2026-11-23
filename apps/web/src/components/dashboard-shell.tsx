@@ -18,7 +18,7 @@ import {
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { openPanelTab, useComputerBusy } from "@/lib/chat-ui";
+import { openPanelTab, useComputerBusy, useViewFile } from "@/lib/chat-ui";
 
 // Header + [page | right panel]. The right panel is always rendered and only
 // collapsed, so the page (the chat and its eve stream) never remounts. It shows the
@@ -39,6 +39,15 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 		if (computerBusy && !isMobile && panel.current?.isCollapsed())
 			panel.current.resize("40%");
 	}, [computerBusy, isMobile, panel]);
+	// A file was opened (a card's Open, the Files tab's eye): show the panel.
+	const viewFile = useViewFile();
+	useEffect(() => {
+		if (!viewFile) return;
+		if (isMobile) return setMobileOpen(true);
+		if (panel.current?.isCollapsed()) panel.current.resize("40%");
+		// onResize can miss a resize made right after load, leaving the panel empty.
+		setOpen(true);
+	}, [viewFile, isMobile, panel]);
 	const shown = isMobile ? mobileOpen : open;
 	const toggle = () =>
 		isMobile
