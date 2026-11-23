@@ -180,4 +180,25 @@
 	html {
 		@apply font-sans;
 	}
+
+	/* === Clickables: one place for cursor + hover on every button, no component edits ===
+	   :where() keeps specificity at 0, so a component's own classes always win. */
+	:where(
+		button,
+		[role="button"],
+		[role="menuitem"],
+		[role="tab"],
+		summary,
+		label[for]
+	):not(:disabled, [aria-disabled="true"]) {
+		cursor: pointer;
+	}
+	/* Buttons with no styling of their own (shadcn ones set data-slot and their hover):
+	   Streamdown's link/copy buttons, plain <button>s. */
+	:where(button:not([data-slot])):not(:disabled):hover {
+		opacity: 0.75;
+	}
+	:where(button, [role="button"]):is(:disabled, [aria-disabled="true"]) {
+		cursor: not-allowed;
+	}
 }

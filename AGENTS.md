@@ -15,3 +15,8 @@ This block is written and re-added by `turbo` before repository-scoped commands 
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+## Always use CodeGraph
+
+This repo is indexed by CodeGraph (`.codegraph/`). For any code in `apps/` or `packages/`, use the `codegraph_explore` MCP tool first: to find, read, or understand code, and before every edit (it returns the verbatim source plus callers and blast radius). Do not grep, `sed`, or `cat` project source instead.
+
+Use the terminal only for what CodeGraph does not index: `node_modules` (library code and types), config files, docs, and git. If the MCP tool is unavailable, run `codegraph explore "<query>"` in the shell.

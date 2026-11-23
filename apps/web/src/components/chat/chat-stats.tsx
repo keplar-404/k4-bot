@@ -24,20 +24,20 @@ export function ChatStats({ view }: { view: SessionView }) {
 	const tps = last?.usage && ms > 0 ? last.usage.outputTokens / (ms / 1000) : 0;
 	const tokens = total.inputTokens + total.outputTokens;
 	return (
-		<p className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs text-muted-foreground tabular-nums">
-			<span className="flex items-center gap-1">
+		<p className="flex flex-wrap items-center justify-center gap-x-6 gap-y-1.5 text-xs text-muted-foreground tabular-nums">
+			<span className="flex items-center gap-1.5">
 				<FootprintsIcon aria-hidden className="size-3" />
 				{turns(view).length} turns · {all.length} steps
 				{tps > 0 && ` · ${Math.round(tps)} tok/s`}
 			</span>
-			<span className="flex items-center gap-1">
+			<span className="flex items-center gap-1.5">
 				<LayersIcon aria-hidden className="size-3" />
 				{fmt.format(tokens)} tok
 				{total.inputTokens > 0 &&
 					` · cache ${Math.round((total.cacheReadTokens / total.inputTokens) * 100)}%`}
 			</span>
 			{context !== undefined && (
-				<span className="flex items-center gap-1" title="Context used">
+				<span className="flex items-center gap-1.5" title="Context used">
 					{/* A ring that fills with the context used; pathLength makes the dash a percent. */}
 					<svg aria-hidden viewBox="0 0 16 16" className="size-3 -rotate-90">
 						<circle

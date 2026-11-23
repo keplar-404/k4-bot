@@ -5,6 +5,10 @@
 			"command": "codegraph",
 			"args": ["serve", "--mcp"],
 			"alwaysLoad": true
+		},
+		"shadcn": {
+			"command": "bunx",
+			"args": ["shadcn@latest", "mcp"]
 		}
 	}
 }

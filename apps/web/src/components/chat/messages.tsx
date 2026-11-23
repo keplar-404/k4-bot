@@ -338,7 +338,7 @@ function gist(part: EveToolPart) {
 	return typeof v === "string" ? v : undefined;
 }
 
-function ToolRow({ part }: { part: EveToolPart }) {
+export function ToolRow({ part }: { part: EveToolPart }) {
 	const [manual, setManual] = useManualOpen(`t:${part.callId}`);
 	const running = RUNNING.has(part.state);
 	const failed = part.state === "failed" || part.state === "rejected";

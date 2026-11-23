@@ -3,7 +3,11 @@
 import { defaultModelId, type Effort, models } from "@repo/shared/models";
 import { ClientError, type ClientSessionState } from "eve/client";
 import { activeTurn, openInteractions } from "eve/events";
-import { type UseEveAgentOptions, useEveAgent } from "eve/react";
+import {
+	type EveToolPart,
+	type UseEveAgentOptions,
+	useEveAgent,
+} from "eve/react";
 import {
 	ArrowUpIcon,
 	MessageCircleDashedIcon,
@@ -68,6 +72,7 @@ import { putCachedChat, recorded } from "@/lib/chat-cache";
 import {
 	setComputerBusy,
 	setComputerSession,
+	setComputerSteps,
 	setMemoryBusy,
 } from "@/lib/chat-ui";
 
@@ -311,6 +316,7 @@ export function Chat({
 	let usingComputer = false;
 	let usedComputer = false;
 	let asking = false;
+	const computerSteps: EveToolPart[] = [];
 	for (const m of agent.messages)
 		for (const p of m.parts) {
 			if (p.type !== "tool") continue;
@@ -318,7 +324,10 @@ export function Chat({
 				p.name.startsWith("computer_") ||
 				p.name === "browser" ||
 				p.name === "app";
-			if (computer) usedComputer = true;
+			if (computer) {
+				usedComputer = true;
+				computerSteps.push(p);
+			}
 			if (!RUNNING.has(p.state)) continue;
 			if (p.name.startsWith("profile__")) savingMemory = true;
 			if (computer) usingComputer = true;
@@ -333,9 +342,16 @@ export function Chat({
 		setComputerBusy(usingComputer);
 		return () => setComputerBusy(false);
 	}, [usingComputer]);
+	// One key per step and state, so the store only changes when a step does.
+	const stepsKey = computerSteps.map((p) => p.callId + p.state).join();
+	// biome-ignore lint/correctness/useExhaustiveDependencies: stepsKey stands for computerSteps
+	useEffect(() => {
+		setComputerSteps(computerSteps);
+		return () => setComputerSteps([]);
+	}, [stepsKey]);
 	const eveSession = agent.session?.sessionId;
 	useEffect(() => {
-		setComputerSession(eveSession);
+		setComputerSession(eveSession, chatIdRef.current);
 		return () => setComputerSession(undefined);
 	}, [eveSession]);
 

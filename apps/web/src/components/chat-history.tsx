@@ -1,6 +1,6 @@
 "use client";
 
-import { LoaderCircleIcon, Trash2Icon } from "lucide-react";
+import { LoaderCircleIcon, MessageSquareIcon, Trash2Icon } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -79,7 +79,7 @@ export function ChatHistory() {
 	}
 
 	return (
-		<SidebarGroup className="group-data-[collapsible=icon]:hidden">
+		<SidebarGroup>
 			<SidebarGroupLabel className="text-[11px] tracking-wider uppercase">
 				Recent
 			</SidebarGroupLabel>
@@ -94,8 +94,11 @@ export function ChatHistory() {
 					<SidebarMenuItem key={chat.id}>
 						<SidebarMenuButton
 							isActive={pathname === `/dashboard/chat/${chat.id}`}
+							tooltip={chat.title}
 							render={<Link href={`/dashboard/chat/${chat.id}`} />}
 						>
+							{/* Collapsed sidebar: one icon per chat, its title in the tooltip. */}
+							<MessageSquareIcon className="hidden group-data-[collapsible=icon]:block" />
 							<span className={deleting.has(chat.id) ? "shimmer" : undefined}>
 								{chat.title}
 							</span>

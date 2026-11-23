@@ -1,3 +1,4 @@
+import type { EveToolPart } from "eve/react";
 import { create } from "zustand";
 
 // Open/closed choices the person made on Steps blocks and rows, by id. Kept
@@ -8,11 +9,19 @@ const useStore = create<{
 	memoryBusy: boolean;
 	computerBusy: boolean;
 	computerSession: string | undefined;
+	chatId: string | undefined;
+	computerSteps: EveToolPart[];
+	panelTab: string;
+	panelTabs: string[];
 }>(() => ({
 	open: {},
 	memoryBusy: false,
 	computerBusy: false,
 	computerSession: undefined,
+	chatId: undefined,
+	computerSteps: [],
+	panelTab: "start",
+	panelTabs: ["start"],
 }));
 
 export function useManualOpen(key: string) {
@@ -37,5 +46,33 @@ export const setComputerBusy = (computerBusy: boolean) =>
 
 // The open chat's eve session: the Computer panel shows that chat's agent desktop.
 export const useComputerSession = () => useStore((s) => s.computerSession);
-export const setComputerSession = (computerSession: string | undefined) =>
-	useStore.setState({ computerSession });
+export const setComputerSession = (
+	computerSession: string | undefined,
+	chatId?: string,
+) => useStore.setState({ computerSession, chatId });
+export const useChatId = () => useStore((s) => s.chatId);
+
+// The open chat's computer steps (Cua, Browser Use, shell), for the panel's Activity.
+export const useComputerSteps = () => useStore((s) => s.computerSteps);
+export const setComputerSteps = (computerSteps: EveToolPart[]) =>
+	useStore.setState({ computerSteps });
+
+// The right panel's open tabs (start, computer, files, terminal) and the shown one.
+// Tabs open on demand and close with ×; closing the last one leaves Start.
+export const usePanelTab = () => useStore((s) => s.panelTab);
+export const usePanelTabs = () => useStore((s) => s.panelTabs);
+export const setPanelTab = (panelTab: string) =>
+	useStore.setState({ panelTab });
+export const openPanelTab = (id: string) =>
+	useStore.setState((s) => ({
+		panelTab: id,
+		panelTabs: s.panelTabs.includes(id) ? s.panelTabs : [...s.panelTabs, id],
+	}));
+export const closePanelTab = (id: string) =>
+	useStore.setState((s) => {
+		const left = s.panelTabs.filter((t) => t !== id);
+		const panelTabs = left.length ? left : ["start"];
+		const panelTab =
+			s.panelTab === id ? panelTabs[panelTabs.length - 1] : s.panelTab;
+		return { panelTabs, panelTab };
+	});

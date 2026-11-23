@@ -82,9 +82,10 @@ export async function deleteFiles(keys: string[]): Promise<DeleteFilesResult> {
 }
 
 /** Every file under a prefix (a chat's files: files.ts chatPrefix). */
-export async function deletePrefix(prefix: string) {
+/** Every object under a prefix, oldest first. */
+export async function listFiles(prefix: string) {
 	const { ListObjectsV2Command } = await sdk();
-	const keys: string[] = [];
+	const files: { key: string; size: number; at: string }[] = [];
 	let token: string | undefined;
 	do {
 		const page = await (await s3()).send(
@@ -94,10 +95,20 @@ export async function deletePrefix(prefix: string) {
 				ContinuationToken: token,
 			}),
 		);
-		for (const o of page.Contents ?? []) if (o.Key) keys.push(o.Key);
+		for (const o of page.Contents ?? [])
+			if (o.Key)
+				files.push({
+					key: o.Key,
+					size: o.Size ?? 0,
+					at: o.LastModified?.toISOString() ?? "",
+				});
 		token = page.NextContinuationToken;
 	} while (token);
-	return deleteFiles(keys);
+	return files.sort((a, b) => a.at.localeCompare(b.at));
+}
+
+export async function deletePrefix(prefix: string) {
+	return deleteFiles((await listFiles(prefix)).map((f) => f.key));
 }
 
 export async function presignUpload(key: string, meta: FileMetadata) {
@@ -123,14 +134,15 @@ export async function presignUpload(key: string, meta: FileMetadata) {
 }
 
 /** A filename with quotes or newlines cannot turn into a header injection. */
-function disposition(name: string) {
-	return `attachment; filename="${name.replace(/["\\\r\n]/g, "_")}"`;
+function disposition(name: string, inline = false) {
+	return `${inline ? "inline" : "attachment"}; filename="${name.replace(/["\\\r\n]/g, "_")}"`;
 }
 
 export async function presignDownload(
 	key: string,
 	name: string,
 	expiresIn = FILE_URL_TTL_SECONDS,
+	inline = false,
 ) {
 	const [{ GetObjectCommand }, { getSignedUrl }] = await Promise.all([
 		sdk(),
@@ -141,7 +153,7 @@ export async function presignDownload(
 		new GetObjectCommand({
 			Bucket: config().bucket,
 			Key: key,
-			ResponseContentDisposition: disposition(name),
+			ResponseContentDisposition: disposition(name, inline),
 		}),
 		{ expiresIn },
 	);

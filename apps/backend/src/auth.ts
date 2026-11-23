@@ -5,6 +5,10 @@ import { db } from "./db";
 
 export const webUrl = process.env.WEB_URL ?? "http://localhost:3000";
 export const isDev = process.env.NODE_ENV !== "production";
+// dev: any localhost origin; prod: only WEB_URL. Used by CORS and the terminal socket.
+export const allowedOrigin = (o: string) =>
+	o === webUrl ||
+	(isDev && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(o));
 
 export type Env = { Variables: { user: AppUser } };
 

@@ -110,6 +110,21 @@ done
 `;
 
 async function ensureStream(sbx: Desktop, password: string, streamKey: string) {
+	// The Desktop SDK starts the user's X server only in create(); after a cold boot
+	// (reboot above) it is gone. Same command as the SDK's _start.
+	const x = await sbx.commands
+		.run("xdpyinfo -display :0 >/dev/null")
+		.then(() => true)
+		.catch(() => false);
+	if (!x) {
+		await (
+			await sbx.commands.run(
+				"Xvfb :0 -ac -screen 0 1280x800x24 -retro -dpi 96 -nolisten tcp -nolisten unix",
+				{ background: true, timeoutMs: 0 },
+			)
+		).disconnect();
+		await sbx.waitAndVerify("xdpyinfo -display :0", (r) => r.exitCode === 0);
+	}
 	await ensureXfce(sbx, "user", ":0");
 	const up = await sbx.commands
 		.run(
@@ -191,10 +206,14 @@ async function create(db: Db, userId: string) {
 
 /** The user's computer, resumed or created, with its live view and firewall up. */
 export async function userDesktop(db: Db, userId: string) {
-	const { Sandbox, NotFoundError } = await Promise.all([
+	const { Sandbox, NotFoundError, GuestUnresponsiveError } = await Promise.all([
 		import("@e2b/desktop"),
 		import("e2b"),
-	]).then(([d, e]) => ({ Sandbox: d.Sandbox, NotFoundError: e.NotFoundError }));
+	]).then(([d, e]) => ({
+		Sandbox: d.Sandbox,
+		NotFoundError: e.NotFoundError,
+		GuestUnresponsiveError: e.GuestUnresponsiveError,
+	}));
 	for (let attempt = 0; attempt < 3; attempt++) {
 		const [row] = await db
 			.select()
@@ -214,9 +233,17 @@ export async function userDesktop(db: Db, userId: string) {
 		}
 		if (row?.streamKey) {
 			try {
-				// connect resumes a paused computer and resets its idle timer.
+				// connect resumes a paused computer and resets its idle timer. One paused while
+				// hung can't resume its memory (E2B docs: resume-without-memory): cold-boot it
+				// from disk instead. Files stay; open apps close, like a restarted computer.
 				const sbx = await Sandbox.connect(row.sandboxId, {
 					timeoutMs: IDLE_MS,
+				}).catch((error) => {
+					if (!(error instanceof GuestUnresponsiveError)) throw error;
+					return Sandbox.connect(row.sandboxId, {
+						timeoutMs: IDLE_MS,
+						onResume: "reboot",
+					});
 				});
 				got = {
 					sbx,
@@ -343,6 +370,18 @@ export async function runOnComputer(
 			if (attempt > 0 || opts.signal?.aborted) throw error;
 		}
 	}
+}
+
+/** Whether the user's computer is on right now. Only asks E2B: never resumes it. */
+export async function computerOn(db: Db, userId: string) {
+	const [row] = await db
+		.select({ sandboxId: userComputer.sandboxId })
+		.from(userComputer)
+		.where(eq(userComputer.userId, userId));
+	if (!row) return false;
+	const { Sandbox } = await import("e2b");
+	const info = await Sandbox.getInfo(row.sandboxId).catch(() => null);
+	return info?.state === "running";
 }
 
 /**

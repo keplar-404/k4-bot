@@ -17,6 +17,8 @@ import {
 	SidebarMenuButton,
 	SidebarMenuItem,
 	SidebarRail,
+	SidebarSeparator,
+	useSidebar,
 } from "@/components/ui/sidebar";
 
 export function AppSidebar({
@@ -25,6 +27,7 @@ export function AppSidebar({
 }: React.ComponentProps<typeof Sidebar> & {
 	user: { name: string; email: string; image?: string | null };
 }) {
+	const { setOpen } = useSidebar();
 	return (
 		<Sidebar collapsible="icon" {...props}>
 			<SidebarHeader>
@@ -52,11 +55,28 @@ export function AppSidebar({
 							<Kbd className="ml-auto font-mono">Ctrl K</Kbd>
 						</SidebarMenuButton>
 					</SidebarMenuItem>
+					{/* Collapsed: the search box becomes an icon that opens the sidebar on it. */}
+					<SidebarMenuItem className="hidden group-data-[collapsible=icon]:block">
+						<SidebarMenuButton
+							tooltip="Search"
+							onClick={() => {
+								setOpen(true);
+								setTimeout(
+									() => document.getElementById("chat-search")?.focus(),
+									250,
+								);
+							}}
+						>
+							<SearchIcon />
+							<span>Search</span>
+						</SidebarMenuButton>
+					</SidebarMenuItem>
 				</SidebarMenu>
 				{/* ponytail: static for now; filter the cached chat list when search ships. */}
 				<div className="relative group-data-[collapsible=icon]:hidden">
 					<SearchIcon className="pointer-events-none absolute top-1/2 left-2 size-4 -translate-y-1/2 text-muted-foreground" />
 					<SidebarInput
+						id="chat-search"
 						placeholder="Search"
 						aria-label="Search chats"
 						className="px-8"
@@ -66,8 +86,10 @@ export function AppSidebar({
 					</Kbd>
 				</div>
 			</SidebarHeader>
+			<SidebarSeparator className="hidden group-data-[collapsible=icon]:block" />
 			<SidebarContent>
 				<NavGroups />
+				<SidebarSeparator className="hidden group-data-[collapsible=icon]:block" />
 				<ChatHistory />
 			</SidebarContent>
 			<SidebarFooter className="border-t border-sidebar-border">

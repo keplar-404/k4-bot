@@ -9,6 +9,7 @@
 import { zValidator } from "@hono/zod-validator";
 import {
 	agentDisplay,
+	computerOn,
 	pauseComputer,
 	streamToken,
 	userDesktop,
@@ -41,11 +42,21 @@ export const myComputer = new Hono<Env>()
 			// noVNC reconnects by itself (with the same token, valid 15 minutes).
 			url.searchParams.set("reconnect", "true");
 			url.searchParams.set("reconnect_delay", "1000");
+			// When the computer was last turned on (E2B), for the panel's uptime.
+			const { startedAt } = await sbx.getInfo();
 			return c.json(
-				{ url: url.toString(), desktop: display === null ? "yours" : "agent" },
+				{
+					url: url.toString(),
+					desktop: display === null ? "yours" : "agent",
+					startedAt: startedAt.toISOString(),
+				},
 				200,
 			);
 		},
+	)
+	// Opening the panel only asks; the computer starts when the user turns it on.
+	.get("/status", async (c) =>
+		c.json({ on: await computerOn(db, c.get("user").id) }, 200),
 	)
 	// The panel's Stop button. Running agents' next computer call resumes it.
 	.post("/pause", async (c) =>
