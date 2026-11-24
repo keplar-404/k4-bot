@@ -1,7 +1,7 @@
 "use client";
 
 // The prompt bar's @ and / menus. Type @ (or press +) for tools and the user's apps;
-// type / for modes and media. ↑↓ and Enter or Tab pick, Esc closes. One highlight
+// type / for modes, media and the user's skills. ↑↓ and Enter or Tab pick, Esc closes. One highlight
 // glides to the active row. A picked app or command becomes a chip in the bar; on
 // send, compose() turns the chips back into the same text as before
 // ("@Gmail Search the web for …"), so the agent gets exactly what it got before.
@@ -15,6 +15,7 @@ import {
 	MusicIcon,
 	PaperclipIcon,
 	SearchIcon,
+	SparklesIcon,
 	VideoIcon,
 	XIcon,
 	ZapIcon,
@@ -93,6 +94,41 @@ export function getApps(
 	return page;
 }
 
+// The user's own skills (Settings > Skills), for the / menu. Loaded once per page
+// load; clearSkills() after an upload or delete.
+type Skill = { name: string; description: string };
+let skillList: Promise<Skill[]> | undefined;
+export const clearSkills = () => {
+	skillList = undefined;
+};
+const getSkills = () => {
+	skillList ??= api.api.me.skills
+		.$get()
+		.then(async (r) => (r.ok ? (await r.json()).skills : []))
+		.catch(() => []);
+	return skillList;
+};
+
+// The user's own MCP servers (Settings > Connectors), for the @ menu. Once per page
+// load; clearMcp() after an add or delete.
+export type McpServer = {
+	name: string;
+	host: string;
+	logo: string | null;
+	hasKey: boolean;
+};
+let mcpList: Promise<McpServer[]> | undefined;
+export const clearMcp = () => {
+	mcpList = undefined;
+};
+export const getMcp = () => {
+	mcpList ??= api.api.me.mcp
+		.$get()
+		.then(async (r) => (r.ok ? (await r.json()).servers : []))
+		.catch(() => []);
+	return mcpList;
+};
+
 // The user's connected apps, for the @ menu.
 const loadConnected = () =>
 	getApps()
@@ -152,12 +188,18 @@ export function usePromptMenu({
 		loading: boolean;
 	}>({ q: "", apps: [], cursor: null, loading: false });
 	const [chips, setChips] = useState<Chip[]>([]);
+	const [skills, setSkills] = useState<Skill[]>([]);
+	const [servers, setServers] = useState<McpServer[]>([]);
 	const token = dismissed ? null : tokenOf(draft);
 	const kind = plus ? "at" : token?.kind;
 	const query = (plus ? search : (token?.query ?? "")).trim().toLowerCase();
 
 	useEffect(() => {
-		if (kind === "at") void loadConnected().then(setConnected);
+		if (kind === "at") {
+			void loadConnected().then(setConnected);
+			void getMcp().then(setServers);
+		}
+		if (kind === "slash") void getSkills().then(setSkills);
 	}, [kind]);
 	// biome-ignore lint/correctness/useExhaustiveDependencies: back to the first row when the list changes
 	useEffect(() => setActive(0), [kind, query]);
@@ -248,6 +290,21 @@ export function usePromptMenu({
 		}),
 	});
 
+	// The agent finds the server by its @name (its connection's description says it).
+	const mcpRow = (m: McpServer): Row => ({
+		key: `mcp:${m.name}`,
+		name: m.name,
+		desc: m.host,
+		icon: appIcon({ logo: m.logo ?? undefined }),
+		section: "Your servers",
+		run: chip({
+			key: `@mcp:${m.name}`,
+			label: m.name,
+			icon: appIcon({ logo: m.logo ?? undefined }),
+			text: `@${m.name} `,
+		}),
+	});
+
 	// No search: connected apps, then the common ones. A search: the backend's pages.
 	const on = new Set(connected.map((a) => a.slug));
 	const apps = query
@@ -281,6 +338,20 @@ export function usePromptMenu({
 			),
 		},
 	];
+	// A skill stays in the text where it was typed ("… /blog-writer …"): the agent
+	// loads the skill it names (agent/instructions/skills.ts).
+	const skillRow = (k: Skill): Row => ({
+		key: `skill:${k.name}`,
+		name: `/${k.name}`,
+		desc: k.description,
+		icon: <SparklesIcon />,
+		section: "Skills",
+		run: () => {
+			setDraft(`${draft.slice(0, token?.start ?? draft.length)}/${k.name} `);
+			setPlus(false);
+			focus();
+		},
+	});
 	const slash = (
 		key: string,
 		desc: string,
@@ -292,6 +363,7 @@ export function usePromptMenu({
 		kind === "at"
 			? [
 					...tools.filter((r) => r.name.toLowerCase().includes(query)),
+					...servers.filter((m) => m.name.includes(query)).map(mcpRow),
 					...apps.map(appRow),
 				]
 			: kind === "slash"
@@ -367,7 +439,8 @@ export function usePromptMenu({
 								"Read this aloud: ",
 							),
 						),
-					].filter((r) => r.name.slice(1).startsWith(query))
+						...skills.map(skillRow),
+					].filter((r) => r.name.slice(1).toLowerCase().startsWith(query))
 				: [];
 
 	const close = () => {

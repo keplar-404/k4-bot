@@ -2,22 +2,34 @@
 
 import { cn } from "cn";
 import {
+	BlocksIcon,
 	BrainIcon,
 	LayoutGridIcon,
 	LogOutIcon,
 	MonitorIcon,
 	MoonIcon,
 	PaletteIcon,
+	PlugIcon,
 	RefreshCwIcon,
 	SearchIcon,
 	SettingsIcon,
+	SparklesIcon,
 	SunIcon,
+	Trash2Icon,
+	UploadIcon,
 	UserIcon,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { clearApps, getApps } from "@/components/chat/prompt-menu";
+import {
+	clearApps,
+	clearMcp,
+	clearSkills,
+	getApps,
+	getMcp,
+	type McpServer,
+} from "@/components/chat/prompt-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -30,7 +42,8 @@ import { Glide } from "@/components/ui/glide";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
-import { api } from "@/lib/api";
+import { API_URL, api } from "@/lib/api";
+import { getToken } from "@/lib/auth-client";
 import { useMemoryBusy } from "@/lib/chat-ui";
 
 type User = { name: string; email: string; image?: string | null };
@@ -50,6 +63,8 @@ const GROUPS = [
 		items: [
 			{ id: "memory", label: "Memory", icon: BrainIcon },
 			{ id: "apps", label: "Connected apps", icon: LayoutGridIcon },
+			{ id: "skills", label: "Skills", icon: SparklesIcon },
+			{ id: "mcp", label: "Custom connectors", icon: PlugIcon },
 		],
 	},
 ] as const;
@@ -146,6 +161,8 @@ export function SettingsDialog({
 						{open && section === "appearance" && <AppearanceSettings />}
 						{open && section === "memory" && <MemorySettings />}
 						{open && section === "apps" && <AppsSettings />}
+						{open && section === "skills" && <SkillsSettings />}
+						{open && section === "mcp" && <McpSettings />}
 					</div>
 				</div>
 			</DialogContent>
@@ -645,6 +662,319 @@ function AppsSettings() {
 					Show more apps
 				</Button>
 			)}
+		</>
+	);
+}
+
+type Skill = { name: string; description: string };
+type Problem = { file: string; issue: string };
+
+// The user's own skills (backend /api/me/skills): each one's name and a trimmed
+// description. The assistant loads a skill when a task needs it. An upload is one
+// .zip or a skill's files, with a SKILL.md; the backend checks every file and saves nothing if one fails.
+function SkillsSettings() {
+	const [skills, setSkills] = useState<Skill[]>();
+	const [problems, setProblems] = useState<Problem[]>([]);
+	const [busy, setBusy] = useState<string>();
+	const picked = useRef<HTMLInputElement>(null);
+
+	useEffect(() => {
+		void api.api.me.skills.$get().then(async (res) => {
+			if (!res.ok) return toast.error("Could not load skills.");
+			setSkills((await res.json()).skills);
+		});
+	}, []);
+
+	async function upload(list: FileList | null) {
+		if (!list?.length) return;
+		const form = new FormData();
+		for (const f of list) {
+			form.append("files", f);
+			form.append("paths", f.name);
+		}
+		setBusy("upload");
+		setProblems([]);
+		// FormData, so plain fetch: the typed client sends JSON bodies.
+		const res = await fetch(`${API_URL}/api/me/skills`, {
+			method: "POST",
+			headers: { authorization: `Bearer ${(await getToken()) ?? ""}` },
+			body: form,
+		}).catch(() => undefined);
+		setBusy(undefined);
+		const body = await res?.json().catch(() => ({}));
+		if (res?.status === 422) {
+			setProblems(body.problems);
+			return toast.error("Not uploaded: some files aren't allowed.");
+		}
+		if (!res?.ok)
+			return toast.error(
+				res?.status === 413
+					? "The skill is over 10 MB."
+					: (body?.error ?? "Upload failed."),
+			);
+		clearSkills(); // the / menu lists it from the next message
+		setSkills((s) => [
+			body as Skill,
+			...(s ?? []).filter((x) => x.name !== body.name),
+		]);
+		toast.success(
+			`Skill “${body.name}” saved. The assistant can use it from its next reply.`,
+		);
+	}
+
+	async function remove(name: string) {
+		setBusy(name);
+		const res = await api.api.me.skills[":name"]
+			.$delete({ param: { name } })
+			.catch(() => undefined);
+		setBusy(undefined);
+		if (!res?.ok) return toast.error("Could not delete the skill.");
+		clearSkills();
+		setSkills((s) => s?.filter((x) => x.name !== name));
+	}
+
+	const reset = (e: React.ChangeEvent<HTMLInputElement>) => {
+		void upload(e.target.files);
+		e.target.value = ""; // the same folder can be picked again
+	};
+	return (
+		<>
+			<SectionHead
+				title="Skills"
+				action={
+					<Button
+						size="sm"
+						disabled={!!busy}
+						onClick={() => picked.current?.click()}
+					>
+						<UploadIcon />
+						{busy === "upload" ? "Checking…" : "Upload"}
+					</Button>
+				}
+			>
+				Your own procedures for tasks. Upload a skill as a .zip of its folder,
+				or just its SKILL.md (name and description at the top) and files. The
+				assistant reads a skill only when a task needs it. Skills can steer the
+				assistant: upload only ones you trust.
+			</SectionHead>
+			<input
+				ref={picked}
+				type="file"
+				multiple
+				className="hidden"
+				onChange={reset}
+			/>
+			{problems.length > 0 && (
+				<div
+					role="alert"
+					className="mb-4 rounded-xl border border-destructive/40 bg-destructive/5 p-4 text-sm"
+				>
+					<p className="mb-2 font-medium text-destructive">
+						Nothing was uploaded. Fix these and try again:
+					</p>
+					<ul className="flex flex-col gap-1">
+						{problems.map((p, i) => (
+							// biome-ignore lint/suspicious/noArrayIndexKey: a fixed list
+							<li key={i}>
+								{p.file && (
+									<code className="mr-1.5 font-mono text-xs">{p.file}</code>
+								)}
+								{p.issue}
+							</li>
+						))}
+					</ul>
+				</div>
+			)}
+			<Rows>
+				{skills === undefined && (
+					<p className="px-4 py-3.5 text-sm text-muted-foreground shimmer">
+						Loading skills…
+					</p>
+				)}
+				{skills?.length === 0 && (
+					<p className="px-4 py-6 text-center text-sm text-muted-foreground">
+						No skills yet. Upload a .zip or a SKILL.md.
+					</p>
+				)}
+				{skills?.map((s) => (
+					<div key={s.name} className="flex items-center gap-3 px-4 py-3">
+						<div className="flex min-w-0 flex-1 flex-col gap-0.5">
+							<span className="truncate text-sm font-medium">{s.name}</span>
+							<span className="line-clamp-2 text-xs text-muted-foreground">
+								{s.description}
+							</span>
+						</div>
+						<Button
+							variant="ghost"
+							size="icon-sm"
+							aria-label={`Delete ${s.name}`}
+							className="text-muted-foreground hover:text-destructive"
+							disabled={busy === s.name}
+							onClick={() => void remove(s.name)}
+						>
+							<Trash2Icon />
+						</Button>
+					</div>
+				))}
+			</Rows>
+		</>
+	);
+}
+
+// MCP servers Composio doesn't have. The key is write-only: sent once over HTTPS,
+// stored encrypted, never shown again; to change it, delete and add the server again.
+function McpSettings() {
+	const [servers, setServers] = useState<McpServer[]>();
+	const [form, setForm] = useState({
+		name: "",
+		url: "",
+		header: "Authorization",
+		key: "",
+	});
+	const [busy, setBusy] = useState<string>();
+	useEffect(() => {
+		void getMcp().then(setServers);
+	}, []);
+	const set =
+		(k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
+			setForm((f) => ({ ...f, [k]: e.target.value }));
+
+	async function add(e: React.FormEvent) {
+		e.preventDefault();
+		setBusy("add");
+		const key = form.key.trim();
+		const res = await api.api.me.mcp
+			.$post({
+				json: {
+					name: form.name.trim(),
+					url: form.url.trim(),
+					...(key
+						? { key, header: form.header.trim() || "Authorization" }
+						: {}),
+				},
+			})
+			.catch(() => undefined);
+		setBusy(undefined);
+		const body = (await res?.json().catch(() => ({}))) as
+			| McpServer
+			| { error?: unknown };
+		if (!res?.ok || !("name" in body)) {
+			// Our checks send `error` as text; a bad field (zod) sends an object.
+			const error = "error" in body ? body.error : undefined;
+			return toast.error(
+				typeof error === "string"
+					? error
+					: res?.status === 400
+						? "Name: 2–30 lowercase letters, digits or -, starting with a letter."
+						: "Could not add the server.",
+			);
+		}
+		setForm((f) => ({ ...f, name: "", url: "", key: "" })); // drop the key from memory
+		clearMcp();
+		setServers((s) => [body, ...(s ?? [])]);
+		toast.success(`“${body.name}” added. Use it with @${body.name}.`);
+	}
+
+	async function remove(name: string) {
+		setBusy(name);
+		const res = await api.api.me.mcp[":name"]
+			.$delete({ param: { name } })
+			.catch(() => undefined);
+		setBusy(undefined);
+		if (!res?.ok) return toast.error("Could not remove the server.");
+		clearMcp();
+		setServers((s) => s?.filter((x) => x.name !== name));
+	}
+
+	return (
+		<>
+			<SectionHead title="Custom connectors">
+				Add an MCP server for an app that isn&apos;t in Connected apps. Its
+				tools come from whoever runs it: add only servers you trust. Your key is
+				stored encrypted and can&apos;t be viewed again, only deleted.
+			</SectionHead>
+			<form
+				onSubmit={add}
+				className="mb-4 grid gap-2 rounded-xl border p-4 sm:grid-cols-2"
+			>
+				<Input
+					required
+					placeholder="Name (e.g. my-docs)"
+					value={form.name}
+					onChange={set("name")}
+					aria-label="Name"
+				/>
+				<Input
+					required
+					type="url"
+					placeholder="https://example.com/mcp"
+					value={form.url}
+					onChange={set("url")}
+					aria-label="Server URL"
+				/>
+				<Input
+					placeholder="Key header (Authorization)"
+					value={form.header}
+					onChange={set("header")}
+					aria-label="Key header"
+				/>
+				<Input
+					type="password"
+					autoComplete="off"
+					placeholder="API key (optional)"
+					value={form.key}
+					onChange={set("key")}
+					aria-label="API key"
+				/>
+				<Button
+					type="submit"
+					size="sm"
+					className="sm:col-span-2"
+					disabled={!!busy}
+				>
+					<PlugIcon />
+					{busy === "add" ? "Checking the server…" : "Add server"}
+				</Button>
+			</form>
+			<Rows>
+				{servers === undefined && (
+					<p className="px-4 py-3.5 text-sm text-muted-foreground shimmer">
+						Loading…
+					</p>
+				)}
+				{servers?.length === 0 && (
+					<p className="px-4 py-6 text-center text-sm text-muted-foreground">
+						No servers yet.
+					</p>
+				)}
+				{servers?.map((m) => (
+					<div key={m.name} className="flex items-center gap-3 px-4 py-3">
+						{m.logo ? (
+							// biome-ignore lint/performance/noImgElement: tiny remote logo
+							<img src={m.logo} alt="" className="size-6 rounded" />
+						) : (
+							<BlocksIcon className="size-6 text-muted-foreground" />
+						)}
+						<div className="flex min-w-0 flex-1 flex-col gap-0.5">
+							<span className="truncate text-sm font-medium">@{m.name}</span>
+							<span className="truncate text-xs text-muted-foreground">
+								{m.host}
+								{m.hasKey ? " · key saved" : ""}
+							</span>
+						</div>
+						<Button
+							variant="ghost"
+							size="icon-sm"
+							aria-label={`Remove ${m.name}`}
+							className="text-muted-foreground hover:text-destructive"
+							disabled={busy === m.name}
+							onClick={() => void remove(m.name)}
+						>
+							<Trash2Icon />
+						</Button>
+					</div>
+				))}
+			</Rows>
 		</>
 	);
 }

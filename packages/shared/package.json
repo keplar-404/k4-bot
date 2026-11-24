@@ -15,7 +15,9 @@
 		"./tools": "./src/tools.ts",
 		"./computer": "./src/computer.ts",
 		"./files": "./src/files.ts",
-		"./r2": "./src/r2.ts"
+		"./r2": "./src/r2.ts",
+		"./skills": "./src/skills.ts",
+		"./mcp": "./src/mcp.ts"
 	},
 	"dependencies": {
 		"@aws-sdk/client-s3": "^3.1171.0",
@@ -23,6 +25,7 @@
 		"@e2b/desktop": "^2.5.0",
 		"drizzle-orm": "^0.45.4",
 		"e2b": "^2.64.0",
+		"fflate": "0.8.3",
 		"jose": "^6.2.17"
 	},
 	"devDependencies": {

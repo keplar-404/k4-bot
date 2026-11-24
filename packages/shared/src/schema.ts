@@ -89,3 +89,40 @@ export const rateLimit = pgTable("rate_limit", {
 	count: integer("count").notNull(),
 	lastRequest: bigint("last_request", { mode: "number" }).notNull(),
 });
+
+// Skills each user uploaded (@repo/shared/skills). The files are in R2 under `prefix`
+// (skillPrefix: a fresh folder per upload, so a failed re-upload keeps the old one);
+// this row is what the agent searches and loads by.
+export const userSkill = pgTable(
+	"user_skill",
+	{
+		userId: text("user_id").notNull(),
+		name: text("name").notNull(),
+		description: text("description").notNull(),
+		prefix: text("prefix").notNull(),
+		// Every file in the skill folder (path, bytes, type), for the agent's file list.
+		files: jsonb("files")
+			.$type<{ path: string; size: number; type: string }[]>()
+			.notNull(),
+		createdAt: timestamp("created_at").defaultNow().notNull(),
+	},
+	(t) => [primaryKey({ columns: [t.userId, t.name] })],
+);
+
+// MCP servers each user added (@repo/shared/mcp), for apps Composio doesn't have.
+// `key` is AES-GCM sealed (sealKey) and never leaves the backend or the agent.
+export const userMcp = pgTable(
+	"user_mcp",
+	{
+		userId: text("user_id").notNull(),
+		name: text("name").notNull(),
+		url: text("url").notNull(),
+		description: text("description").notNull(),
+		logo: text("logo"),
+		// The header the key goes in (Authorization, x-api-key …); null with no key.
+		header: text("header"),
+		key: text("key"),
+		createdAt: timestamp("created_at").defaultNow().notNull(),
+	},
+	(t) => [primaryKey({ columns: [t.userId, t.name] })],
+);

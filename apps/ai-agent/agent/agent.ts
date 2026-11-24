@@ -7,7 +7,16 @@ const openrouter = createOpenRouter({ apiKey: process.env.OPENROUTER_API_KEY });
 
 // Plan mode reads the web only; lib/mode.ts hides every other tool from the model.
 // ask_question changes nothing, and eve's built-in workflow tools must stay static.
-const PLAN_TOOLS = new Set(["web_search", "web_fetch", "ask_question"]);
+// Skill tools only read the user's skills (R2), so Plan mode keeps them.
+const PLAN_TOOLS = new Set([
+	"web_search",
+	"web_fetch",
+	"ask_question",
+	"find_skill",
+	"load_skill",
+	"read_skill_file",
+	"search_skill",
+]);
 // Tools that change something: Ask mode confirms each call.
 const WRITE_TOOLS = new Set([
 	"browser",

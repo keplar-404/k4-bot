@@ -3,7 +3,11 @@
 import type { Interaction, SessionView } from "eve/events";
 import { openInteractions } from "eve/events";
 import type { UseEveAgentReturn } from "eve/react";
-import { LoaderCircleIcon } from "lucide-react";
+import {
+	ChevronRightIcon,
+	LoaderCircleIcon,
+	ShieldCheckIcon,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CodeBlock, CodeBlockContent } from "@/components/ui/code-block";
@@ -42,12 +46,83 @@ export function OpenRequests({
 			{open.map((i) =>
 				i.call?.name === "connect_app" ? (
 					<ConnectApp key={i.interactionId} request={i} onAnswer={onAnswer} />
+				) : i.request.kind === "approval" && i.request.options?.length ? (
+					<Approval key={i.interactionId} request={i} onAnswer={onAnswer} />
 				) : i.request.kind === "sign-in" ? (
 					<SignIn key={i.interactionId} request={i} />
 				) : (
 					<Question key={i.interactionId} request={i} onAnswer={onAnswer} />
 				),
 			)}
+		</div>
+	);
+}
+
+// A tool call waiting for the user's OK: one click answers (no radio + Send). eve's
+// text is "Approve <tool>?"; the call's input is shown, folded, so the user can check it.
+function Approval({
+	request: { interactionId, request, call },
+	onAnswer,
+}: {
+	request: Interaction;
+	onAnswer: Answer;
+}) {
+	const [sending, setSending] = useState<string>();
+	const options = request.options ?? [];
+	const action = (request.title ?? request.prompt)
+		.replace(/^Approve\s+/i, "")
+		.replace(/\?$/, "")
+		.replace(/^Mcp\s+/i, ""); // custom connectors: "Mcp notes: …" -> "notes: …"
+	const yes = (label: string) => /^(approve|allow|yes)/i.test(label);
+	const input =
+		call?.input != null && JSON.stringify(call.input) !== "{}"
+			? JSON.stringify(call.input, null, 2)
+			: null;
+	return (
+		<div className="flex flex-col gap-3 rounded-xl border bg-card p-3.5 shadow-xs">
+			<div className="flex items-start gap-3">
+				<span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+					<ShieldCheckIcon className="size-4" />
+				</span>
+				<div className="flex min-w-0 flex-1 flex-col gap-0.5">
+					<p className="text-sm font-medium">Allow this action?</p>
+					<p className="truncate text-sm text-muted-foreground">{action}</p>
+				</div>
+			</div>
+			{input && (
+				<details className="group rounded-lg border bg-muted/40 text-xs">
+					<summary className="flex cursor-pointer list-none items-center gap-1.5 px-3 py-2 text-muted-foreground select-none hover:text-foreground">
+						<ChevronRightIcon className="size-3.5 transition-transform group-open:rotate-90" />
+						Details
+					</summary>
+					<pre className="max-h-48 overflow-auto border-t px-3 py-2 font-mono whitespace-pre-wrap break-all">
+						{input}
+					</pre>
+				</details>
+			)}
+			<div className="flex justify-end gap-2">
+				{[...options]
+					.sort((a, b) => Number(yes(a.label)) - Number(yes(b.label)))
+					.map((o) => (
+						<Button
+							key={o.id}
+							size="sm"
+							variant={yes(o.label) ? "default" : "outline"}
+							disabled={!!sending}
+							onClick={() => {
+								setSending(o.id);
+								onAnswer([{ interactionId, optionId: o.id }])?.catch(() =>
+									setSending(undefined),
+								);
+							}}
+						>
+							{sending === o.id && (
+								<LoaderCircleIcon className="animate-spin" />
+							)}
+							{o.label}
+						</Button>
+					))}
+			</div>
 		</div>
 	);
 }

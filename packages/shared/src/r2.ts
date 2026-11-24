@@ -166,3 +166,25 @@ export async function presignDownload(
 		},
 	);
 }
+
+/** Server-side upload of bytes the backend already checked (user skills). */
+export async function putFile(key: string, bytes: Uint8Array, type: string) {
+	const { PutObjectCommand } = await sdk();
+	await (await s3()).send(
+		new PutObjectCommand({
+			Bucket: config().bucket,
+			Key: key,
+			Body: bytes,
+			ContentType: type,
+		}),
+	);
+}
+
+/** A small text object, read on the server (a skill's SKILL.md). */
+export async function getText(key: string) {
+	const { GetObjectCommand } = await sdk();
+	const res = await (await s3()).send(
+		new GetObjectCommand({ Bucket: config().bucket, Key: key }),
+	);
+	return (await res.Body?.transformToString("utf-8")) ?? "";
+}

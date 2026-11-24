@@ -10,13 +10,17 @@ import { allowedOrigin } from "./auth";
 import { chats } from "./chats";
 import { myComputer } from "./computer";
 import { files } from "./files";
+import { mcp } from "./mcp";
 import { me } from "./me";
+import { skills } from "./skills";
 import { terminal } from "./terminal";
 import { transcribe } from "./transcribe";
 
 // Chained so the RPC client gets one inferred AppType (hono.dev/docs/guides/rpc).
 // Order follows the hono-middleware skill: id, log, security headers, CORS, routes.
 const small = bodyLimit({ maxSize: 64 * 1024 });
+// A skill upload: 10 MB of files (skills.ts checks the real limits) plus form overhead.
+const skillUpload = bodyLimit({ maxSize: 11 * 1024 * 1024 });
 
 const app = new Hono()
 	.use(requestId())
@@ -25,7 +29,11 @@ const app = new Hono()
 	// The largest real body is an 8,000-character memory note; refuse anything far bigger.
 	// Audio for the mic has its own 1 MB limit (transcribe.ts).
 	.use((c, next) =>
-		c.req.path === "/api/transcribe" ? next() : small(c, next),
+		c.req.path === "/api/transcribe"
+			? next()
+			: c.req.path === "/api/me/skills" && c.req.method === "POST"
+				? skillUpload(c, next)
+				: small(c, next),
 	)
 	.use(
 		"*",
@@ -38,6 +46,8 @@ const app = new Hono()
 	.route("/api/chats", chats)
 	.route("/api/me/computer", myComputer)
 	.route("/api/files", files)
+	.route("/api/me/skills", skills)
+	.route("/api/me/mcp", mcp)
 	.route("/api/me", me)
 	.route("/api/terminal", terminal)
 	.route("/api/transcribe", transcribe)
