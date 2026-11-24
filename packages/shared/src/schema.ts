@@ -74,6 +74,15 @@ export const userComputer = pgTable("user_computer", {
 	createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Composio's app list, so the prompt bar's @ menu doesn't ask Composio each time.
+// "catalog": every app (slug, name, logo), the same for all users, refreshed daily.
+// "connected:<userId>": that user's connected slugs, cleared on connect/disconnect.
+export const appCache = pgTable("app_cache", {
+	key: text("key").primaryKey(),
+	data: jsonb("data").notNull(),
+	updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // Per-user request counters (see rate-limit.ts in this package).
 export const rateLimit = pgTable("rate_limit", {
 	key: text("key").primaryKey(),

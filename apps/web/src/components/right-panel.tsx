@@ -23,6 +23,7 @@ import {
 	EmptyMedia,
 	EmptyTitle,
 } from "@/components/ui/empty";
+import { Glide } from "@/components/ui/glide";
 import { Kbd } from "@/components/ui/kbd";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { API_URL, api } from "@/lib/api";
@@ -139,6 +140,7 @@ export function RightPanel() {
 				className="flex min-h-0 flex-col overflow-y-auto"
 			>
 				<div className="m-auto flex w-full max-w-md flex-col items-center gap-3 px-4 py-8">
+					<Glide items="[data-glide-item]" className="rounded-xl" />
 					<CompassIcon
 						className="mb-6 size-12 text-muted-foreground/50"
 						aria-hidden
@@ -148,6 +150,7 @@ export function RightPanel() {
 							<button
 								key={id}
 								type="button"
+								data-glide-item
 								onClick={() => openPanelTab(id)}
 								className="flex w-full items-center gap-4 rounded-xl border bg-card px-5 py-4 text-left text-card-foreground transition-colors hover:bg-accent"
 							>

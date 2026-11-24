@@ -94,8 +94,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 					collapsible
 					collapsedSize="0%"
 					defaultSize="0%"
-					minSize="20%"
-					maxSize="50%"
+					minSize="30%"
+					maxSize="60%"
 					onResize={(size) => setOpen(size.asPercentage > 0)}
 				>
 					<aside aria-label="Side panel" className="h-full">

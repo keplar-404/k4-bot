@@ -8,7 +8,7 @@ import { notInPlan } from "../lib/mode";
 
 const tool = defineWorkflowTool({
 	description:
-		"Ask the user to connect an app (a Composio toolkit slug such as gmail) and wait until it is connected. Call it whenever an app has no active connection, then retry the task.",
+		"Ask the user to connect an app (its short lowercase name, such as gmail) and wait until it is connected. Call it whenever an app has no active connection, then retry the task.",
 	inputSchema: z.object({ app: z.string().min(1).max(100) }),
 	async execute({ app }, ctx) {
 		"use workflow";

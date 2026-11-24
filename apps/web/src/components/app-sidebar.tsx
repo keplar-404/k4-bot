@@ -6,6 +6,7 @@ import type * as React from "react";
 import { ChatHistory } from "@/components/chat-history";
 import { NavGroups } from "@/components/nav-groups";
 import { NavUser } from "@/components/nav-user";
+import { Glide } from "@/components/ui/glide";
 import { Kbd } from "@/components/ui/kbd";
 import {
 	Sidebar,
@@ -21,6 +22,10 @@ import {
 	useSidebar,
 } from "@/components/ui/sidebar";
 
+// One highlight glides between the sidebar's items on hover.
+const MENU_ITEMS =
+	"[data-sidebar=menu-button],[data-slot=sidebar-menu-sub-button]";
+
 export function AppSidebar({
 	user,
 	...props
@@ -31,6 +36,7 @@ export function AppSidebar({
 	return (
 		<Sidebar collapsible="icon" {...props}>
 			<SidebarHeader>
+				<Glide items={MENU_ITEMS} className="bg-sidebar-accent" />
 				<SidebarMenu>
 					<SidebarMenuItem>
 						<SidebarMenuButton
@@ -88,6 +94,7 @@ export function AppSidebar({
 			</SidebarHeader>
 			<SidebarSeparator className="hidden group-data-[collapsible=icon]:block" />
 			<SidebarContent>
+				<Glide items={MENU_ITEMS} className="bg-sidebar-accent" />
 				<NavGroups />
 				<SidebarSeparator className="hidden group-data-[collapsible=icon]:block" />
 				<ChatHistory />

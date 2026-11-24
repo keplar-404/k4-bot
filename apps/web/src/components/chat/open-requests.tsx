@@ -191,7 +191,17 @@ function ConnectApp({
 				if (!res.ok) return;
 				const a = await res.json();
 				setApp(a);
-				if (a.connected) answer("connected");
+				if (!a.connected) return;
+				// The chat may still be resuming its stream (eve refuses answers until
+				// then): try again for a few seconds.
+				const tryAnswer = (left: number) => {
+					answered.current = true;
+					onAnswer([{ interactionId, optionId: "connected" }])?.catch(() => {
+						answered.current = false;
+						if (left > 0) setTimeout(() => tryAnswer(left - 1), 1000);
+					});
+				};
+				if (!answered.current) tryAnswer(5);
 			})
 			.catch(() => {});
 	}, [interactionId]);

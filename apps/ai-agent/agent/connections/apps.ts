@@ -20,7 +20,7 @@ export default defineDynamic(async (ctx) => {
 	return defineMcpClientConnection({
 		url,
 		description:
-			"The user's own apps through Composio (Gmail, Calendar, Slack, Notion, GitHub, Airtable, Sheets and 1,000+ more): search for tools, connect an app, and run its actions.",
+			"The user's own apps (Gmail, Calendar, Slack, Notion, GitHub, Airtable, Sheets and 1,000+ more): search for actions and run them.",
 		instanceKey: userId,
 		// Connecting goes through the connect_app tool, which waits for the user.
 		tools: { block: ["COMPOSIO_MANAGE_CONNECTIONS"] },

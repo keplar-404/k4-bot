@@ -175,8 +175,8 @@ export default eveChannel({
 					...(effort ? { reasoning: effort } : {}),
 				},
 			},
-			// The model still sees the mode, so it can explain what it may do.
-			clientContext: JSON.stringify({ mode: safeMode, ...rest }),
+			// Mode stays out of the model's context: it is enforced by tools and approval.
+			clientContext: JSON.stringify(rest),
 			...(history?.length ? { history } : {}),
 		};
 	},

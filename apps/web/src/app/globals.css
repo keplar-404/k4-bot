@@ -169,6 +169,63 @@
 	--tracking-widest: calc(var(--tracking-normal) + 0.1em);
 }
 
+/* Prompt bar: menus pop up from the bar, the mic shows an equalizer, and a new model
+   sends one rainbow sweep across the bar. */
+@keyframes pop-in {
+	from {
+		opacity: 0;
+		transform: translateY(4px) scale(0.98);
+	}
+}
+@keyframes eq-bounce {
+	0%,
+	100% {
+		transform: scaleY(0.35);
+	}
+	50% {
+		transform: scaleY(1);
+	}
+}
+@keyframes sweep {
+	from {
+		transform: translateX(-100%);
+		opacity: 0.9;
+	}
+	to {
+		transform: translateX(100%);
+		opacity: 0;
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	[data-sweep] {
+		display: none;
+	}
+}
+
+/* Glide (components/ui/glide.tsx): one gliding highlight stands in for each item's own
+   hover background. Unlayered, so it beats the items' hover utilities. Active items
+   keep theirs. */
+[data-glide]
+	:is(
+		[data-sidebar="menu-button"],
+		[data-slot="sidebar-menu-sub-button"],
+		[data-glide-item]
+	):not([data-active]):is(:hover, :focus-visible),
+[data-glide] [role^="menuitem"]:focus {
+	background-color: transparent;
+}
+
+/* The agent's working loader (chat/messages.tsx): a cell lights up and fades. */
+@keyframes pixel-on {
+	0%,
+	100% {
+		opacity: 0.15;
+	}
+	35% {
+		opacity: 1;
+	}
+}
+
 @layer base {
 	* {
 		@apply border-border outline-ring/50;

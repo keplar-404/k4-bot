@@ -20,6 +20,7 @@ import {
 	MessageCircleDashedIcon,
 	MicIcon,
 	PaperclipIcon,
+	PlusIcon,
 	SquareIcon,
 	XIcon,
 } from "lucide-react";
@@ -40,6 +41,7 @@ import {
 	ModePicker,
 	VisionPicker,
 } from "@/components/chat/pickers";
+import { usePromptMenu } from "@/components/chat/prompt-menu";
 import { startOrder } from "@/components/chat/split-turn";
 import { useDictation } from "@/components/chat/voice";
 import {
@@ -242,6 +244,9 @@ export function Chat({
 	);
 	const formRef = useRef<HTMLFormElement>(null);
 	const fileRef = useRef<HTMLInputElement>(null);
+	const inputRef = useRef<HTMLTextAreaElement>(null);
+	// Bumped on each model change: replays the bar's rainbow sweep.
+	const [sweep, setSweep] = useState(0);
 	const [upload, setUpload] = useState<{
 		name: string;
 		type?: string;
@@ -314,11 +319,18 @@ export function Chat({
 	const hidden = Math.max(0, rows.length - shown);
 	const running = activeTurn(agent.view) !== undefined;
 	const busy = agent.status === "busy" || running;
-	const _last = live.at(-1);
 	// The mic types into the prompt bar, after what is already there.
 	const voice = useDictation((text) =>
 		setInput((v) => (v.trim() ? `${v.trimEnd()} ${text}` : text)),
 	);
+	const menu = usePromptMenu({
+		draft: input,
+		setDraft: setInput,
+		focus: () => inputRef.current?.focus(),
+		// Files go to this chat's agent, so the chat needs its session first.
+		attach: agent.session ? () => fileRef.current?.click() : undefined,
+		setMode,
+	});
 	// Tools running right now, in one pass: memory edits lock Settings > Memory,
 	// computer tools open the Computer panel.
 	// A question the agent asks after using the computer (a captcha or sign-in to do
@@ -378,8 +390,10 @@ export function Chat({
 	}, [agent.status, agent.session, agent.events]);
 
 	async function send(text: string, dead_ = dead) {
-		const t = text.trim();
-		if (!t || resuming) return;
+		if (!text.trim() || resuming) return;
+		// Chips (apps, commands) go back to the text they stand for.
+		const t = menu.compose(text.trim());
+		menu.clearChips();
 		setInput("");
 		// The old session is gone: keep its turns on screen, start a new session, and
 		// let the agent load the conversation from Neon for it.
@@ -440,7 +454,7 @@ export function Chat({
 
 	return (
 		<MessageScrollerProvider autoScroll>
-			<div className="flex h-[calc(100dvh-4rem)] min-h-0 w-full flex-col gap-2 px-3 pb-3 *:mx-auto *:w-full *:max-w-4xl sm:px-6 sm:pb-4">
+			<div className="flex h-[calc(100dvh-4rem)] min-h-0 w-full flex-col gap-2 px-3 pb-1.5 *:mx-auto *:w-full *:max-w-4xl sm:px-6">
 				{/* full width so the empty side space scrolls the chat too */}
 				<div className="min-h-0 flex-1 max-w-none!">
 					{resuming && empty ? (
@@ -523,7 +537,11 @@ export function Chat({
 						view={agent.view}
 						onAnswer={(answers) =>
 							agent.respond(answers).catch((error: unknown) => {
-								toast.error("Could not send your answer. Try again.");
+								// Reopening a chat (back from connecting an app) resumes its stream
+								// first, and eve refuses answers until then. The Connect card retries
+								// by itself, so that one isn't a failure to show.
+								if (!/resuming/.test(String((error as Error)?.message)))
+									toast.error("Could not send your answer. Try again.");
 								throw error; // the card re-enables its Send button
 							})
 						}
@@ -532,47 +550,77 @@ export function Chat({
 
 				<form
 					ref={formRef}
+					className="relative"
 					onSubmit={(e) => {
 						e.preventDefault();
 						void send(input);
 					}}
 				>
-					<InputGroup>
-						{upload && (
-							<InputGroupAddon align="block-start">
-								<Attachment size="xs" state={upload.state}>
-									<AttachmentMedia>
-										<PaperclipIcon />
-									</AttachmentMedia>
-									<AttachmentContent>
-										<AttachmentTitle>{upload.name}</AttachmentTitle>
-										{upload.state === "error" && (
-											<AttachmentDescription>
-												Upload failed
-											</AttachmentDescription>
-										)}
-									</AttachmentContent>
-									<AttachmentActions>
-										<AttachmentAction
-											aria-label="Remove file"
-											onClick={() => setUpload(undefined)}
-										>
-											<XIcon />
-										</AttachmentAction>
-									</AttachmentActions>
-								</Attachment>
+					{menu.menu}
+					<InputGroup className="isolate overflow-hidden rounded-xl bg-card shadow-md transition-[border-color,box-shadow] has-[[data-slot=input-group-control]:focus-visible]:ring-2 dark:bg-card">
+						{sweep > 0 && (
+							<span
+								key={sweep}
+								data-sweep
+								aria-hidden
+								className="pointer-events-none absolute inset-0 -z-10 animate-[sweep_900ms_cubic-bezier(0.16,1,0.3,1)_both] bg-[linear-gradient(90deg,transparent,oklch(0.72_0.19_25/0.6),oklch(0.8_0.17_85/0.6),oklch(0.75_0.18_150/0.6),oklch(0.7_0.15_240/0.6),oklch(0.65_0.2_300/0.6),transparent)]"
+							/>
+						)}
+						{(upload || menu.chipList) && (
+							<InputGroupAddon
+								align="block-start"
+								className="flex-wrap gap-1.5"
+							>
+								{menu.chipList}
+								{upload && (
+									<Attachment
+										size="xs"
+										state={upload.state}
+										className="animate-[pop-in_200ms_cubic-bezier(0.23,1,0.32,1)_both]"
+									>
+										<AttachmentMedia>
+											<PaperclipIcon />
+										</AttachmentMedia>
+										<AttachmentContent>
+											<AttachmentTitle>{upload.name}</AttachmentTitle>
+											{upload.state === "error" && (
+												<AttachmentDescription>
+													Upload failed
+												</AttachmentDescription>
+											)}
+										</AttachmentContent>
+										<AttachmentActions>
+											<AttachmentAction
+												aria-label="Remove file"
+												onClick={() => setUpload(undefined)}
+											>
+												<XIcon />
+											</AttachmentAction>
+										</AttachmentActions>
+									</Attachment>
+								)}
 							</InputGroupAddon>
 						)}
 						<InputGroupTextarea
+							ref={inputRef}
 							value={input}
-							onChange={(e) => setInput(e.target.value)}
+							onChange={(e) => {
+								setInput(e.target.value);
+								menu.onType();
+							}}
 							placeholder={
-								running ? "Steer the assistant…" : "Ask the assistant…"
+								voice.state === "recording"
+									? "Listening…"
+									: running
+										? "Steer the assistant…"
+										: "Ask anything. @ for files and apps, / for commands"
 							}
 							aria-label="Message"
+							aria-expanded={menu.open}
 							disabled={resuming}
 							className="max-h-40 min-h-14 text-base md:text-sm"
 							onKeyDown={(e) => {
+								if (menu.onKeyDown(e)) return e.preventDefault();
 								if (
 									e.key === "Enter" &&
 									!e.shiftKey &&
@@ -584,31 +632,35 @@ export function Chat({
 							}}
 						/>
 						<InputGroupAddon align="block-end" className="pt-1">
-							{/* Files go to this chat's agent, so the chat needs its session first. */}
-							{agent.session && (
-								<>
-									<input
-										ref={fileRef}
-										type="file"
-										hidden
-										onChange={(e) => {
-											const f = e.target.files?.[0];
-											e.target.value = "";
-											if (f) void attach(f);
-										}}
-									/>
-									<InputGroupButton
-										type="button"
-										size="icon-sm"
-										variant="ghost"
-										aria-label="Attach a file"
-										disabled={upload?.state === "uploading"}
-										onClick={() => fileRef.current?.click()}
-									>
-										<PaperclipIcon />
-									</InputGroupButton>
-								</>
-							)}
+							<input
+								ref={fileRef}
+								type="file"
+								hidden
+								onChange={(e) => {
+									const f = e.target.files?.[0];
+									e.target.value = "";
+									if (f) void attach(f);
+								}}
+							/>
+							{/* Files, web search and apps: the same menu as typing @. */}
+							<InputGroupButton
+								type="button"
+								size="icon-sm"
+								variant={menu.plus ? "secondary" : "ghost"}
+								aria-label="Add files, web search and apps"
+								aria-expanded={menu.plus}
+								disabled={upload?.state === "uploading"}
+								className="rounded-lg transition-transform active:scale-95"
+								onClick={menu.togglePlus}
+							>
+								<PlusIcon
+									className={
+										menu.plus
+											? "rotate-45 transition-transform"
+											: "transition-transform"
+									}
+								/>
+							</InputGroupButton>
 							{voice.supported && (
 								<InputGroupButton
 									type="button"
@@ -630,14 +682,21 @@ export function Chat({
 								>
 									{voice.state === "working" ? (
 										<LoaderCircleIcon className="animate-spin" />
+									) : voice.state === "recording" ? (
+										<span
+											aria-hidden
+											className="flex h-3.5 items-center gap-0.5"
+										>
+											{[0, 150, 300].map((d) => (
+												<span
+													key={d}
+													className="h-full w-0.5 animate-[eq-bounce_900ms_ease-in-out_infinite] rounded-full bg-current"
+													style={{ animationDelay: `${d}ms` }}
+												/>
+											))}
+										</span>
 									) : (
-										<MicIcon
-											className={
-												voice.state === "recording"
-													? "animate-pulse"
-													: undefined
-											}
-										/>
+										<MicIcon />
 									)}
 								</InputGroupButton>
 							)}
@@ -645,6 +704,9 @@ export function Chat({
 								model={model}
 								effort={effort}
 								onModel={(m) => {
+									// The sparkle is for the flagship model only.
+									if (m !== model && findModel(m).flagship)
+										setSweep((s) => s + 1);
 									setModel(m);
 									setEffort(undefined); // fall back to the new model's default
 								}}
@@ -657,7 +719,7 @@ export function Chat({
 									type="button"
 									size="icon-sm"
 									variant="default"
-									className="ml-auto"
+									className="ml-auto rounded-lg transition-transform active:scale-95"
 									onClick={() => void agent.cancel()}
 								>
 									<SquareIcon />
@@ -668,7 +730,7 @@ export function Chat({
 									type="submit"
 									size="icon-sm"
 									variant="default"
-									className="ml-auto"
+									className="ml-auto rounded-lg transition-transform enabled:active:scale-95"
 									disabled={!input.trim() || resuming}
 								>
 									<ArrowUpIcon />
@@ -678,7 +740,10 @@ export function Chat({
 						</InputGroupAddon>
 					</InputGroup>
 				</form>
-				<ChatStats view={agent.view} />
+				{/* A fixed slot, so the stats appearing never push the bar up. */}
+				<div className="flex h-5 shrink-0 items-center justify-center">
+					<ChatStats view={agent.view} />
+				</div>
 			</div>
 		</MessageScrollerProvider>
 	);

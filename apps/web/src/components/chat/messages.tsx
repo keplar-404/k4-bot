@@ -174,6 +174,7 @@ const isRunning = (p: Step) =>
 			? RUNNING.has(p.state)
 			: false;
 
+// Seconds since the agent started, in tenths while it runs.
 function useElapsed(running: boolean) {
 	const start = useRef<number>(undefined);
 	const [secs, setSecs] = useState(0);
@@ -181,21 +182,49 @@ function useElapsed(running: boolean) {
 		if (!running) return;
 		start.current ??= Date.now();
 		const id = setInterval(
-			() => setSecs(Math.round((Date.now() - (start.current ?? 0)) / 1000)),
-			1000,
+			() => setSecs((Date.now() - (start.current ?? 0)) / 1000),
+			100,
 		);
 		return () => clearInterval(id);
 	}, [running]);
 	return secs;
 }
+const clock = (s: number) =>
+	s < 60
+		? `${s.toFixed(1)}s`
+		: `${Math.floor(s / 60)}m ${(s % 60).toFixed(1)}s`;
 
-function AgentLogo({ running }: { running: boolean }) {
+function AgentLogo() {
 	return (
 		<span
 			aria-hidden="true"
 			className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground"
 		>
-			<SparklesIcon className={running ? "size-3 animate-pulse" : "size-3"} />
+			<SparklesIcon className="size-3" />
+		</span>
+	);
+}
+
+// While the agent works: a 3×3 grid where a chevron of light drives left to right.
+// The 650 ms cycle is shorter than the sweep, so two fronts are always moving.
+const DRIVE = Array.from(
+	{ length: 9 },
+	(_, i) => ((i % 3) + Math.abs(Math.floor(i / 3) - 1)) * 90,
+);
+function WorkingLoader() {
+	return (
+		<span
+			aria-hidden="true"
+			className="grid size-5 shrink-0 grid-cols-[repeat(3,4px)] place-content-center gap-[1.5px]"
+		>
+			{DRIVE.map((delay, i) => (
+				<span
+					// biome-ignore lint/suspicious/noArrayIndexKey: fixed grid of cells
+					key={i}
+					className="size-1 animate-[pixel-on_650ms_ease-in-out_infinite] rounded-[1px] bg-primary opacity-15 motion-reduce:animate-none"
+					style={{ animationDelay: `${delay}ms` }}
+				/>
+			))}
 		</span>
 	);
 }
@@ -224,14 +253,20 @@ function Steps({
 		<Trace>
 			<TraceCollapsible open={open} onOpenChange={setManual}>
 				<TraceCollapsibleTrigger>
-					<AgentLogo running={running} />
+					{running ? <WorkingLoader /> : <AgentLogo />}
 					<TraceLine status={running ? "running" : undefined}>
 						<TraceTitle>{running ? "Deep diving" : "Steps"}</TraceTitle>
-						{!running && count > 0 && (
-							<TraceDescription>
-								{count}
-								{secs >= 1 ? ` · ${secs}s` : ""}
+						{running ? (
+							<TraceDescription className="font-mono text-xs">
+								{clock(secs)}
 							</TraceDescription>
+						) : (
+							count > 0 && (
+								<TraceDescription>
+									{count}
+									{secs >= 1 ? ` · ${Math.round(secs)}s` : ""}
+								</TraceDescription>
+							)
 						)}
 					</TraceLine>
 				</TraceCollapsibleTrigger>
@@ -263,11 +298,6 @@ function Steps({
 								</div>
 							)
 						),
-					)}
-					{running && steps.length === 0 && (
-						<span className="text-xs text-muted-foreground">
-							Getting started…
-						</span>
 					)}
 				</TraceCollapsibleContent>
 			</TraceCollapsible>

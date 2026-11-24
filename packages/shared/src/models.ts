@@ -16,6 +16,8 @@ export type ModelOption = {
 	contextWindow: number;
 	/** false: text only (OpenRouter `input_modalities`); a vision model reads images for it. */
 	vision?: false;
+	/** The top model: picking it plays the prompt bar's sparkle. */
+	flagship?: true;
 };
 
 export const models: ModelOption[] = [
@@ -34,6 +36,7 @@ export const models: ModelOption[] = [
 		provider: "Anthropic",
 		efforts: ["low", "medium", "high", "xhigh"],
 		defaultEffort: "high",
+		flagship: true,
 	},
 	{
 		id: "anthropic/claude-haiku-5.5",
