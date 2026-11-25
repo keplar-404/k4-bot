@@ -8,7 +8,11 @@ export type Effort = "none" | "minimal" | "low" | "medium" | "high" | "xhigh";
 export type ModelOption = {
 	id: string;
 	name: string;
+	/** One line under the name in the picker. */
+	description: string;
 	provider: string;
+	/** Where it runs (the API we call). Only OpenRouter for now; the picker's tabs. */
+	via: string;
 	/** Empty: the model has no effort control. */
 	efforts: Effort[];
 	defaultEffort?: Effort;
@@ -26,14 +30,18 @@ export const models: ModelOption[] = [
 		// Routes to many models, some smaller than the listed 200k: stay conservative.
 		contextWindow: 128_000,
 		name: "Free router",
+		description: "Picks a free model for each message",
 		provider: "OpenRouter",
+		via: "OpenRouter",
 		efforts: [],
 	},
 	{
 		id: "anthropic/claude-sonnet-5.5",
 		contextWindow: 1_000_000,
 		name: "Claude Sonnet 5.5",
+		description: "Strong all-rounder for agents and code",
 		provider: "Anthropic",
+		via: "OpenRouter",
 		efforts: ["low", "medium", "high", "xhigh"],
 		defaultEffort: "high",
 		flagship: true,
@@ -42,7 +50,9 @@ export const models: ModelOption[] = [
 		id: "anthropic/claude-haiku-5.5",
 		contextWindow: 1_000_000,
 		name: "Claude Haiku 5.5",
+		description: "Quick and light, good for everyday tasks",
 		provider: "Anthropic",
+		via: "OpenRouter",
 		efforts: ["none", "low", "medium", "high", "xhigh"],
 		defaultEffort: "medium",
 	},
@@ -50,7 +60,9 @@ export const models: ModelOption[] = [
 		id: "openai/gpt-6.1-sol",
 		contextWindow: 1_050_000,
 		name: "GPT-6.1 Sol",
+		description: "Deep reasoning for hard problems",
 		provider: "OpenAI",
+		via: "OpenRouter",
 		efforts: ["low", "medium", "high", "xhigh"],
 		defaultEffort: "medium",
 	},
@@ -58,7 +70,9 @@ export const models: ModelOption[] = [
 		id: "openai/gpt-6-luna",
 		contextWindow: 1_050_000,
 		name: "GPT-6 Luna",
+		description: "Fast, focused answers",
 		provider: "OpenAI",
+		via: "OpenRouter",
 		efforts: ["none", "low", "medium", "high", "xhigh"],
 		defaultEffort: "medium",
 	},
@@ -66,7 +80,9 @@ export const models: ModelOption[] = [
 		id: "google/gemini-3.8-flash",
 		contextWindow: 1_048_576,
 		name: "Gemini 3.8 Flash",
+		description: "Fast with a huge context window",
 		provider: "Google",
+		via: "OpenRouter",
 		efforts: ["low", "medium", "high"],
 		defaultEffort: "medium",
 	},
@@ -74,7 +90,9 @@ export const models: ModelOption[] = [
 		id: "z-ai/glm-5.3-prime",
 		contextWindow: 1_000_000,
 		name: "GLM 5.3 Prime",
+		description: "Text-only reasoning model",
 		provider: "Z.ai",
+		via: "OpenRouter",
 		efforts: ["low", "high"],
 		defaultEffort: "high",
 		vision: false,
@@ -83,13 +101,18 @@ export const models: ModelOption[] = [
 		id: "deepseek/deepseek-v4.1-flash",
 		contextWindow: 1_048_576,
 		name: "DeepSeek V4.1 Flash",
+		description: "Low-cost reasoning and code",
 		provider: "DeepSeek",
+		via: "OpenRouter",
 		efforts: ["none", "low", "high"],
 		defaultEffort: "high",
 	},
 ];
 
 export const defaultModelId = models[0].id;
+
+/** The picker's tabs, in list order. */
+export const gateways = [...new Set(models.map((m) => m.via))];
 
 /** Read images for a text-only model (view_file). The first is the default (free). */
 export const visionModels = [
