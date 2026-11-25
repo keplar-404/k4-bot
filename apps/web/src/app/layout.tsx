@@ -1,21 +1,16 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Inter } from "next/font/google";
+import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Agentation } from "agentation";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { cn } from "@/lib/utils";
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
-
-const geistSans = Geist({
-	variable: "--font-geist-sans",
+// globals.css maps these to font-sans / font-mono; font-serif is the system Georgia.
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
+const mono = JetBrains_Mono({
 	subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-	variable: "--font-geist-mono",
-	subsets: ["latin"],
+	variable: "--font-jetbrains-mono",
 });
 
 export const metadata: Metadata = {
@@ -31,10 +26,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
 			className={cn(
 				"h-full",
 				"antialiased",
-				geistSans.variable,
-				geistMono.variable,
 				"font-sans",
 				inter.variable,
+				mono.variable,
 			)}
 		>
 			<body className="min-h-full flex flex-col" suppressHydrationWarning>

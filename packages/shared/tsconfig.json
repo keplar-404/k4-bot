@@ -1,0 +1,9 @@
+{
+	"compilerOptions": {
+		"types": ["bun"],
+		"skipLibCheck": true,
+		"strict": true,
+		"noEmit": true
+	},
+	"exclude": ["node_modules"]
+}

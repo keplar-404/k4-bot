@@ -1,14 +1,15 @@
 "use client";
 
 import {
+	BrainIcon,
 	ChevronsUpDownIcon,
+	LayoutGridIcon,
 	LogOutIcon,
-	MonitorIcon,
-	MoonIcon,
-	SunIcon,
+	SettingsIcon,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useTheme } from "next-themes";
+import { useState } from "react";
+import { type Section, SettingsDialog } from "@/components/settings-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
 	DropdownMenu,
@@ -19,13 +20,15 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Glide } from "@/components/ui/glide";
 import {
 	SidebarMenu,
 	SidebarMenuButton,
 	SidebarMenuItem,
 	useSidebar,
 } from "@/components/ui/sidebar";
-import { authClient } from "@/lib/auth-client";
+import { authClient, forgetToken } from "@/lib/auth-client";
+import { clearChatCache } from "@/lib/chat-cache";
 
 export function NavUser({
 	user,
@@ -33,8 +36,20 @@ export function NavUser({
 	user: { name: string; email: string; image?: string | null };
 }) {
 	const { isMobile } = useSidebar();
-	const { setTheme } = useTheme();
 	const router = useRouter();
+	const [settingsOpen, setSettingsOpen] = useState(false);
+	const [start, setStart] = useState<Section>("account");
+	const openSettings = (s: Section) => () => {
+		setStart(s);
+		setSettingsOpen(true);
+	};
+	const logOut = async () => {
+		await clearChatCache(); // this browser's copy of their chats
+		await authClient.signOut();
+		forgetToken();
+		router.push("/login");
+		router.refresh();
+	};
 	const initials = user.name
 		.split(" ")
 		.map((w) => w[0])
@@ -43,7 +58,12 @@ export function NavUser({
 		.toUpperCase();
 	const avatar = (
 		<Avatar>
-			<AvatarImage src={user.image ?? undefined} alt={user.name} />
+			<AvatarImage
+				src={user.image ?? undefined}
+				alt={user.name}
+				// Google profile photos refuse requests that send a referrer.
+				referrerPolicy="no-referrer"
+			/>
 			<AvatarFallback>{initials}</AvatarFallback>
 		</Avatar>
 	);
@@ -72,6 +92,7 @@ export function NavUser({
 						align="end"
 						sideOffset={4}
 					>
+						<Glide items="[role^=menuitem]" />
 						<DropdownMenuGroup>
 							<DropdownMenuLabel className="p-0 font-normal">
 								<div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
@@ -82,32 +103,33 @@ export function NavUser({
 						</DropdownMenuGroup>
 						<DropdownMenuSeparator />
 						<DropdownMenuGroup>
-							<DropdownMenuItem onClick={() => setTheme("light")}>
-								<SunIcon />
-								Light
+							<DropdownMenuItem onClick={openSettings("apps")}>
+								<LayoutGridIcon />
+								Connected apps
 							</DropdownMenuItem>
-							<DropdownMenuItem onClick={() => setTheme("dark")}>
-								<MoonIcon />
-								Dark
+							<DropdownMenuItem onClick={openSettings("memory")}>
+								<BrainIcon />
+								Memory
 							</DropdownMenuItem>
-							<DropdownMenuItem onClick={() => setTheme("system")}>
-								<MonitorIcon />
-								System
+							<DropdownMenuItem onClick={openSettings("account")}>
+								<SettingsIcon />
+								Settings
 							</DropdownMenuItem>
 						</DropdownMenuGroup>
 						<DropdownMenuSeparator />
-						<DropdownMenuItem
-							onClick={async () => {
-								await authClient.signOut();
-								router.push("/login");
-								router.refresh();
-							}}
-						>
+						<DropdownMenuItem onClick={logOut}>
 							<LogOutIcon />
 							Log out
 						</DropdownMenuItem>
 					</DropdownMenuContent>
 				</DropdownMenu>
+				<SettingsDialog
+					open={settingsOpen}
+					onOpenChange={setSettingsOpen}
+					user={user}
+					onLogOut={logOut}
+					start={start}
+				/>
 			</SidebarMenuItem>
 		</SidebarMenu>
 	);

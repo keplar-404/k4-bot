@@ -3,7 +3,12 @@
 		"codegraph": {
 			"type": "stdio",
 			"command": "codegraph",
-			"args": ["serve", "--mcp"]
+			"args": ["serve", "--mcp"],
+			"alwaysLoad": true
+		},
+		"shadcn": {
+			"command": "bunx",
+			"args": ["shadcn@latest", "mcp"]
 		}
 	}
 }

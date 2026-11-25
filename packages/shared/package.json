@@ -7,14 +7,28 @@
 	},
 	"exports": {
 		"./models": "./src/models.ts",
-		"./desktop": "./src/desktop.ts",
-		"./storage": "./src/storage.ts",
-		"./auth": "./src/auth.ts"
+		"./auth": "./src/auth.ts",
+		"./schema": "./src/schema.ts",
+		"./db": "./src/db.ts",
+		"./rate-limit": "./src/rate-limit.ts",
+		"./memory": "./src/memory.ts",
+		"./tools": "./src/tools.ts",
+		"./computer": "./src/computer.ts",
+		"./files": "./src/files.ts",
+		"./r2": "./src/r2.ts",
+		"./skills": "./src/skills.ts",
+		"./mcp": "./src/mcp.ts"
 	},
 	"dependencies": {
-		"@aws-sdk/client-s3": "^3.1000.0",
-		"@aws-sdk/s3-request-presigner": "^3.1000.0",
+		"@aws-sdk/client-s3": "^3.1171.0",
+		"@aws-sdk/s3-request-presigner": "3.1171.0",
 		"@e2b/desktop": "^2.5.0",
+		"drizzle-orm": "^0.45.4",
+		"e2b": "^2.64.0",
+		"fflate": "0.8.3",
 		"jose": "^6.2.17"
+	},
+	"devDependencies": {
+		"@types/bun": "^1.3.1"
 	}
 }

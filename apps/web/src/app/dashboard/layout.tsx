@@ -1,31 +1,23 @@
-import { Suspense } from "react";
 import { AppSidebar } from "@/components/app-sidebar";
-import { DashboardHeader } from "@/components/dashboard-header";
-import { EnsureDesktop } from "@/components/ensure-desktop";
+import { ChatCacheOwner } from "@/components/chat/chat-cache-owner";
+import { DashboardShell } from "@/components/dashboard-shell";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { getSession } from "@/lib/session";
 
-// Reads the request cookie, so it renders inside <Suspense> (Cache Components).
-async function UserSidebar() {
-	// proxy.ts already sends signed-out users to /login.
-	const session = await getSession();
-	return session ? <AppSidebar user={session.user} /> : null;
-}
-
-export default function DashboardLayout({
+// No <Suspense> here: a streamed boundary can stay hidden and unhydrated (Next.js #94750).
+export default async function DashboardLayout({
 	children,
 }: {
 	children: React.ReactNode;
 }) {
+	// proxy.ts already sends signed-out users to /login.
+	const session = await getSession();
 	return (
 		<SidebarProvider>
-			<EnsureDesktop />
-			<Suspense>
-				<UserSidebar />
-			</Suspense>
+			{session && <ChatCacheOwner userId={session.user.id} />}
+			{session && <AppSidebar user={session.user} />}
 			<SidebarInset className="min-w-0">
-				<DashboardHeader />
-				{children}
+				<DashboardShell>{children}</DashboardShell>
 			</SidebarInset>
 		</SidebarProvider>
 	);

@@ -1,27 +1,25 @@
 "use client";
 
-import type {
-	EveMessage,
-	EveMessagePart,
-	EveToolPart,
-	UseEveAgentReturn,
-} from "eve/react";
+import { typeOf } from "@repo/shared/files";
+import type { SearchOutput } from "@repo/shared/tools";
+import type { EveMessage, EveToolPart } from "eve/react";
 import {
+	BrainIcon,
 	CheckIcon,
-	CircleCheckIcon,
 	CopyIcon,
-	ExternalLinkIcon,
 	GlobeIcon,
 	LoaderCircleIcon,
-	MonitorIcon,
-	TerminalIcon,
+	MessageSquareTextIcon,
+	SparklesIcon,
 	ThumbsDownIcon,
 	ThumbsUpIcon,
+	Volume2Icon,
 	WrenchIcon,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Streamdown } from "streamdown";
-import { Screenshot } from "@/components/chat/screenshot";
+import { FileCard } from "@/components/chat/file-card";
+import { speak, stopSpeaking } from "@/components/chat/voice";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
 import { Button } from "@/components/ui/button";
 import { CodeBlock, CodeBlockContent } from "@/components/ui/code-block";
@@ -40,76 +38,104 @@ import {
 	TraceCollapsible,
 	TraceCollapsibleContent,
 	TraceCollapsibleTrigger,
+	TraceDescription,
 	TraceIcon,
 	TraceLine,
 	TraceTitle,
 } from "@/components/ui/trace";
-
-type Answers = Parameters<UseEveAgentReturn["respond"]>[0];
+import { useManualOpen } from "@/lib/chat-ui";
+import { type StartOrder, type Step, splitTurn } from "./split-turn";
 
 const textOf = (m: EveMessage) =>
 	m.parts.flatMap((p) => (p.type === "text" ? [p.text] : [])).join("");
 
+// chat.tsx sends an upload's id inside the text for the agent; the user sees a card.
+// Until the server echoes the message, eve shows it as text with "[file: name]" after.
+const ATTACHED = /\n\n\(Attached .+, file id `([^`]+)`\.\)[\s\S]*$/;
+
 export function UserMessage({ message }: { message: EveMessage }) {
+	const text = textOf(message);
+	const key = ATTACHED.exec(text)?.[1];
+	const part = message.parts.find((p) => p.type === "file");
+	const name =
+		part?.filename ?? decodeURIComponent(key?.split("/").pop() ?? "");
+	const files = key
+		? [{ key, name, size: part?.size, type: part?.mediaType ?? typeOf(name) }]
+		: [];
 	return (
 		<Message align="end">
-			<MessageContent>
+			<MessageContent className="items-end gap-2">
+				{files.length > 0 && (
+					<div className="flex flex-wrap justify-end gap-2">
+						{files.map((f) => (
+							<FileCard key={f.key} file={f} compact />
+						))}
+					</div>
+				)}
 				<Bubble align="end" variant="muted">
-					<BubbleContent>{textOf(message)}</BubbleContent>
+					<BubbleContent>{text.replace(ATTACHED, "")}</BubbleContent>
 				</Bubble>
 			</MessageContent>
 		</Message>
 	);
 }
 
-// Parts render in order, so reasoning, tool calls and text interleave as the
-// agent produced them.
+// A turn reads as one unit: a "Steps" block (thinking, tools, narration) that is
+// open and shimmering while the agent works and folds to a one-line summary when
+// it is done, followed by the final reply. Nothing here keeps its own copy of
+// the conversation: eve's useEveAgent store owns it and these components only
+// project `message.parts`, so there is no second store to fall out of sync.
 export function AssistantMessage({
 	message,
 	streaming,
-	onAnswer,
+	order,
 }: {
 	message: EveMessage;
 	streaming: boolean;
-	onAnswer: (answers: Answers) => void;
+	order?: StartOrder;
 }) {
-	const groups = groupParts(message.parts);
-	const reply = textOf(message);
+	const { steps, reply } = splitTurn(message.parts, order);
+	const running = streaming || steps.some(isRunning);
+	// Files the agent gave the user (share_file) show under the reply, not in folded Steps.
+	const files = message.parts.flatMap((p) => {
+		const f = (
+			p.type === "tool" && p.name === "share_file" ? p.output : undefined
+		) as
+			| { key?: unknown; name?: unknown; size?: unknown; type?: unknown }
+			| undefined;
+		return typeof f?.key === "string" &&
+			typeof f.name === "string" &&
+			typeof f.size === "number"
+			? [
+					{
+						key: f.key,
+						name: f.name,
+						size: f.size,
+						type: typeof f.type === "string" ? f.type : undefined,
+					},
+				]
+			: [];
+	});
 	return (
 		<Message>
 			<MessageContent className="gap-3">
-				{groups.map((g, i) =>
-					g.kind === "text" ? (
-						<Streamdown
-							// biome-ignore lint/suspicious/noArrayIndexKey: groups are positional
-							key={i}
-							className="min-w-0 text-sm leading-relaxed"
-							isAnimating={streaming}
-						>
-							{g.text}
-						</Streamdown>
-					) : (
-						// biome-ignore lint/suspicious/noArrayIndexKey: groups are positional
-						<Trace key={i}>
-							{g.parts.map((p, j) =>
-								p.type === "reasoning" ? (
-									<ReasoningRow
-										key={p.id ?? j}
-										text={p.text}
-										running={p.state === "streaming"}
-									/>
-								) : p.type === "tool" ? (
-									<ToolRow key={p.callId} part={p} onAnswer={onAnswer} />
-								) : p.type === "interaction" ? (
-									<Prompt
-										key={p.interactionId}
-										interaction={p}
-										onAnswer={onAnswer}
-									/>
-								) : null,
-							)}
-						</Trace>
-					),
+				{(running || steps.length > 0) && (
+					<Steps id={message.id} steps={steps} running={running} />
+				)}
+				{reply && (
+					<Streamdown
+						className="min-w-0 text-sm leading-relaxed"
+						isAnimating={streaming}
+					>
+						{reply}
+					</Streamdown>
+				)}
+				{files.length > 0 && (
+					<div className="grid gap-2 sm:grid-cols-2">
+						{files.map((f) => (
+							<FileCard key={f.key} file={f} />
+						))}
+					</div>
 				)}
 				{!streaming && reply && (
 					<MessageFooter>
@@ -121,50 +147,19 @@ export function AssistantMessage({
 	);
 }
 
-type Group =
-	| { kind: "text"; text: string }
-	| { kind: "steps"; parts: EveMessagePart[] };
-
-function groupParts(parts: readonly EveMessagePart[]): Group[] {
-	const out: Group[] = [];
-	for (const p of parts) {
-		if (p.type === "tool" && p.hidden) continue;
-		const prev = out.at(-1);
-		if (p.type === "text") {
-			if (prev?.kind === "text") prev.text += p.text;
-			else out.push({ kind: "text", text: p.text });
-		} else if (p.type !== "file") {
-			if (prev?.kind === "steps") prev.parts.push(p);
-			else out.push({ kind: "steps", parts: [p] });
-		}
-	}
-	return out;
-}
-
-function ReasoningRow({ text, running }: { text: string; running: boolean }) {
-	const [open, setOpen] = useState<boolean>();
+// Shown the instant a message is sent, before eve has projected any assistant
+// part, so there is never a blank gap between "send" and the first event.
+export function PendingAssistant() {
 	return (
-		<TraceCollapsible open={open ?? running} onOpenChange={setOpen}>
-			<TraceCollapsibleTrigger>
-				<TraceLine status={running ? "running" : undefined}>
-					<TraceIcon>
-						{running ? (
-							<LoaderCircleIcon className="animate-spin" />
-						) : (
-							<CircleCheckIcon />
-						)}
-					</TraceIcon>
-					<TraceTitle>{running ? "Thinking" : "Thought"}</TraceTitle>
-				</TraceLine>
-			</TraceCollapsibleTrigger>
-			<TraceCollapsibleContent className="whitespace-pre-wrap">
-				{text}
-			</TraceCollapsibleContent>
-		</TraceCollapsible>
+		<Message>
+			<MessageContent>
+				<Steps id="pending" steps={[]} running />
+			</MessageContent>
+		</Message>
 	);
 }
 
-const RUNNING = new Set([
+export const RUNNING = new Set([
 	"streaming",
 	"requested",
 	"approval",
@@ -172,49 +167,242 @@ const RUNNING = new Set([
 	"blocked",
 ]);
 
-type SearchOutput = {
-	results?: { url: string; title: string; snippet: string }[];
-};
-type DesktopOutput = {
-	streamUrl?: string;
-	screenshotKey?: string;
-	stdout?: string;
-	stderr?: string;
-	exitCode?: number;
-};
-type ShellOutput = { stdout?: string; stderr?: string };
+const isRunning = (p: Step) =>
+	p.type === "reasoning"
+		? p.state === "streaming"
+		: p.type === "tool"
+			? RUNNING.has(p.state)
+			: false;
 
-function ToolRow({
-	part,
-	onAnswer,
+// When the pending placeholder started: the real message replaces it at the first
+// event and keeps counting from here instead of from 0.
+let pendingSince: number | undefined;
+
+// Seconds since the agent started, in tenths while it runs.
+function useElapsed(running: boolean, pending = false) {
+	const start = useRef<number>(undefined);
+	const [secs, setSecs] = useState(0);
+	useEffect(() => {
+		if (!running) return;
+		if (pending) pendingSince = Date.now(); // a new placeholder is a new turn
+		start.current ??= pending ? pendingSince : (pendingSince ?? Date.now());
+		if (!pending) pendingSince = undefined;
+		const id = setInterval(
+			() => setSecs((Date.now() - (start.current ?? 0)) / 1000),
+			100,
+		);
+		return () => clearInterval(id);
+	}, [running, pending]);
+	return secs;
+}
+const clock = (s: number) =>
+	s < 60
+		? `${s.toFixed(1)}s`
+		: `${Math.floor(s / 60)}m ${(s % 60).toFixed(1)}s`;
+
+function AgentLogo() {
+	return (
+		<span
+			aria-hidden="true"
+			className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground"
+		>
+			<SparklesIcon className="size-3" />
+		</span>
+	);
+}
+
+// While the agent works: a 3×3 grid where a chevron of light drives left to right.
+// The 650 ms cycle is shorter than the sweep, so two fronts are always moving.
+const DRIVE = Array.from(
+	{ length: 9 },
+	(_, i) => ((i % 3) + Math.abs(Math.floor(i / 3) - 1)) * 90,
+);
+function WorkingLoader() {
+	return (
+		<span
+			aria-hidden="true"
+			className="grid size-5 shrink-0 grid-cols-[repeat(3,4px)] place-content-center gap-[1.5px]"
+		>
+			{DRIVE.map((delay, i) => (
+				<span
+					// biome-ignore lint/suspicious/noArrayIndexKey: fixed grid of cells
+					key={i}
+					className="size-1 animate-[pixel-on_650ms_ease-in-out_infinite] rounded-[1px] bg-primary opacity-15 motion-reduce:animate-none"
+					style={{ animationDelay: `${delay}ms` }}
+				/>
+			))}
+		</span>
+	);
+}
+
+function Steps({
+	id,
+	steps,
+	running,
 }: {
-	part: EveToolPart;
-	onAnswer: (a: Answers) => void;
+	id: string;
+	steps: Step[];
+	running: boolean;
 }) {
+	// Open while the agent works, folded when it finishes. Once the person
+	// toggles it, their choice wins.
+	const [manual, setManual] = useManualOpen(`steps:${id}`);
+	const waiting = steps.some(
+		(p) =>
+			(p.type === "tool" && p.interaction?.status === "open") ||
+			(p.type === "interaction" && p.status === "open"),
+	);
+	const open = manual ?? (running || waiting);
+	const secs = useElapsed(running, id === "pending");
+	const count = steps.filter((p) => p.type !== "text").length;
+	return (
+		<Trace>
+			<TraceCollapsible open={open} onOpenChange={setManual}>
+				<TraceCollapsibleTrigger>
+					{running ? <WorkingLoader /> : <AgentLogo />}
+					<TraceLine status={running ? "running" : undefined}>
+						<TraceTitle>{running ? "Deep diving" : "Steps"}</TraceTitle>
+						{running ? (
+							<TraceDescription className="font-mono text-xs">
+								{clock(secs)}
+							</TraceDescription>
+						) : (
+							count > 0 && (
+								<TraceDescription>
+									{count}
+									{secs >= 1 ? ` · ${Math.round(secs)}s` : ""}
+								</TraceDescription>
+							)
+						)}
+					</TraceLine>
+				</TraceCollapsibleTrigger>
+				{/* One polite status for screen readers instead of every shimmer tick. */}
+				<span role="status" className="sr-only">
+					{running ? "Working" : ""}
+				</span>
+				<TraceCollapsibleContent className="flex flex-col gap-2.5">
+					{steps.map((p, i) =>
+						p.type === "reasoning" ? (
+							<ReasoningRow
+								key={p.id ?? `r${i}`}
+								k={`${id}:r:${p.id ?? i}`}
+								text={p.text}
+								running={p.state === "streaming"}
+							/>
+						) : p.type === "tool" ? (
+							<ToolRow key={p.callId} part={p} />
+						) : p.type === "interaction" ? null : (
+							p.text.trim() && (
+								<div
+									key={p.id ?? `t${i}`}
+									className="flex gap-2 text-xs text-muted-foreground"
+								>
+									<MessageSquareTextIcon className="mt-0.5 size-3.5 shrink-0" />
+									<p className="min-w-0 whitespace-pre-wrap italic">
+										{p.text.trim()}
+									</p>
+								</div>
+							)
+						),
+					)}
+				</TraceCollapsibleContent>
+			</TraceCollapsible>
+		</Trace>
+	);
+}
+
+function ReasoningRow({
+	k,
+	text,
+	running,
+}: {
+	k: string;
+	text: string;
+	running: boolean;
+}) {
+	const [open, setOpen] = useManualOpen(k);
+	return (
+		<TraceCollapsible open={open ?? running} onOpenChange={setOpen}>
+			<TraceCollapsibleTrigger>
+				<TraceLine status={running ? "running" : undefined}>
+					<TraceIcon>
+						<BrainIcon className={running ? "animate-pulse" : undefined} />
+					</TraceIcon>
+					<TraceTitle>{running ? "Thinking" : "Thought"}</TraceTitle>
+				</TraceLine>
+			</TraceCollapsibleTrigger>
+			<TraceCollapsibleContent>
+				<FadeScroll follow={running}>{text}</FadeScroll>
+			</TraceCollapsibleContent>
+		</TraceCollapsible>
+	);
+}
+
+// A capped box that fades out at the bottom while there is more below, and
+// follows new text while `follow` is on unless the person scrolled up.
+function FadeScroll({
+	children,
+	follow,
+}: {
+	children: React.ReactNode;
+	follow: boolean;
+}) {
+	const ref = useRef<HTMLDivElement>(null);
+	const pinned = useRef(true);
+	// Plain DOM attribute, not state: measuring must never re-render.
+	const measure = () => {
+		const el = ref.current;
+		if (!el) return;
+		const left = el.scrollHeight - el.scrollTop - el.clientHeight;
+		pinned.current = left < 24;
+		el.dataset.more = String(left > 4);
+	};
+	// biome-ignore lint/correctness/useExhaustiveDependencies: runs when the text grows
+	useEffect(() => {
+		const el = ref.current;
+		if (el && follow && pinned.current) el.scrollTop = el.scrollHeight;
+		measure();
+	}, [children, follow]);
+	return (
+		<div
+			ref={ref}
+			onScroll={measure}
+			data-more="false"
+			className="max-h-48 overflow-y-auto whitespace-pre-wrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden data-[more=true]:[mask-image:linear-gradient(to_bottom,black_calc(100%-2.5rem),transparent)]"
+		>
+			{children}
+		</div>
+	);
+}
+
+// The one-line gist next to a tool's title: the query, command or action.
+function gist(part: EveToolPart) {
+	const i = (part.input ?? {}) as Record<string, unknown>;
+	const v = i.query ?? i.command ?? i.text ?? i.url;
+	return typeof v === "string" ? v : undefined;
+}
+
+export function ToolRow({ part }: { part: EveToolPart }) {
+	const [manual, setManual] = useManualOpen(`t:${part.callId}`);
 	const running = RUNNING.has(part.state);
 	const failed = part.state === "failed" || part.state === "rejected";
 	const Icon =
 		part.name === "web_search" || part.name === "web_fetch"
 			? GlobeIcon
-			: part.name === "computer"
-				? MonitorIcon
-				: part.name === "bash"
-					? TerminalIcon
-					: WrenchIcon;
-	const asking =
-		part.interaction?.status === "open" ? part.interaction : undefined;
+			: WrenchIcon;
+	const g = gist(part);
 	return (
-		<TraceCollapsible defaultOpen={part.name === "computer" || !!asking}>
+		<TraceCollapsible open={manual ?? false} onOpenChange={setManual}>
 			<TraceCollapsibleTrigger>
 				<TraceLine status={running ? "running" : failed ? "error" : undefined}>
 					<TraceIcon>
 						{running ? <LoaderCircleIcon className="animate-spin" /> : <Icon />}
 					</TraceIcon>
 					<TraceTitle>{part.label}</TraceTitle>
+					{g && <TraceDescription className="truncate">{g}</TraceDescription>}
 				</TraceLine>
 			</TraceCollapsibleTrigger>
 			<TraceCollapsibleContent className="flex flex-col gap-2">
-				{asking && <Prompt interaction={asking} onAnswer={onAnswer} />}
 				{part.error && <p className="text-destructive">{part.error.message}</p>}
 				<ToolInput part={part} />
 				<ToolDetail part={part} />
@@ -223,11 +411,12 @@ function ToolRow({
 	);
 }
 
-// What the model sent the tool. bash shows its command in the terminal instead.
+// What the model sent the tool.
 function ToolInput({ part }: { part: EveToolPart }) {
+	if (part.state === "streaming" && part.inputText)
+		return <Terminal text={part.inputText} />;
 	const input = part.input as Record<string, unknown> | undefined;
-	if (part.name === "bash" || !input || Object.keys(input).length === 0)
-		return null;
+	if (!input || Object.keys(input).length === 0) return null;
 	return <Terminal text={JSON.stringify(input, null, 2)} />;
 }
 
@@ -254,36 +443,6 @@ function ToolDetail({ part }: { part: EveToolPart }) {
 			</ul>
 		);
 	}
-	if (part.name === "computer") {
-		const d = out as DesktopOutput;
-		return (
-			<div className="flex flex-col gap-2">
-				{d.stdout !== undefined && (
-					<Terminal text={[d.stdout, d.stderr].filter(Boolean).join("\n")} />
-				)}
-				{d.screenshotKey && <Screenshot k={d.screenshotKey} />}
-				{d.streamUrl && (
-					<a
-						href={d.streamUrl}
-						target="_blank"
-						rel="noreferrer"
-						className="inline-flex items-center gap-1 text-xs underline-offset-2 hover:underline"
-					>
-						Watch the desktop live <ExternalLinkIcon className="size-3" />
-					</a>
-				)}
-			</div>
-		);
-	}
-	if (part.name === "bash") {
-		const s = out as ShellOutput;
-		const cmd = (part.input as { command?: string } | undefined)?.command;
-		return (
-			<Terminal
-				text={`$ ${cmd ?? ""}\n${[s.stdout, s.stderr].filter(Boolean).join("\n")}`}
-			/>
-		);
-	}
 	return (
 		<Terminal
 			text={typeof out === "string" ? out : JSON.stringify(out, null, 2)}
@@ -298,53 +457,6 @@ function Terminal({ text }: { text: string }) {
 				{text || "(no output)"}
 			</CodeBlockContent>
 		</CodeBlock>
-	);
-}
-
-// Approvals and questions from the agent (eve human-in-the-loop).
-function Prompt({
-	interaction,
-	onAnswer,
-}: {
-	interaction: NonNullable<EveToolPart["interaction"]>;
-	onAnswer: (a: Answers) => void;
-}) {
-	const { interactionId, request } = interaction;
-	if (interaction.status !== "open") return null;
-	if (request.kind === "sign-in") {
-		const s = request.signIn;
-		return (
-			<p>
-				{s?.instructions ?? request.prompt}{" "}
-				{s?.url && (
-					<a
-						href={s.url}
-						target="_blank"
-						rel="noreferrer"
-						className="underline"
-					>
-						Sign in
-					</a>
-				)}
-			</p>
-		);
-	}
-	return (
-		<div className="flex flex-col gap-2 rounded-md border p-2">
-			<p className="text-foreground">{request.prompt}</p>
-			<div className="flex flex-wrap gap-2">
-				{request.options?.map((o) => (
-					<Button
-						key={o.id}
-						size="sm"
-						variant="outline"
-						onClick={() => onAnswer([{ interactionId, optionId: o.id }])}
-					>
-						{o.label}
-					</Button>
-				))}
-			</div>
-		</div>
 	);
 }
 
@@ -380,6 +492,10 @@ function Actions({ text }: { text: string }) {
 					setCopied(true);
 					setTimeout(() => setCopied(false), 2000);
 				},
+			})}
+			{btn("Read aloud", <Volume2Icon />, {
+				onClick: () =>
+					speechSynthesis.speaking ? stopSpeaking() : speak(text),
 			})}
 			{btn("Good response", <ThumbsUpIcon />, {
 				"aria-pressed": vote === "up",

@@ -6,15 +6,9 @@ if (!process.env.DATABASE_URL_UNPOOLED) {
 }
 
 export default defineConfig({
-	schema: "./src/db/app-schema.ts",
+	schema: "../../packages/shared/src/schema.ts",
 	// push only touches these tables, never anything else in the DB
-	tablesFilter: [
-		"rate_limit",
-		"chat",
-		"agent_event",
-		"user_desktop",
-		"agent_memory",
-	],
+	tablesFilter: ["rate_limit", "chat", "agent_event", "agent_memory", "app_cache", "user_skill", "user_mcp"],
 	out: "./drizzle",
 	dialect: "postgresql",
 	dbCredentials: { url: process.env.DATABASE_URL_UNPOOLED },

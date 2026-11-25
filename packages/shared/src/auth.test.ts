@@ -29,4 +29,11 @@ test("missing, forged, expired and foreign tokens give nobody", async () => {
 	expect(
 		await check(await sign(privateKey, { iss: "https://evil" })),
 	).toBeNull();
+	const noExpiry = await new SignJWT({})
+		.setProtectedHeader({ alg: "EdDSA" })
+		.setSubject("user-1")
+		.setIssuer(issuer)
+		.setAudience(issuer)
+		.sign(privateKey);
+	expect(await check(noExpiry)).toBeNull();
 });

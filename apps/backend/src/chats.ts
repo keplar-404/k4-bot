@@ -1,11 +1,12 @@
 import { zValidator } from "@hono/zod-validator";
-import { screenshotUrl } from "@repo/shared/storage";
-import { and, desc, eq } from "drizzle-orm";
+import { chatPrefix } from "@repo/shared/files";
+import { deletePrefix } from "@repo/shared/r2";
+import { agentEvent, chat } from "@repo/shared/schema";
+import { and, desc, eq, gt } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import { type Env, requireUser, webUrl } from "./auth";
 import { db } from "./db";
-import { agentEvent, chat } from "./db/app-schema";
 
 // Chat ids are UUIDs we made. Anything else is simply "not found" (the web app
 // then sends the user to a new chat).
@@ -42,32 +43,70 @@ export const chats = new Hono<Env>()
 			return c.json({ id: row.id }, 201);
 		},
 	)
-	// A short-lived link to one of the user's own desktop screenshots. The first
-	// segment of the key is the owner (see newScreenshotKey).
+	// `after`: the last line this browser already has cached. Only newer events are
+	// read (Neon bills every byte sent out); an unchanged chat returns none.
 	.get(
-		"/screenshot",
-		zValidator("query", z.object({ key: z.string().max(300) })),
+		"/:id",
+		chatId,
+		zValidator(
+			"query",
+			z.object({ after: z.coerce.number().int().min(-1).optional() }),
+		),
 		async (c) => {
-			const { key } = c.req.valid("query");
-			if (!key.startsWith(`${c.get("user").id}/`)) {
-				return c.json({ error: "Not found" }, 404);
-			}
-			return c.json({ url: await screenshotUrl(key) }, 200);
+			const [row] = await db
+				.select()
+				.from(chat)
+				.where(
+					and(
+						eq(chat.id, c.req.valid("param").id),
+						eq(chat.userId, c.get("user").id),
+					),
+				);
+			if (!row) return c.json({ error: "Not found" }, 404);
+			// The session's saved events, for eve's initialEvents (eve docs: Resume a saved
+			// session): the page shows them at once and eve only catches up after them.
+			// Token deltas aren't saved; eve rebuilds the same state without them.
+			const after = c.req.valid("query").after ?? -1;
+			const rows = row.eveSessionId
+				? await db
+						.select({
+							line: agentEvent.line,
+							index: agentEvent.index,
+							type: agentEvent.type,
+							scope: agentEvent.scope,
+							data: agentEvent.data,
+							createdAt: agentEvent.createdAt,
+						})
+						.from(agentEvent)
+						.where(
+							and(
+								eq(agentEvent.sessionId, row.eveSessionId),
+								// PATCH lets a user set any eveSessionId on their chat: only
+								// their own events may come back.
+								eq(agentEvent.userId, c.get("user").id),
+								gt(agentEvent.line, after),
+							),
+						)
+						.orderBy(agentEvent.line, agentEvent.index)
+				: [];
+			// Rows saved before `scope` existed can't rebuild the view: replay as before.
+			const events = rows.every((e) => e.scope !== null)
+				? rows.map((e, i) => ({
+						type: e.type,
+						scope: e.scope,
+						data: e.data,
+						meta: {
+							position: { line: e.line, index: e.index },
+							at: e.createdAt.toISOString(),
+							// eve treats a line as done after an event without this, so every
+							// event but a line's last says more of its line follows.
+							...(rows[i + 1]?.line === e.line ? { endOfLine: false } : {}),
+						},
+					}))
+				: [];
+			return c.json({ chat: row, events }, 200);
 		},
 	)
-	.get("/:id", chatId, async (c) => {
-		const [row] = await db
-			.select()
-			.from(chat)
-			.where(
-				and(
-					eq(chat.id, c.req.valid("param").id),
-					eq(chat.userId, c.get("user").id),
-				),
-			);
-		if (!row) return c.json({ error: "Not found" }, 404);
-		return c.json({ chat: row }, 200);
-	})
 	.patch(
 		"/:id",
 		chatId,
@@ -113,13 +152,23 @@ export const chats = new Hono<Env>()
 						signal: AbortSignal.timeout(10_000),
 					},
 				);
-				if (!res.ok && res.status !== 409 && res.status !== 404) {
+				// 404/410: the session is already gone or expired; 409: already ending.
+				if (!res.ok && ![404, 409, 410].includes(res.status)) {
 					console.error("end session failed", row.eveSessionId, res.status);
 				}
 			} catch (error) {
 				console.error("end session failed", row.eveSessionId, error);
 			}
 		}
+		// The chat's shared files and media in R2. Like ending the session, a failure
+		// must not block deleting the user's data: it is logged and the objects stay.
+		const chatId = c.req.valid("param").id;
+		await deletePrefix(chatPrefix(userId, chatId))
+			.then(({ failed }) => {
+				if (failed.length)
+					console.error("chat files not deleted", chatId, failed.length);
+			})
+			.catch((error) => console.error("chat files not deleted", chatId, error));
 		// drizzle skill: multi-step writes that must succeed together go in a transaction.
 		await db.transaction(async (tx) => {
 			if (row.eveSessionId) {
