@@ -1,5 +1,7 @@
 # K4
 
+![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=nextdotjs) ![Bun](https://img.shields.io/badge/Bun-1.4-000?logo=bun) ![Hono](https://img.shields.io/badge/Hono-API-E36002?logo=hono) ![TypeScript](https://img.shields.io/badge/TypeScript-7-3178C6?logo=typescript&logoColor=white)
+
 K4 is a personal AI assistant. You sign in and chat with an agent that searches the web and remembers you. Your chats and the agent's memory of you are saved to your account.
 
 ## Features
@@ -12,6 +14,11 @@ K4 is a personal AI assistant. You sign in and chat with an agent that searches 
   - **Full:** the agent acts without asking.
 - **Web search** with cited sources (Firecrawl).
 - **Memory you control.** The agent saves your preferences and lasting facts on its own and uses them in every chat. You can view and edit them in **Settings → Memory**. Memory is stored in Postgres, so it follows your account to any device.
+- **Your apps.** 1,800+ apps through Composio (Gmail, Sheets, Slack, ...) and your own MCP servers, picked with `@`.
+- **Skills.** Upload a folder or zip and call it with `/`.
+- **Cloud computer.** Each user gets an E2B desktop with a live view, browser, shell and terminal.
+- **Files.** Attachments and agent outputs stored in Cloudflare R2, with previews.
+- **Media.** Image, speech, music and video generation; voice typing.
 - **Transparent steps.** The agent's reasoning and every tool call, with its input and output, can be expanded in the chat.
 
 ## Architecture
