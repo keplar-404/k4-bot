@@ -1,40 +1,114 @@
-import { expect, test } from "bun:test";
-import { checkMcpUrl, keyHeader, openKey, privateIp, sealKey } from "./mcp";
+import { afterEach, expect, mock, test } from "bun:test";
+import { ensureToolkit, mcpUrlError, pickedMcp } from "./mcp";
 
-process.env.MCP_SECRET_KEY = Buffer.alloc(32, 7).toString("base64");
-
-test("a sealed key opens only for its user and server", () => {
-	const s = sealKey("sk-123", "u1", "docs");
-	expect(s).not.toContain("sk-123");
-	expect(openKey(s, "u1", "docs")).toBe("sk-123");
-	expect(() => openKey(s, "u2", "docs")).toThrow();
-	expect(() => openKey(s, "u1", "other")).toThrow();
+const realFetch = globalThis.fetch;
+afterEach(() => {
+	globalThis.fetch = realFetch;
 });
 
-test("private addresses and non-https URLs are refused", async () => {
-	for (const ip of [
-		"127.0.0.1",
-		"10.1.2.3",
-		"169.254.169.254",
-		"192.168.0.1",
-		"::1",
-		"fd00::1",
-		"::ffff:127.0.0.1",
-	])
-		expect(privateIp(ip)).toBe(true);
-	expect(privateIp("8.8.8.8")).toBe(false);
-	expect(await checkMcpUrl("http://example.com/mcp")).not.toBeNull();
-	expect(await checkMcpUrl("http://localhost:3001/mcp")).toBeNull(); // dev only
-	process.env.NODE_ENV = "production";
-	expect(await checkMcpUrl("http://localhost:3001/mcp")).not.toBeNull();
-	expect(await checkMcpUrl("https://localhost/mcp")).not.toBeNull();
-	expect(await checkMcpUrl("https://169.254.169.254/")).not.toBeNull();
-	expect(await checkMcpUrl("https://a:b@example.com/")).not.toBeNull();
+test("picked servers: only valid names, no repeats, capped", () => {
+	expect(pickedMcp(["docs", "docs", "x", "Bad", "../a", 3, null])).toEqual([
+		"docs",
+	]);
+	expect(pickedMcp("docs")).toEqual([]);
+	expect(pickedMcp(undefined)).toEqual([]);
+	expect(pickedMcp(Array.from({ length: 50 }, (_, i) => `s${i}`)).length).toBe(
+		20,
+	);
 });
 
-test("key header", () => {
-	expect(keyHeader("Authorization", "abc")).toEqual({
-		Authorization: "Bearer abc",
+test("only public https URLs without keys in them", () => {
+	expect(mcpUrlError("https://mcp.notion.com/mcp")).toBeNull();
+	expect(mcpUrlError("http://mcp.notion.com/mcp")).toContain("https");
+	expect(mcpUrlError("not a url")).toContain("isn't a URL");
+	expect(mcpUrlError("https://user:pw@x.com/mcp")).toContain("key");
+	expect(mcpUrlError("https://x.com/mcp?api_key=1")).toContain("key");
+	expect(mcpUrlError("https://localhost/mcp")).toContain("public");
+	expect(mcpUrlError("https://10.0.0.1/mcp")).toContain("public");
+});
+
+/** Fakes Composio's API: each call gets the next answer; returns what was sent. */
+function fakeComposio(...answers: [number, unknown][]) {
+	const sent: { url: string; body?: unknown }[] = [];
+	globalThis.fetch = mock(async (url: string | URL, init?: RequestInit) => {
+		sent.push({
+			url: String(url),
+			body: init?.body ? JSON.parse(String(init.body)) : undefined,
+		});
+		const [status, body] = answers.shift() ?? [500, null];
+		return Response.json(body, { status });
+	}) as unknown as typeof fetch;
+	return sent;
+}
+
+test("a shared toolkit is made with the chosen auth; keys stay on Composio", async () => {
+	const sent = fakeComposio([200, { slug: "CUSTOM_ACME" }]);
+	expect(
+		await ensureToolkit({
+			name: "acme",
+			url: "https://mcp.acme.com/mcp",
+			auth: "key",
+			header: "x-api-key",
+		}),
+	).toEqual({ slug: "CUSTOM_ACME", auth: "key" });
+	expect(sent[0].body).toMatchObject({
+		user_id: "all",
+		mcp_url: "https://mcp.acme.com/mcp",
+		auth_schemes: [
+			{ mode: "API_KEY", headers: { "x-api-key": "{{generic_api_key}}" } },
+		],
 	});
-	expect(keyHeader("x-api-key", "abc")).toEqual({ "x-api-key": "abc" });
+	const oauth = fakeComposio([200, { slug: "CUSTOM_NOTION" }]);
+	await ensureToolkit({
+		name: "notion",
+		url: "https://mcp.notion.com/mcp",
+		auth: "oauth",
+	});
+	expect(oauth[0].body).toMatchObject({
+		auth_schemes: [
+			{
+				mode: "DCR_OAUTH",
+				discovery_url:
+					"https://mcp.notion.com/.well-known/oauth-authorization-server",
+			},
+		],
+	});
+});
+
+test("a URL another user added reuses its toolkit and its auth", async () => {
+	fakeComposio(
+		[409, { error: { message: "already shared" } }],
+		[
+			200,
+			{
+				items: [
+					{
+						slug: "custom_notion",
+						auth_schemes: ["DCR_OAUTH"],
+						meta: { app_url: "https://mcp.notion.com/mcp" },
+					},
+				],
+			},
+		],
+	);
+	expect(
+		await ensureToolkit({
+			name: "n",
+			url: "https://mcp.notion.com/mcp",
+			auth: "none",
+		}),
+	).toEqual({ slug: "CUSTOM_NOTION", auth: "oauth" });
+	const refused = fakeComposio(
+		[400, { error: { message: "mcp_url must be reachable" } }],
+		[
+			200,
+			{ items: [{ slug: "custom_x", meta: { app_url: "https://x.com/mcp" } }] },
+		],
+		[200, {}],
+	);
+	await expect(
+		ensureToolkit({ name: "x", url: "https://x.com/mcp", auth: "none" }),
+	).rejects.toThrow("mcp_url must be reachable");
+	// The toolkit Composio kept anyway is deleted.
+	expect(refused[2].url).toEndWith("/custom/toolkits/CUSTOM_X");
 });

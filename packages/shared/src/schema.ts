@@ -109,20 +109,24 @@ export const userSkill = pgTable(
 	(t) => [primaryKey({ columns: [t.userId, t.name] })],
 );
 
-// MCP servers each user added (@repo/shared/mcp), for apps Composio doesn't have.
-// `key` is AES-GCM sealed (sealKey) and never leaves the backend or the agent.
+// MCP servers each user added (Settings > Custom connectors), for apps Composio doesn't
+// have. Composio hosts them (Custom MCP toolkits, apps/backend/src/mcp.ts): it keeps the
+// keys and sign-ins and makes the calls. This row only says which user added which.
 export const userMcp = pgTable(
 	"user_mcp",
 	{
 		userId: text("user_id").notNull(),
 		name: text("name").notNull(),
 		url: text("url").notNull(),
-		description: text("description").notNull(),
-		logo: text("logo"),
-		// The header the key goes in (Authorization, x-api-key …); null with no key.
-		header: text("header"),
-		key: text("key"),
+		// The Composio toolkit (CUSTOM_…). On the free plan one toolkit per URL is shared
+		// by all users, so several rows can hold the same slug.
+		slug: text("slug").notNull(),
+		// How the user connects: "none", "key" (on Composio's page) or "oauth".
+		auth: text("auth").$type<"none" | "key" | "oauth">().notNull(),
 		createdAt: timestamp("created_at").defaultNow().notNull(),
 	},
-	(t) => [primaryKey({ columns: [t.userId, t.name] })],
+	(t) => [
+		primaryKey({ columns: [t.userId, t.name] }),
+		index("user_mcp_slug_idx").on(t.slug),
+	],
 );

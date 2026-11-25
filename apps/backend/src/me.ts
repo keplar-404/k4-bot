@@ -1,5 +1,6 @@
 import { Composio } from "@composio/core";
 import { zValidator } from "@hono/zod-validator";
+import { listMcp } from "@repo/shared/mcp";
 import {
 	MAX_MEMORY_CHARS,
 	readMemory,
@@ -17,11 +18,11 @@ import { db } from "./db";
 // connection. Docs: configuring-sessions > toolkits() / authorize().
 // Created on first use, so the app (and its tests) load without COMPOSIO_API_KEY.
 let client: Composio | undefined;
-const composio = () => {
+export const composio = () => {
 	client ??= new Composio();
 	return client;
 };
-const appSession = (userId: string) =>
+export const appSession = (userId: string) =>
 	composio().create(userId, { sandbox: { enable: false } });
 
 // The @ menu's apps, read from app_cache (schema.ts) instead of Composio each time.
@@ -41,7 +42,7 @@ const store = (key: string, data: unknown) =>
 			target: appCache.key,
 			set: { data, updatedAt: new Date() },
 		});
-const forget = (userId: string) =>
+export const forget = (userId: string) =>
 	db.delete(appCache).where(eq(appCache.key, `connected:${userId}`));
 const tooMany = { error: "Too many requests" } as const;
 
@@ -62,7 +63,7 @@ async function allToolkits(userId: string, isConnected?: true) {
 let refreshing: Promise<{ data: CatalogApp[]; updatedAt: Date }> | undefined;
 // The slugs this user has connected: from app_cache, from Composio when missing,
 // stale or `fresh` (Refresh, back from connecting).
-async function connectedSlugs(userId: string, fresh = false) {
+export async function connectedSlugs(userId: string, fresh = false) {
 	const key = `connected:${userId}`;
 	const hit = fresh ? undefined : await cached<string[]>(key);
 	if (hit && Date.now() - hit.updatedAt.getTime() <= CONNECTED_MS)
@@ -85,7 +86,9 @@ const refreshCatalog = (userId: string) => {
 	refreshing ??= allToolkits(userId)
 		.then(async (items) => {
 			const data = items
-				.filter((t) => t.slug !== "composio") // the integration itself
+				// Not the integration itself, nor custom MCP toolkits: on the free plan those
+				// are shared by every user, and each user sees only their own (mcp.ts).
+				.filter((t) => t.slug !== "composio" && !CUSTOM.test(t.slug))
 				.map((t) => ({ slug: t.slug, name: t.name, logo: t.logo }));
 			await store("catalog", data);
 			return { data, updatedAt: new Date() };
@@ -95,6 +98,14 @@ const refreshCatalog = (userId: string) => {
 		});
 	return refreshing;
 };
+
+// Custom MCP toolkits (CUSTOM_…) are reachable here only by the user who added them.
+const CUSTOM = /^custom_/i;
+async function othersCustom(userId: string, slug: string) {
+	if (!CUSTOM.test(slug)) return false;
+	const mine = await listMcp(db, userId);
+	return !mine.some((m) => m.slug.toLowerCase() === slug.toLowerCase());
+}
 
 const slug = zValidator(
 	"param",
@@ -174,6 +185,8 @@ export const me = new Hono<Env>()
 	.get("/apps/:slug", slug, async (c) => {
 		const userId = c.get("user").id;
 		const want = c.req.valid("param").slug;
+		if (await othersCustom(userId, want))
+			return c.json({ error: "Not found" }, 404);
 		if (overLimitInMemory(`apps-one:${userId}`, 30, 60_000))
 			return c.json(tooMany, 429);
 		const [catalog, on] = await Promise.all([
@@ -214,6 +227,8 @@ export const me = new Hono<Env>()
 		async (c) => {
 			if (await overLimit(db, `apps-change:${c.get("user").id}`, 10, 60_000))
 				return c.json(tooMany, 429);
+			if (await othersCustom(c.get("user").id, c.req.valid("param").slug))
+				return c.json({ error: "Not found" }, 404);
 			const session = await appSession(c.get("user").id);
 			await forget(c.get("user").id); // read connections again when they're back
 			const request = await session.authorize(c.req.valid("param").slug, {

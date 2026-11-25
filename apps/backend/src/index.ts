@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { websocket } from "hono/bun";
+import { compress } from "hono/compress";
 import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
 import { logger } from "hono/logger";
@@ -26,6 +27,29 @@ const app = new Hono()
 	.use(requestId())
 	.use(logger())
 	.use(secureHeaders())
+	// gzip for JSON and text over 1 KB (chat history is the big one). Hono skips
+	// event streams, images, websocket upgrades and anything already encoded.
+	.use(compress())
+	// zValidator's default 400 sends zod's whole error, regexes and limits included.
+	// Send which fields were wrong, nothing more.
+	.use(async (c, next) => {
+		await next();
+		if (c.res.status !== 400) return;
+		const body = await c.res
+			.clone()
+			.json()
+			.catch(() => null);
+		if (body?.success !== false || body.error?.name !== "ZodError") return;
+		// zod 4 serializes its issues as a JSON string in `message`.
+		let issues: { path?: unknown[] }[] = [];
+		try {
+			issues = JSON.parse(body.error.message);
+		} catch {}
+		const fields = [
+			...new Set(issues.map((i) => (i.path ?? []).join(".")).filter(Boolean)),
+		];
+		c.res = c.json({ error: "Invalid request.", fields }, 400);
+	})
 	// The largest real body is an 8,000-character memory note; refuse anything far bigger.
 	// Audio for the mic has its own 1 MB limit (transcribe.ts).
 	.use((c, next) =>

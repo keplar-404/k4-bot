@@ -9,7 +9,7 @@
 	"scripts": {
 		"build": "eve build",
 		"deploy": "eve deploy",
-		"dev:tui": "eve dev",
+		"dev:tui": "K4_LOCAL_DEV_AUTH=1 eve dev",
 		"eval": "eve eval",
 		"start": "eve start",
 		"test": "bun test",

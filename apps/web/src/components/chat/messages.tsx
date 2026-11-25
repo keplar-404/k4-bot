@@ -174,19 +174,25 @@ const isRunning = (p: Step) =>
 			? RUNNING.has(p.state)
 			: false;
 
+// When the pending placeholder started: the real message replaces it at the first
+// event and keeps counting from here instead of from 0.
+let pendingSince: number | undefined;
+
 // Seconds since the agent started, in tenths while it runs.
-function useElapsed(running: boolean) {
+function useElapsed(running: boolean, pending = false) {
 	const start = useRef<number>(undefined);
 	const [secs, setSecs] = useState(0);
 	useEffect(() => {
 		if (!running) return;
-		start.current ??= Date.now();
+		if (pending) pendingSince = Date.now(); // a new placeholder is a new turn
+		start.current ??= pending ? pendingSince : (pendingSince ?? Date.now());
+		if (!pending) pendingSince = undefined;
 		const id = setInterval(
 			() => setSecs((Date.now() - (start.current ?? 0)) / 1000),
 			100,
 		);
 		return () => clearInterval(id);
-	}, [running]);
+	}, [running, pending]);
 	return secs;
 }
 const clock = (s: number) =>
@@ -247,7 +253,7 @@ function Steps({
 			(p.type === "interaction" && p.status === "open"),
 	);
 	const open = manual ?? (running || waiting);
-	const secs = useElapsed(running);
+	const secs = useElapsed(running, id === "pending");
 	const count = steps.filter((p) => p.type !== "text").length;
 	return (
 		<Trace>

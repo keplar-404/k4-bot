@@ -109,13 +109,13 @@ const getSkills = () => {
 	return skillList;
 };
 
-// The user's own MCP servers (Settings > Connectors), for the @ menu. Once per page
-// load; clearMcp() after an add or delete.
+// The user's own MCP servers (Settings > Custom connectors, hosted by Composio), for the
+// @ menu. Once per page load; clearMcp() after an add or delete.
 export type McpServer = {
 	name: string;
 	host: string;
-	logo: string | null;
-	hasKey: boolean;
+	auth: "none" | "key" | "oauth";
+	connected: boolean;
 };
 let mcpList: Promise<McpServer[]> | undefined;
 export const clearMcp = () => {
@@ -290,17 +290,17 @@ export function usePromptMenu({
 		}),
 	});
 
-	// The agent finds the server by its @name (its connection's description says it).
+	// Picked servers go with the message (pickedMcp); the agent gets their tools by name.
 	const mcpRow = (m: McpServer): Row => ({
 		key: `mcp:${m.name}`,
 		name: m.name,
 		desc: m.host,
-		icon: appIcon({ logo: m.logo ?? undefined }),
+		icon: appIcon({}),
 		section: "Your servers",
 		run: chip({
 			key: `@mcp:${m.name}`,
 			label: m.name,
-			icon: appIcon({ logo: m.logo ?? undefined }),
+			icon: appIcon({}),
 			text: `@${m.name} `,
 		}),
 	});
@@ -327,7 +327,7 @@ export function usePromptMenu({
 		{
 			key: "web",
 			name: "Web search",
-			desc: "Current news and info",
+			desc: "Look things up on the web",
 			icon: <GlobeIcon />,
 			section: "Tools",
 			run: command(
@@ -518,6 +518,11 @@ export function usePromptMenu({
 			]
 				.map((c) => c.text)
 				.join("") + text,
+		/** The user's MCP servers picked with @, sent with the message so the agent uses them. */
+		pickedMcp: () =>
+			chips
+				.filter((c) => c.key.startsWith("@mcp:"))
+				.map((c) => c.key.slice("@mcp:".length)),
 		clearChips: () => setChips([]),
 		chipList: chips.length ? (
 			<ul aria-label="Added to this message" className="flex flex-wrap gap-1.5">
@@ -612,7 +617,10 @@ function MenuList({
 	// biome-ignore lint/correctness/useExhaustiveDependencies: re-measure when the rows change (apps load in)
 	useLayoutEffect(() => {
 		const el = refs.current[active];
-		el?.scrollIntoView({ block: "nearest" });
+		// The first row: show its section heading too (scrolling to the row hid it).
+		(active === 0 ? el?.parentElement : el)?.scrollIntoView({
+			block: "nearest",
+		});
 		setBox(el ? { top: el.offsetTop, height: el.offsetHeight } : undefined);
 	}, [active, rows.length]);
 	// The last rows in view load the next page.

@@ -4,7 +4,24 @@
 const cap = (text: string, max: number) =>
 	text.length > max ? `${text.slice(0, max)}… (trimmed)` : text;
 
+// Any other result (an MCP server's, an app's) is stored whole only up to this size;
+// past it, a preview. One test server's 2 MB answer was otherwise one 2 MB row.
+const MAX_STORED = 20_000;
+
 export function withoutPageText(data: unknown): unknown {
+	const slim = slimOutput(data);
+	const output = (slim as { output?: unknown } | null)?.output;
+	if (output === undefined) return slim;
+	const json = JSON.stringify(output) ?? "";
+	return json.length > MAX_STORED
+		? {
+				...(slim as object),
+				output: { trimmed: true, preview: `${json.slice(0, 2000)}…` },
+			}
+		: slim;
+}
+
+function slimOutput(data: unknown): unknown {
 	const output = (data as { output?: Record<string, unknown> } | null)?.output;
 	if (!output || typeof output !== "object") return data;
 	const slim = { ...output };

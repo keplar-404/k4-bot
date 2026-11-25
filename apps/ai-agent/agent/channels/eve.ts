@@ -1,4 +1,5 @@
 import { userFromBearer } from "@repo/shared/auth";
+import { pickedMcp } from "@repo/shared/mcp";
 import { findModel, findVisionModel, pickEffort } from "@repo/shared/models";
 import { overLimit } from "@repo/shared/rate-limit";
 import { agentEvent, chat } from "@repo/shared/schema";
@@ -138,8 +139,16 @@ const appSession: AuthFn<Request> = async (request) => {
 
 export default eveChannel({
 	// No vercelOidc(): the agent is self-hosted (eve docs: omit it on non-Vercel hosts).
-	auth: [appSession, localDev()],
-	// The web app sends { model, reasoning, mode } as clientContext. Validate it and
+	// localDev() only when asked for (the terminal UI, `bun run dev:tui`). The web app
+	// always sends a token, and in `bun run dev` Next.js listens on every network
+	// address and forwards /eve from this machine, so localDev() let any device on
+	// the network read sessions with no token (eve docs: a local proxy forwards its
+	// callers as local-dev). It never runs in production either way.
+	auth: [
+		appSession,
+		...(process.env.K4_LOCAL_DEV_AUTH === "1" ? [localDev()] : []),
+	],
+	// The web app sends { model, reasoning, mode, mcp } as clientContext. Validate it and
 	// hand it to agent.ts (model, approval policy) through the turn's auth.
 	async onMessage(ctx) {
 		const auth = defaultEveAuth(ctx);
@@ -153,6 +162,7 @@ export default eveChannel({
 			mode,
 			reseed,
 			vision,
+			mcp,
 			...rest
 		} = sent as Record<string, unknown>;
 		// A new session for a chat whose old session ended or is gone: the model
@@ -172,6 +182,8 @@ export default eveChannel({
 					model: model.id,
 					mode: safeMode,
 					vision: findVisionModel(vision).id,
+					// Servers picked with @ (names only; instructions/mcp.ts checks they're the user's).
+					mcp: pickedMcp(mcp),
 					...(effort ? { reasoning: effort } : {}),
 				},
 			},

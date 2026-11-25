@@ -29,6 +29,22 @@ test("stored web_fetch content is capped; other data is unchanged", () => {
 	expect(withoutPageText({ output: "plain" })).toEqual({ output: "plain" });
 });
 
+test("any huge stored result (an MCP server's) becomes a short preview", () => {
+	const big = withoutPageText({
+		callId: "c2",
+		output: { content: [{ type: "text", text: "Z".repeat(2_000_000) }] },
+	}) as { callId: string; output: { trimmed: boolean; preview: string } };
+	expect(big.callId).toBe("c2");
+	expect(big.output.trimmed).toBe(true);
+	expect(JSON.stringify(big).length).toBeLessThan(2200);
+	const text = withoutPageText({ output: "Y".repeat(100_000) }) as {
+		output: { preview: string };
+	};
+	expect(text.output.preview.length).toBeLessThan(2010);
+	const small = { output: { content: [{ type: "text", text: "ok" }] } };
+	expect(withoutPageText(small)).toEqual(small);
+});
+
 test("stored computer tool output is capped; exit code is kept", () => {
 	const out = withoutPageText({
 		output: {

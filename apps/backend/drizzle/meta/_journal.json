@@ -85,6 +85,20 @@
       "when": 1795539099335,
       "tag": "0011_user_mcp",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1795588806612,
+      "tag": "0012_user_mcp_composio",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1795588818403,
+      "tag": "0013_user_mcp_slug",
+      "breakpoints": true
     }
   ]
 }

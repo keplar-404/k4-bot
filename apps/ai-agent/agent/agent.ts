@@ -26,6 +26,7 @@ const WRITE_TOOLS = new Set([
 	"delete_file",
 	"media",
 	"video",
+	"use_connector", // the user's own MCP servers: any tool may write
 ]);
 
 export default defineAgent({

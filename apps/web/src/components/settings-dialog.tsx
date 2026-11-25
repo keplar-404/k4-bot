@@ -31,6 +31,7 @@ import {
 	type McpServer,
 } from "@/components/chat/prompt-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
@@ -89,13 +90,7 @@ export function SettingsDialog({
 	useEffect(() => {
 		if (open) setSection(start);
 	}, [open, start]);
-	const [filter, setFilter] = useState("");
-	const groups = GROUPS.map((g) => ({
-		...g,
-		items: g.items.filter((i) =>
-			i.label.toLowerCase().includes(filter.trim().toLowerCase()),
-		),
-	})).filter((g) => g.items.length);
+	const groups = GROUPS;
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
 			<DialogContent className="flex h-[min(44rem,calc(100dvh-2rem))] flex-col gap-0 overflow-hidden p-0 sm:max-w-5xl">
@@ -110,16 +105,6 @@ export function SettingsDialog({
 						aria-label="Settings sections"
 						className="flex shrink-0 flex-col gap-3 border-b bg-muted/30 p-3 md:w-60 md:border-r md:border-b-0"
 					>
-						<div className="relative">
-							<SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-							<Input
-								value={filter}
-								onChange={(e) => setFilter(e.target.value)}
-								placeholder="Find a setting"
-								aria-label="Find a setting"
-								className="h-9 pl-8"
-							/>
-						</div>
 						<div className="flex gap-1 overflow-x-auto md:flex-col md:overflow-visible">
 							<Glide items="[data-glide-item]" />
 							{groups.map((g, i) => (
@@ -147,11 +132,6 @@ export function SettingsDialog({
 									))}
 								</Fragment>
 							))}
-							{groups.length === 0 && (
-								<p className="px-2.5 py-2 text-sm text-muted-foreground">
-									Nothing matches “{filter}”.
-								</p>
-							)}
 						</div>
 					</nav>
 					<div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto p-5 md:p-8">
@@ -176,14 +156,16 @@ function SectionHead({
 	children,
 	action,
 }: {
-	title: string;
+	title: React.ReactNode;
 	children: React.ReactNode;
 	action?: React.ReactNode;
 }) {
 	return (
 		<div className="mb-5 flex items-start justify-between gap-4 pr-6">
 			<div className="flex flex-col gap-1">
-				<h3 className="font-heading text-lg font-semibold">{title}</h3>
+				<h3 className="flex items-center gap-2 font-heading text-lg font-semibold">
+					{title}
+				</h3>
 				<DialogDescription>{children}</DialogDescription>
 			</div>
 			{action}
@@ -821,58 +803,89 @@ function SkillsSettings() {
 	);
 }
 
-// MCP servers Composio doesn't have. The key is write-only: sent once over HTTPS,
-// stored encrypted, never shown again; to change it, delete and add the server again.
+// MCP servers Composio's catalog doesn't have, hosted by Composio (Custom MCP). Keys and
+// sign-ins happen on Composio's connect page, never in K4: like Connected apps, the
+// page leaves for Composio and comes back here.
+const AUTHS = [
+	{ id: "none", label: "No sign-in" },
+	{ id: "key", label: "API key" },
+	{ id: "oauth", label: "Sign in" },
+] as const;
+
 function McpSettings() {
 	const [servers, setServers] = useState<McpServer[]>();
-	const [form, setForm] = useState({
-		name: "",
-		url: "",
-		header: "Authorization",
-		key: "",
-	});
+	const [form, setForm] = useState<{
+		name: string;
+		url: string;
+		auth: McpServer["auth"];
+		header: string;
+	}>({ name: "", url: "", auth: "none", header: "Authorization" });
 	const [busy, setBusy] = useState<string>();
 	useEffect(() => {
+		clearMcp(); // back from Composio's page: read connections again
 		void getMcp().then(setServers);
 	}, []);
 	const set =
-		(k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
+		(k: "name" | "url" | "header") =>
+		(e: React.ChangeEvent<HTMLInputElement>) =>
 			setForm((f) => ({ ...f, [k]: e.target.value }));
+	const returnTo = () => window.location.pathname;
 
 	async function add(e: React.FormEvent) {
 		e.preventDefault();
 		setBusy("add");
-		const key = form.key.trim();
 		const res = await api.api.me.mcp
 			.$post({
 				json: {
 					name: form.name.trim(),
 					url: form.url.trim(),
-					...(key
-						? { key, header: form.header.trim() || "Authorization" }
+					auth: form.auth,
+					...(form.auth === "key"
+						? { header: form.header.trim() || "Authorization" }
 						: {}),
+					returnTo: returnTo(),
 				},
 			})
 			.catch(() => undefined);
 		setBusy(undefined);
 		const body = (await res?.json().catch(() => ({}))) as
-			| McpServer
-			| { error?: unknown };
-		if (!res?.ok || !("name" in body)) {
-			// Our checks send `error` as text; a bad field (zod) sends an object.
-			const error = "error" in body ? body.error : undefined;
+			| { server: McpServer; connectUrl: string | null; reused: boolean }
+			| { error?: unknown; fields?: unknown };
+		if (!res?.ok || !("server" in body)) {
+			// A bad field comes back as { error, fields }; our own checks as { error }.
+			const { error, fields } = body as { error?: unknown; fields?: unknown };
 			return toast.error(
-				typeof error === "string"
-					? error
-					: res?.status === 400
-						? "Name: 2–30 lowercase letters, digits or -, starting with a letter."
+				Array.isArray(fields) && fields.includes("name")
+					? "Name: 2–30 lowercase letters, digits or -, starting with a letter."
+					: typeof error === "string"
+						? error
 						: "Could not add the server.",
 			);
 		}
-		setForm((f) => ({ ...f, name: "", url: "", key: "" })); // drop the key from memory
 		clearMcp();
-		setServers((s) => [body, ...(s ?? [])]);
-		toast.success(`“${body.name}” added. Use it with @${body.name}.`);
+		setForm((f) => ({ ...f, name: "", url: "" }));
+		setServers((s) => [body.server, ...(s ?? [])]);
+		if (body.reused && body.server.auth !== form.auth)
+			toast.info(
+				`This server was already set up with “${AUTHS.find((a) => a.id === body.server.auth)?.label}”, so it uses that.`,
+			);
+		// A key or sign-in: on to Composio's page, which comes back here.
+		if (body.connectUrl) window.location.href = body.connectUrl;
+		else
+			toast.success(
+				`“${body.server.name}” added. Use it with @${body.server.name}.`,
+			);
+	}
+
+	async function connect(name: string) {
+		setBusy(name);
+		const res = await api.api.me.mcp[":name"].connect
+			.$post({ param: { name }, json: { returnTo: returnTo() } })
+			.catch(() => undefined);
+		setBusy(undefined);
+		const url = res?.ok ? (await res.json()).url : null;
+		if (!url) return toast.error("Could not start connecting.");
+		window.location.href = url;
 	}
 
 	async function remove(name: string) {
@@ -888,10 +901,20 @@ function McpSettings() {
 
 	return (
 		<>
-			<SectionHead title="Custom connectors">
-				Add an MCP server for an app that isn&apos;t in Connected apps. Its
-				tools come from whoever runs it: add only servers you trust. Your key is
-				stored encrypted and can&apos;t be viewed again, only deleted.
+			<SectionHead
+				title={
+					<>
+						Custom connectors{" "}
+						<Badge className="border-amber-500/40 bg-amber-500/15 text-amber-600 dark:text-amber-400">
+							Test mode
+						</Badge>
+					</>
+				}
+			>
+				Add a remote MCP server (an https:// URL) for an app that isn&apos;t in
+				Connected apps. Its tools come from whoever runs it: add only servers
+				you trust. Composio connects to it for you; API keys and sign-ins are
+				entered on Composio&apos;s page and never pass through this app.
 			</SectionHead>
 			<form
 				onSubmit={add}
@@ -912,20 +935,52 @@ function McpSettings() {
 					onChange={set("url")}
 					aria-label="Server URL"
 				/>
-				<Input
-					placeholder="Key header (Authorization)"
-					value={form.header}
-					onChange={set("header")}
-					aria-label="Key header"
-				/>
-				<Input
-					type="password"
-					autoComplete="off"
-					placeholder="API key (optional)"
-					value={form.key}
-					onChange={set("key")}
-					aria-label="API key"
-				/>
+				<div
+					role="radiogroup"
+					aria-label="How it connects"
+					className="flex gap-1 sm:col-span-2"
+				>
+					{AUTHS.map((a) => (
+						<Button
+							key={a.id}
+							type="button"
+							size="sm"
+							role="radio"
+							aria-checked={form.auth === a.id}
+							variant={form.auth === a.id ? "secondary" : "ghost"}
+							onClick={() => setForm((f) => ({ ...f, auth: a.id }))}
+						>
+							{a.label}
+						</Button>
+					))}
+				</div>
+				{form.auth === "key" && (
+					<div className="flex flex-col gap-2 text-xs text-muted-foreground sm:col-span-2">
+						<p>
+							You&apos;ll paste your API key on Composio&apos;s secure page
+							next.
+						</p>
+						{/* Most servers read the key as "Authorization: Bearer <key>" (the MCP
+						    standard); the few that don't say which header in their docs. */}
+						<details>
+							<summary className="cursor-pointer select-none">
+								Advanced: the server&apos;s docs name a different header
+							</summary>
+							<label
+								htmlFor="mcp-key-header"
+								className="mt-2 flex flex-col gap-1.5"
+							>
+								Header name (e.g. X-API-Key)
+								<Input
+									id="mcp-key-header"
+									placeholder="Authorization"
+									value={form.header}
+									onChange={set("header")}
+								/>
+							</label>
+						</details>
+					</div>
+				)}
 				<Button
 					type="submit"
 					size="sm"
@@ -933,7 +988,11 @@ function McpSettings() {
 					disabled={!!busy}
 				>
 					<PlugIcon />
-					{busy === "add" ? "Checking the server…" : "Add server"}
+					{busy === "add"
+						? "Adding…"
+						: form.auth === "none"
+							? "Add server"
+							: "Add and connect"}
 				</Button>
 			</form>
 			<Rows>
@@ -944,24 +1003,33 @@ function McpSettings() {
 				)}
 				{servers?.length === 0 && (
 					<p className="px-4 py-6 text-center text-sm text-muted-foreground">
-						No servers yet.
+						No connectors yet.
 					</p>
 				)}
 				{servers?.map((m) => (
 					<div key={m.name} className="flex items-center gap-3 px-4 py-3">
-						{m.logo ? (
-							// biome-ignore lint/performance/noImgElement: tiny remote logo
-							<img src={m.logo} alt="" className="size-6 rounded" />
-						) : (
-							<BlocksIcon className="size-6 text-muted-foreground" />
-						)}
+						<BlocksIcon className="size-6 text-muted-foreground" />
 						<div className="flex min-w-0 flex-1 flex-col gap-0.5">
 							<span className="truncate text-sm font-medium">@{m.name}</span>
 							<span className="truncate text-xs text-muted-foreground">
 								{m.host}
-								{m.hasKey ? " · key saved" : ""}
+								{m.auth === "none"
+									? ""
+									: m.connected
+										? " · connected"
+										: " · not connected"}
 							</span>
 						</div>
+						{m.auth !== "none" && !m.connected && (
+							<Button
+								size="sm"
+								variant="outline"
+								disabled={busy === m.name}
+								onClick={() => void connect(m.name)}
+							>
+								Connect
+							</Button>
+						)}
 						<Button
 							variant="ghost"
 							size="icon-sm"

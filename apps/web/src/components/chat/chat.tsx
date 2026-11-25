@@ -389,10 +389,11 @@ export function Chat({
 		});
 	}, [agent.status, agent.session, agent.events]);
 
-	async function send(text: string, dead_ = dead) {
+	async function send(text: string, dead_ = dead, picked?: string[]) {
 		if (!text.trim() || resuming) return;
 		// Chips (apps, commands) go back to the text they stand for.
 		const t = menu.compose(text.trim());
+		const mcp = picked ?? menu.pickedMcp();
 		menu.clearChips();
 		setInput("");
 		// The old session is gone: keep its turns on screen, start a new session, and
@@ -441,13 +442,14 @@ export function Chat({
 					reasoning: effort ?? null,
 					mode,
 					vision,
+					...(mcp.length ? { mcp } : {}),
 					...(reseed ? { reseed } : {}),
 				},
 			});
 			if (file) setUpload(undefined);
 		} catch (error) {
 			// Found out only now that the session is gone: send again on a new one.
-			if (!reseed && isDeadSession(error)) return send(t, true);
+			if (!reseed && isDeadSession(error)) return send(t, true, mcp);
 			setInput(t);
 		}
 	}

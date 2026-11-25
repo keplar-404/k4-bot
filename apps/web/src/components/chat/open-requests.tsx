@@ -71,8 +71,7 @@ function Approval({
 	const options = request.options ?? [];
 	const action = (request.title ?? request.prompt)
 		.replace(/^Approve\s+/i, "")
-		.replace(/\?$/, "")
-		.replace(/^Mcp\s+/i, ""); // custom connectors: "Mcp notes: …" -> "notes: …"
+		.replace(/\?$/, "");
 	const yes = (label: string) => /^(approve|allow|yes)/i.test(label);
 	const input =
 		call?.input != null && JSON.stringify(call.input) !== "{}"
