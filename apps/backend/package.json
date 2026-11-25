@@ -6,7 +6,8 @@
 		"db:push": "drizzle-kit push",
 		"db:generate": "drizzle-kit generate",
 		"db:migrate": "drizzle-kit migrate",
-		"test": "bun test"
+		"test": "bun test",
+		"providers:reseal": "bun scripts/reseal-provider-keys.ts"
 	},
 	"dependencies": {
 		"@composio/core": "^0.31.0",

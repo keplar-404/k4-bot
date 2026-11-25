@@ -1,6 +1,6 @@
 // Reads one file of a loaded skill: a range of lines of a text or code file, or an
 // image the model can look at. Only the signed-in user's own skills.
-import { findModel } from "@repo/shared/models";
+import { resolveModel } from "@repo/shared/providers";
 import { presignDownload } from "@repo/shared/r2";
 import { SKILL_NAME } from "@repo/shared/skills";
 import { defineTool, toolOutput, toolOutputPart } from "eve/tools";
@@ -29,7 +29,7 @@ export default defineTool({
 		// A text-only model fails on an image part (see view_file).
 		if (
 			!isText(file.type) &&
-			findModel(ctx.session.auth.current?.attributes.model).vision === false
+			resolveModel(ctx.session.auth.current?.attributes.model).vision === false
 		)
 			return { error: "This model can't look at images; skip the image." };
 		if (!isText(file.type))

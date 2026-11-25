@@ -3,7 +3,8 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"test": "bun test"
+		"test": "bun test",
+		"providers:sync": "bun scripts/sync-providers.ts"
 	},
 	"exports": {
 		"./models": "./src/models.ts",
@@ -17,7 +18,8 @@
 		"./files": "./src/files.ts",
 		"./r2": "./src/r2.ts",
 		"./skills": "./src/skills.ts",
-		"./mcp": "./src/mcp.ts"
+		"./mcp": "./src/mcp.ts",
+		"./providers": "./src/providers.ts"
 	},
 	"dependencies": {
 		"@aws-sdk/client-s3": "^3.1171.0",

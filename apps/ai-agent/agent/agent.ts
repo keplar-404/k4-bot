@@ -1,7 +1,31 @@
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { findModel, pickEffort } from "@repo/shared/models";
+import {
+	decryptKey,
+	parseRef,
+	providerModels,
+	resolveModel,
+} from "@repo/shared/providers";
+import { userProviderKey } from "@repo/shared/schema";
+import { and, eq } from "drizzle-orm";
 import { defineAgent, defineDynamic } from "eve";
+import { appUserId, db } from "./lib/db";
 import { modeOf } from "./lib/mode";
+import { userModel } from "./lib/providers";
+
+/** The user's saved credentials for a provider (secrets still sealed), or null. */
+async function savedCreds(userId: string, provider: string) {
+	const [row] = await db()
+		.select({ sealed: userProviderKey.sealed, config: userProviderKey.config })
+		.from(userProviderKey)
+		.where(
+			and(
+				eq(userProviderKey.userId, userId),
+				eq(userProviderKey.provider, provider),
+			),
+		);
+	return row ?? null;
+}
 
 const openrouter = createOpenRouter({ apiKey: process.env.OPENROUTER_API_KEY });
 
@@ -32,8 +56,42 @@ const WRITE_TOOLS = new Set([
 export default defineAgent({
 	// The web picker's choice arrives as auth attributes set in channels/eve.ts.
 	// Pure reads, no I/O, so no memo is needed.
-	model: defineDynamic((ctx) => {
+	model: defineDynamic(async (ctx) => {
 		const attrs = ctx.session.auth.current?.attributes ?? {};
+		// A model on the user's own key (Settings > Model providers).
+		const own = parseRef(attrs.model);
+		if (own) {
+			const userId = appUserId(ctx.session.auth.current);
+			if (!userId) throw new Error("Sign in to use your own providers.");
+			// eve saves memo results with the session: keep only the sealed secrets
+			// there, and decrypt on each call (eve docs: Dynamic configuration > Memo rules).
+			const saved = await ctx.memo(
+				["provider-key", own.provider.id, ctx.turn?.id ?? null],
+				() => savedCreds(userId, own.provider.id),
+			);
+			if (!saved)
+				throw new Error(
+					`Add your ${own.provider.name} details in Settings > Model providers.`,
+				);
+			// Custom endpoints and Azure: only the model names the user saved.
+			const model = providerModels(own.provider, saved.config).find(
+				(m) => m.id === own.model.id,
+			);
+			if (!model)
+				throw new Error(
+					`${own.model.id} isn't one of your ${own.provider.name} models.`,
+				);
+			return {
+				model: await userModel(own.provider, model, {
+					secret: JSON.parse(decryptKey(userId, own.provider.id, saved.sealed)),
+					config: saved.config,
+				}),
+				reasoning:
+					pickEffort(resolveModel(attrs.model), attrs.reasoning) ??
+					"provider-default",
+				modelContextWindowTokens: model.contextWindow,
+			};
+		}
 		const model = findModel(attrs.model);
 		return {
 			model: openrouter(model.id, {

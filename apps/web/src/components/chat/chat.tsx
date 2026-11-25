@@ -3,7 +3,6 @@
 import {
 	defaultModelId,
 	type Effort,
-	findModel,
 	models,
 	visionModels,
 } from "@repo/shared/models";
@@ -85,6 +84,7 @@ import {
 	setComputerSteps,
 	setMemoryBusy,
 } from "@/lib/chat-ui";
+import { modelIn, useOwnModels } from "@/lib/providers";
 
 const SUGGESTIONS = [
 	"Search the web for this week's top AI news.",
@@ -231,14 +231,20 @@ export function Chat({
 		},
 	});
 	const [input, setInput] = useState("");
-	const [model, setModel] = useStored("k4.model", defaultModelId, (v) =>
-		models.some((m) => m.id === v),
+	// A `byok:` model is checked by the agent, which falls back to the free model when
+	// it isn't in the catalog; the key check happens there too.
+	const [model, setModel] = useStored(
+		"k4.model",
+		defaultModelId,
+		(v) => v.startsWith("byok:") || models.some((m) => m.id === v),
 	);
+	const own = useOwnModels();
 	const [effort, setEffort] = useState<Effort>();
 	const [vision, setVision] = useStored("k4.vision", visionModels[0].id, (v) =>
 		visionModels.some((m) => m.id === v),
 	);
-	const textOnly = findModel(model).vision === false;
+	const current = modelIn(own, model);
+	const textOnly = current.vision === false;
 	const [mode, setMode] = useStored("k4.mode", defaultMode, (v) =>
 		MODES.includes(v),
 	);
@@ -417,10 +423,14 @@ export function Chat({
 		try {
 			// The agent finds an uploaded file on its computer by this path.
 			const file = upload?.state === "done" ? upload : undefined;
-			// A text-only model can't take the file itself: it gets the id and calls
-			// view_file, where a vision model reads images for it.
+			// A model that can't take the file itself (text-only, or one of the user's
+			// own models without PDF support) gets the id and calls view_file, where a
+			// vision model reads it.
+			const inline =
+				!textOnly &&
+				!(file?.type === "application/pdf" && current.pdf === false);
 			const message =
-				file?.read && file.type && !textOnly
+				file?.read && file.type && inline
 					? [
 							{
 								type: "text" as const,
@@ -433,7 +443,7 @@ export function Chat({
 								filename: file.name,
 							},
 						]
-					: file && textOnly
+					: file && !inline
 						? `${t}\n\n(Attached ${file.name}, file id \`${file.key}\`.)`
 						: t;
 			await agent.send(message, {
@@ -707,7 +717,7 @@ export function Chat({
 								effort={effort}
 								onModel={(m) => {
 									// The sparkle is for the flagship model only.
-									if (m !== model && findModel(m).flagship)
+									if (m !== model && modelIn(own, m).flagship)
 										setSweep((s) => s + 1);
 									setModel(m);
 									setEffort(undefined); // fall back to the new model's default
@@ -744,7 +754,7 @@ export function Chat({
 				</form>
 				{/* A fixed slot, so the stats appearing never push the bar up. */}
 				<div className="flex h-5 shrink-0 items-center justify-center">
-					<ChatStats view={agent.view} />
+					<ChatStats view={agent.view} contextWindow={current.contextWindow} />
 				</div>
 			</div>
 		</MessageScrollerProvider>

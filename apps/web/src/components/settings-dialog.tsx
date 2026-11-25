@@ -4,6 +4,8 @@ import { cn } from "cn";
 import {
 	BlocksIcon,
 	BrainIcon,
+	CpuIcon,
+	ExternalLinkIcon,
 	LayoutGridIcon,
 	LogOutIcon,
 	MonitorIcon,
@@ -46,6 +48,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { API_URL, api } from "@/lib/api";
 import { getToken } from "@/lib/auth-client";
 import { useMemoryBusy } from "@/lib/chat-ui";
+import { changeProviders, getProviders, type Provider } from "@/lib/providers";
 
 type User = { name: string; email: string; image?: string | null };
 
@@ -66,6 +69,7 @@ const GROUPS = [
 			{ id: "apps", label: "Connected apps", icon: LayoutGridIcon },
 			{ id: "skills", label: "Skills", icon: SparklesIcon },
 			{ id: "mcp", label: "Custom connectors", icon: PlugIcon },
+			{ id: "providers", label: "Model providers", icon: CpuIcon },
 		],
 	},
 ] as const;
@@ -143,6 +147,7 @@ export function SettingsDialog({
 						{open && section === "apps" && <AppsSettings />}
 						{open && section === "skills" && <SkillsSettings />}
 						{open && section === "mcp" && <McpSettings />}
+						{open && section === "providers" && <ProvidersSettings />}
 					</div>
 				</div>
 			</DialogContent>
@@ -1044,5 +1049,307 @@ function McpSettings() {
 				))}
 			</Rows>
 		</>
+	);
+}
+
+// AI providers the user pays for with their own credentials. Each provider's form comes
+// from the backend (fields per kind: key, AWS keys, a Google service account JSON, a
+// custom https endpoint…). Secrets are sent once over the app's HTTPS connection, stored
+// encrypted, and never come back: an edit asks for them again. Connected providers'
+// models appear as tabs in the chat's model picker.
+function ProvidersSettings() {
+	const [list, setList] = useState<Provider[]>();
+	const [q, setQ] = useState("");
+	const [open, setOpen] = useState<string>();
+	const [busy, setBusy] = useState<string>();
+
+	const load = () => void getProviders().then((s) => setList(s.providers));
+	useEffect(load, []);
+
+	async function remove(p: Provider) {
+		setBusy(p.id);
+		const res = await api.api.me.providers[":id"]
+			.$delete({ param: { id: p.id } })
+			.catch(() => undefined);
+		setBusy(undefined);
+		if (!res?.ok) return toast.error("Could not remove it.");
+		changeProviders();
+		load();
+	}
+
+	const term = q.trim().toLowerCase();
+	const shown = list
+		?.filter((p) => p.name.toLowerCase().includes(term))
+		// Saved first, then the catalog's order; the "add a custom endpoint" row last.
+		.sort(
+			(a, b) =>
+				Number(!!b.saved) - Number(!!a.saved) ||
+				Number(a.id === "custom") - Number(b.id === "custom"),
+		);
+	return (
+		<>
+			<SectionHead title="Model providers">
+				Use models from your own AI provider accounts, billed to you. Add a key
+				and that provider's models appear in the chat's model picker. Keys are
+				stored encrypted and never shown again.
+			</SectionHead>
+			<div className="relative mb-3">
+				<SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+				<Input
+					value={q}
+					onChange={(e) => setQ(e.target.value)}
+					placeholder={`Search ${list?.length ?? ""} providers`}
+					aria-label="Search providers"
+					className="h-9 pl-8"
+				/>
+			</div>
+			<Rows>
+				{shown === undefined && (
+					<p className="px-4 py-3.5 text-sm text-muted-foreground shimmer">
+						Loading providers…
+					</p>
+				)}
+				{shown?.length === 0 && (
+					<p className="px-4 py-6 text-center text-sm text-muted-foreground">
+						No providers match “{q}”.
+					</p>
+				)}
+				{shown?.map((p) => (
+					<div key={p.id} className="flex flex-col gap-3 px-4 py-2.5">
+						<div className="flex items-center gap-3">
+							<span className="flex size-9 shrink-0 items-center justify-center rounded-lg border bg-background">
+								{p.kind === "custom" ? (
+									<PlugIcon className="size-4 text-muted-foreground" />
+								) : (
+									// biome-ignore lint/performance/noImgElement: tiny remote logo
+									<img
+										src={`https://models.dev/logos/${p.id}.svg`}
+										alt=""
+										loading="lazy"
+										className="size-5 dark:invert"
+										onError={(e) => {
+											e.currentTarget.style.visibility = "hidden";
+										}}
+									/>
+								)}
+							</span>
+							<div className="flex min-w-0 flex-1 flex-col">
+								<span className="truncate text-sm font-medium">{p.name}</span>
+								<span
+									className={cn(
+										"flex items-center gap-1.5 text-xs",
+										p.saved
+											? "text-emerald-600 dark:text-emerald-400"
+											: "text-muted-foreground",
+									)}
+								>
+									{p.saved && (
+										<span className="size-1.5 rounded-full bg-current" />
+									)}
+									{p.saved
+										? `Saved · ${p.saved.hint}`
+										: p.id === "custom"
+											? "Any OpenAI-compatible https API"
+											: p.kind === "azure"
+												? "Your deployments"
+												: `${p.models} models`}
+								</span>
+							</div>
+							{open !== p.id && (
+								<Button
+									variant="outline"
+									size="sm"
+									disabled={busy === p.id}
+									onClick={() => setOpen(p.id)}
+								>
+									{p.saved ? "Edit" : "Add"}
+								</Button>
+							)}
+							{p.saved && open !== p.id && (
+								<Button
+									variant="ghost"
+									size="icon-sm"
+									aria-label={`Remove ${p.name}`}
+									className="text-muted-foreground hover:text-destructive"
+									disabled={busy === p.id}
+									onClick={() => void remove(p)}
+								>
+									<Trash2Icon />
+								</Button>
+							)}
+						</div>
+						{open === p.id && (
+							<ProviderForm
+								provider={p}
+								onClose={() => setOpen(undefined)}
+								onSaved={() => {
+									setOpen(undefined);
+									changeProviders();
+									load();
+								}}
+							/>
+						)}
+					</div>
+				))}
+			</Rows>
+		</>
+	);
+}
+
+// One provider's form. Plain settings start from what's saved; secrets always start
+// empty and live only in this form's state until sent.
+function ProviderForm({
+	provider: p,
+	onClose,
+	onSaved,
+}: {
+	provider: Provider;
+	onClose: () => void;
+	onSaved: () => void;
+}) {
+	const [values, setValues] = useState<Record<string, string>>(() =>
+		Object.fromEntries(
+			p.fields.map((f) => {
+				const v = p.saved?.config[f.name];
+				return [f.name, Array.isArray(v) ? v.join(", ") : String(v ?? "")];
+			}),
+		),
+	);
+	const [error, setError] = useState<{ text: string; field?: string }>();
+	const [saving, setSaving] = useState(false);
+	const set = (name: string, v: string) =>
+		setValues((x) => ({ ...x, [name]: v }));
+
+	async function save() {
+		// A custom endpoint is stored under its name.
+		const id = p.id === "custom" ? `custom-${values.name?.trim() ?? ""}` : p.id;
+		setSaving(true);
+		const res = await api.api.me.providers[":id"]
+			.$put({ param: { id }, json: { values } })
+			.catch(() => undefined);
+		setSaving(false);
+		if (res?.ok) {
+			setValues({}); // drop the secrets from memory
+			toast.success(`${p.name} saved. Its models are in the model picker.`);
+			return onSaved();
+		}
+		const body = (await res?.json().catch(() => null)) as {
+			error?: string;
+			field?: string;
+		} | null;
+		setError({
+			text: body?.error ?? "Could not save. Check your connection.",
+			field: body?.field,
+		});
+	}
+
+	return (
+		<form
+			className="flex flex-col gap-3 pl-12"
+			autoComplete="off"
+			onSubmit={(e) => {
+				e.preventDefault();
+				void save();
+			}}
+		>
+			{p.fields.map((f, i) => {
+				const id = `pf-${p.id}-${f.name}`;
+				const bad = error?.field === f.name;
+				return (
+					<div key={f.name} className="flex flex-col gap-1.5">
+						<label htmlFor={id} className="text-xs font-medium">
+							{f.label}
+							{f.optional && (
+								<span className="font-normal text-muted-foreground">
+									{" "}
+									(optional)
+								</span>
+							)}
+						</label>
+						{f.type === "json" ? (
+							<>
+								<Textarea
+									id={id}
+									value={values[f.name] ?? ""}
+									onChange={(e) => set(f.name, e.target.value)}
+									placeholder='{"type": "service_account", …}'
+									spellCheck={false}
+									aria-invalid={bad}
+									className="h-24 resize-none font-mono text-xs"
+								/>
+								<input
+									type="file"
+									accept="application/json,.json"
+									aria-label={`Upload ${f.label}`}
+									className="text-xs text-muted-foreground file:mr-2 file:rounded-md file:border file:bg-background file:px-2 file:py-1 file:text-xs"
+									onChange={async (e) => {
+										// Read in the browser; the file itself is never uploaded anywhere.
+										const file = e.target.files?.[0];
+										e.target.value = "";
+										if (!file) return;
+										if (file.size > 20_000)
+											return setError({
+												text: "That file is too big.",
+												field: f.name,
+											});
+										set(f.name, await file.text());
+									}}
+								/>
+							</>
+						) : (
+							<Input
+								id={id}
+								autoFocus={i === 0}
+								type={
+									f.type === "secret"
+										? "password"
+										: f.type === "number"
+											? "number"
+											: "text"
+								}
+								inputMode={f.type === "number" ? "numeric" : undefined}
+								autoComplete={f.type === "secret" ? "new-password" : "off"}
+								spellCheck={false}
+								value={values[f.name] ?? ""}
+								onChange={(e) => set(f.name, e.target.value)}
+								placeholder={
+									f.type === "secret" && p.saved
+										? "Enter it again to save changes"
+										: f.placeholder
+								}
+								// A saved custom endpoint keeps its name (it is its id).
+								readOnly={f.name === "name" && p.kind === "custom" && !!p.saved}
+								aria-invalid={bad}
+								className={cn("h-8", f.type === "secret" && "font-mono")}
+							/>
+						)}
+					</div>
+				);
+			})}
+			{error && (
+				<p role="alert" className="text-xs text-destructive">
+					{error.text}
+				</p>
+			)}
+			<div className="flex flex-wrap items-center gap-2">
+				<Button type="submit" size="sm" disabled={saving}>
+					{saving ? "Saving…" : "Save"}
+				</Button>
+				<Button type="button" variant="ghost" size="sm" onClick={onClose}>
+					Cancel
+				</Button>
+				{p.doc && (
+					<a
+						href={p.doc}
+						target="_blank"
+						rel="noreferrer"
+						className="ml-auto flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+					>
+						{p.name} docs
+						<ExternalLinkIcon className="size-3" />
+					</a>
+				)}
+			</div>
+		</form>
 	);
 }

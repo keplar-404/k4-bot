@@ -31,7 +31,10 @@ describe.skipIf(!dbUrl)("routes (TEST_DATABASE_URL)", async () => {
 	const { default: server } = await import("../src/index");
 	const { db, pool } = await import("../src/db");
 	const { overLimit } = await import("@repo/shared/rate-limit");
-	const { agentMemory, chat, rateLimit } = await import("@repo/shared/schema");
+	const { agentMemory, chat, rateLimit, userProviderKey } = await import(
+		"@repo/shared/schema"
+	);
+	process.env.PROVIDER_KEY_SECRET ??= Buffer.alloc(32, 1).toString("base64");
 	const { inArray, like } = await import("drizzle-orm");
 
 	const as = async (user: string, path: string, init: RequestInit = {}) =>
@@ -48,6 +51,9 @@ describe.skipIf(!dbUrl)("routes (TEST_DATABASE_URL)", async () => {
 	afterAll(async () => {
 		await db.delete(chat).where(inArray(chat.userId, users));
 		await db.delete(agentMemory).where(inArray(agentMemory.userId, users));
+		await db
+			.delete(userProviderKey)
+			.where(inArray(userProviderKey.userId, users));
 		for (const u of users)
 			await db.delete(rateLimit).where(like(rateLimit.key, `%${u}%`));
 		await pool.end();
@@ -123,6 +129,39 @@ describe.skipIf(!dbUrl)("routes (TEST_DATABASE_URL)", async () => {
 			body: JSON.stringify({ title: "   " }),
 		});
 		expect(empty.status).toBe(400);
+	});
+
+	test("a provider key is stored sealed, per user, and never returned", async () => {
+		const [me, other] = users;
+		const put = (id: string, apiKey: string) =>
+			as(me, `/api/me/providers/${id}`, {
+				method: "PUT",
+				body: JSON.stringify({ values: { apiKey } }),
+			});
+		expect((await put("openai", "sk-test-abcd1234")).status).toBe(200);
+		expect((await put("not-a-provider", "sk-test-abcd1234")).status).toBe(404);
+		expect((await put("openai", "has space")).status).toBe(400);
+		const [row] = await db
+			.select()
+			.from(userProviderKey)
+			.where(inArray(userProviderKey.userId, [me]));
+		expect(row.sealed).not.toContain("sk-test");
+		const body = await (await as(me, "/api/me/providers")).text();
+		expect(body).not.toContain("sk-test");
+		const list = JSON.parse(body);
+		expect(
+			list.providers.find((p: { id: string }) => p.id === "openai").saved,
+		).toEqual({ hint: "…1234", config: {} });
+		expect(list.models.length).toBeGreaterThan(0);
+		const theirs = await (await as(other, "/api/me/providers")).json();
+		expect(theirs.models).toEqual([]);
+		expect(
+			(await as(other, "/api/me/providers/openai", { method: "DELETE" }))
+				.status,
+		).toBe(404);
+		expect(
+			(await as(me, "/api/me/providers/openai", { method: "DELETE" })).status,
+		).toBe(200);
 	});
 
 	test("memory is saved cleaned, per user, and capped", async () => {

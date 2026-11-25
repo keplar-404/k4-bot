@@ -20,6 +20,8 @@ export type ModelOption = {
 	contextWindow: number;
 	/** false: text only (OpenRouter `input_modalities`); a vision model reads images for it. */
 	vision?: false;
+	/** false: can't read PDFs (OpenRouter parses PDFs for every model, so only own models). */
+	pdf?: false;
 	/** The top model: picking it plays the prompt bar's sparkle. */
 	flagship?: true;
 };
@@ -110,9 +112,6 @@ export const models: ModelOption[] = [
 ];
 
 export const defaultModelId = models[0].id;
-
-/** The picker's tabs, in list order. */
-export const gateways = [...new Set(models.map((m) => m.via))];
 
 /** Read images for a text-only model (view_file). The first is the default (free). */
 export const visionModels = [

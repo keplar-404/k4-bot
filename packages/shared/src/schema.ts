@@ -130,3 +130,24 @@ export const userMcp = pgTable(
 		index("user_mcp_slug_idx").on(t.slug),
 	],
 );
+
+// Credentials each user added for a model provider (Settings > Model providers,
+// @repo/shared/providers). `sealed`: the secret fields (keys, service account) as JSON,
+// encrypted with PROVIDER_KEY_SECRET; only the agent decrypts it, to call the provider.
+// `config`: the plain fields (region, project, base URL, model names). `hint`: at most
+// the key's last 4 characters, to show which one is saved.
+export const userProviderKey = pgTable(
+	"user_provider_key",
+	{
+		userId: text("user_id").notNull(),
+		provider: text("provider").notNull(),
+		sealed: text("sealed").notNull(),
+		hint: text("hint").notNull(),
+		config: jsonb("config")
+			.$type<Record<string, string | number | string[]>>()
+			.notNull()
+			.default({}),
+		createdAt: timestamp("created_at").defaultNow().notNull(),
+	},
+	(t) => [primaryKey({ columns: [t.userId, t.provider] })],
+);

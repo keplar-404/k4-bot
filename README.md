@@ -8,6 +8,7 @@ K4 is a personal AI assistant. You sign in and chat with an agent that searches 
 
 - **Chat with saved history.** Conversations stream live, resume after a reload, and appear in the sidebar. You can delete them from the sidebar.
 - **Model and reasoning picker.** Models come through OpenRouter, and the reasoning effort is set per model.
+- **Your own model providers.** In **Settings → Model providers**, add your own credentials for 57 providers (OpenAI, Anthropic, Google, xAI, Perplexity, Bedrock, Vertex, Azure, Groq, …) or any OpenAI-compatible https endpoint; their models join the picker, billed to you. Secrets are stored encrypted (`PROVIDER_KEY_SECRET`, the same in `apps/backend` and `apps/ai-agent`) and never sent back to the browser; to rotate it, move the old value to `PROVIDER_KEY_SECRET_PREVIOUS`, set a new one, then run `bun run providers:reseal` in `apps/backend`. The provider and model list is a [models.dev](https://models.dev) snapshot: `bun run providers:sync` in `packages/shared` refreshes it.
 - **Three modes:**
   - **Ask:** the agent answers and explains; nothing it can do changes anything, so there is nothing to approve.
   - **Plan:** the agent only plans and can only search the web.

@@ -1,0 +1,1 @@
+ALTER TABLE "user_provider_key" ADD COLUMN "config" jsonb DEFAULT '{}'::jsonb NOT NULL;

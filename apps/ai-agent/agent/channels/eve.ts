@@ -1,6 +1,7 @@
 import { userFromBearer } from "@repo/shared/auth";
 import { pickedMcp } from "@repo/shared/mcp";
-import { findModel, findVisionModel, pickEffort } from "@repo/shared/models";
+import { findVisionModel, pickEffort } from "@repo/shared/models";
+import { resolveModel } from "@repo/shared/providers";
 import { overLimit } from "@repo/shared/rate-limit";
 import { agentEvent, chat } from "@repo/shared/schema";
 import { and, eq, inArray, isNotNull } from "drizzle-orm";
@@ -171,7 +172,8 @@ export default eveChannel({
 			!ctx.eve.sessionId && typeof reseed === "string" && auth.principalId
 				? await chatHistory(reseed, auth.principalId)
 				: undefined;
-		const model = findModel(modelId);
+		// A built-in model or one of the user's own (agent.ts checks they have its key).
+		const model = resolveModel(modelId);
 		const effort = pickEffort(model, reasoning);
 		const safeMode = MODES.find((m) => m === mode) ?? "ask";
 		return {

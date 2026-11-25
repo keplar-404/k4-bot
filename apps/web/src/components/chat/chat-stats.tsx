@@ -1,6 +1,5 @@
 "use client";
 
-import { findModel } from "@repo/shared/models";
 import { runs, type SessionView, turns, usage } from "eve/events";
 import {
 	CoinsIcon,
@@ -14,14 +13,20 @@ const fmt = new Intl.NumberFormat("en", { notation: "compact" });
 
 // One line under the prompt bar. eve folds the stream into the view, so every
 // number is a selector read: turns, model runs (steps), session usage, and the
-// last run's input against its model's window.
-export function ChatStats({ view }: { view: SessionView }) {
+// last run's input against the chosen model's window.
+export function ChatStats({
+	view,
+	contextWindow,
+}: {
+	view: SessionView;
+	contextWindow: number;
+}) {
 	const all = runs(view);
 	if (all.length === 0) return null;
 	const total = usage(view).total;
 	const last = all.findLast((r) => r.usage);
 	const context = last?.usage
-		? last.usage.inputTokens / findModel(last.modelId).contextWindow
+		? last.usage.inputTokens / contextWindow
 		: undefined;
 	const ms =
 		last?.startedAt && last.endedAt

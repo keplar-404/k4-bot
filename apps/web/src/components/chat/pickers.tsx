@@ -2,7 +2,7 @@
 
 import {
 	type Effort,
-	gateways,
+	type ModelOption,
 	models,
 	visionModels,
 } from "@repo/shared/models";
@@ -10,6 +10,7 @@ import {
 	CheckIcon,
 	ChevronDownIcon,
 	EyeIcon,
+	KeyRoundIcon,
 	ListChecksIcon,
 	MessageCircleQuestionIcon,
 	SearchIcon,
@@ -35,6 +36,7 @@ import {
 } from "@/components/ui/popover";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { useOwnModels } from "@/lib/providers";
 
 const effortNames: Record<Effort, string> = {
 	none: "Off",
@@ -55,8 +57,21 @@ export const defaultMode = "ask";
 
 type PickerProps = { value: string; onChange: (v: string) => void };
 
-// models.dev serves each provider's mark as a one-colour SVG (black: inverted in dark).
-const logoSlug: Record<string, string> = { "Z.ai": "zai" };
+// models.dev serves each provider's mark as a one-colour SVG (black: inverted in dark),
+// named by its provider id; the names here are display names, so map the odd ones.
+const logoSlug: Record<string, string> = {
+	"Z.ai": "zai",
+	"Z.AI": "zai",
+	"Together AI": "togetherai",
+	"Fireworks AI": "fireworks-ai",
+	"Deep Infra": "deepinfra",
+	"Moonshot AI": "moonshotai",
+	"Hugging Face": "huggingface",
+	"Novita AI": "novita-ai",
+	"Ollama Cloud": "ollama-cloud",
+	"GMI Cloud": "gmicloud",
+	"Perplexity Agent": "perplexity",
+};
 function ProviderLogo({ provider }: { provider: string }) {
 	return (
 		// biome-ignore lint/performance/noImgElement: tiny remote provider mark
@@ -75,7 +90,8 @@ function ProviderLogo({ provider }: { provider: string }) {
 const tokens = (n: number) =>
 	n >= 1e6 ? `${Math.round(n / 1e6)}M` : `${Math.round(n / 1e3)}K`;
 
-// Tabs for where the model runs (OpenRouter now; OpenAI, Anthropic later), a search
+// Tabs for where the model runs (K4's OpenRouter, then each provider the user added a
+// key for in Settings > Model providers), a search
 // line, then that gateway's models grouped by lab, one line each. The chosen model's
 // details and reasoning levels sit in the footer: clicking a model with levels
 // selects it and keeps the panel open on them; a level (or a model without levels)
@@ -93,13 +109,20 @@ export function ModelPicker({
 }) {
 	const [open, setOpen] = useState(false);
 	const [query, setQuery] = useState("");
-	const m = models.find((x) => x.id === model) ?? models[0];
-	const [via, setVia] = useState(m.via);
+	const own = useOwnModels();
+	const all = [...models, ...own];
+	// The user's own key for a provider we also host (OpenRouter) gets its own tab.
+	const tabOf = (x: ModelOption) =>
+		x.id.startsWith("byok:") ? `byok:${x.via}` : x.via;
+	const tabs = [...new Set(all.map(tabOf))];
+	const m = all.find((x) => x.id === model) ?? models[0];
+	const [via, setVia] = useState(tabOf(m));
+	const viaName = via.replace(/^byok:/, "");
 	const e = m.efforts.find((x) => x === effort) ?? m.defaultEffort;
 	const q = query.trim().toLowerCase();
-	const shown = models.filter(
+	const shown = all.filter(
 		(x) =>
-			x.via === via &&
+			tabOf(x) === via &&
 			`${x.name} ${x.provider} ${x.description}`.toLowerCase().includes(q),
 	);
 	const labs = [...new Set(shown.map((x) => x.provider))];
@@ -109,14 +132,14 @@ export function ModelPicker({
 	};
 	const choose = (id: string) => {
 		onModel(id); // resets the effort to the model's default
-		if (!models.find((x) => x.id === id)?.efforts.length) close();
+		if (!all.find((x) => x.id === id)?.efforts.length) close();
 	};
 	return (
 		<Popover
 			open={open}
 			onOpenChange={(o) => {
 				if (!o) return close();
-				setVia(m.via);
+				setVia(tabOf(m));
 				setOpen(true);
 			}}
 		>
@@ -145,13 +168,25 @@ export function ModelPicker({
 				className="w-[min(22rem,calc(100vw-1.5rem))] gap-0 overflow-hidden p-0"
 			>
 				<Tabs value={via} onValueChange={(v) => setVia(String(v))}>
-					<TabsList variant="line" className="w-full justify-start px-2 pt-1">
-						{gateways.map((g) => (
-							<TabsTrigger key={g} value={g} className="flex-none text-xs">
-								<ProviderLogo provider={g} />
-								{g}
-							</TabsTrigger>
-						))}
+					<TabsList
+						variant="line"
+						className="w-full justify-start overflow-x-auto px-2 pt-1"
+					>
+						{tabs.map((g) => {
+							const name = g.replace(/^byok:/, "");
+							return (
+								<TabsTrigger key={g} value={g} className="flex-none text-xs">
+									<ProviderLogo provider={name} />
+									{name}
+									{g !== name && (
+										<KeyRoundIcon
+											aria-label="your key"
+											className="size-3 text-muted-foreground"
+										/>
+									)}
+								</TabsTrigger>
+							);
+						})}
 					</TabsList>
 				</Tabs>
 				<label className="flex items-center gap-2 border-y px-3 text-muted-foreground">
@@ -167,7 +202,7 @@ export function ModelPicker({
 								choose(shown[0].id);
 							}
 						}}
-						placeholder={`Search ${via} models`}
+						placeholder={`Search ${viaName} models`}
 						aria-label="Search models"
 						className="h-9 min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
 					/>

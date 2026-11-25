@@ -83,3 +83,13 @@ test("file links and uploads are only for the signed-in user", async () => {
 	});
 	expect(upload.status).toBe(401);
 });
+
+test("model provider keys are only for the signed-in user", async () => {
+	expect((await call("/api/me/providers")).status).toBe(401);
+	const put = await call("/api/me/providers/openai", {
+		method: "PUT",
+		headers: { "content-type": "application/json" },
+		body: JSON.stringify({ apiKey: "sk-test-abcd1234" }),
+	});
+	expect(put.status).toBe(401);
+});
