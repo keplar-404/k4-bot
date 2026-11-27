@@ -14,6 +14,7 @@ import { files } from "./files";
 import { mcp } from "./mcp";
 import { me } from "./me";
 import { providers } from "./providers";
+import { routines } from "./routines";
 import { skills } from "./skills";
 import { terminal } from "./terminal";
 import { transcribe } from "./transcribe";
@@ -74,6 +75,7 @@ const app = new Hono()
 	.route("/api/me/skills", skills)
 	.route("/api/me/mcp", mcp)
 	.route("/api/me/providers", providers)
+	.route("/api/routines", routines)
 	.route("/api/me", me)
 	.route("/api/terminal", terminal)
 	.route("/api/transcribe", transcribe)

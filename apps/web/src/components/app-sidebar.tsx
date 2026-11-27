@@ -21,6 +21,7 @@ import {
 	SidebarSeparator,
 	useSidebar,
 } from "@/components/ui/sidebar";
+import { RoutinesGroup } from "@/features/routines/routines-group";
 
 // One highlight glides between the sidebar's items on hover.
 const MENU_ITEMS =
@@ -97,6 +98,7 @@ export function AppSidebar({
 				<Glide items={MENU_ITEMS} className="bg-sidebar-accent" />
 				<NavGroups />
 				<SidebarSeparator className="hidden group-data-[collapsible=icon]:block" />
+				<RoutinesGroup />
 				<ChatHistory />
 			</SidebarContent>
 			<SidebarFooter className="border-t border-sidebar-border">

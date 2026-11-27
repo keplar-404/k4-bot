@@ -299,7 +299,10 @@ export function Chat({
 	useEffect(() => {
 		if (
 			sessionId &&
-			(activeTurn(agent.view) || openInteractions(agent.view).length > 0)
+			// No saved events yet: a session still on its first turn (a routine run).
+			(!events?.length ||
+				activeTurn(agent.view) ||
+				openInteractions(agent.view).length > 0)
 		)
 			void agent.resume().catch(() => {});
 	}, []);
@@ -452,6 +455,8 @@ export function Chat({
 					reasoning: effort ?? null,
 					mode,
 					vision,
+					// The user's time zone: the agent adds their local time to the message.
+					tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
 					...(mcp.length ? { mcp } : {}),
 					...(reseed ? { reseed } : {}),
 				},

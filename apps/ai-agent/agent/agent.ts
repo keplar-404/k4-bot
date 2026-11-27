@@ -12,6 +12,7 @@ import { defineAgent, defineDynamic } from "eve";
 import { appUserId, db } from "./lib/db";
 import { modeOf } from "./lib/mode";
 import { userModel } from "./lib/providers";
+import { routineGate } from "./lib/routine";
 
 /** The user's saved credentials for a provider (secrets still sealed), or null. */
 async function savedCreds(userId: string, provider: string) {
@@ -40,6 +41,8 @@ const PLAN_TOOLS = new Set([
 	"load_skill",
 	"read_skill_file",
 	"search_skill",
+	"time", // pure date math and arithmetic, no I/O
+	"calculate",
 ]);
 // Tools that change something: Ask mode confirms each call.
 const WRITE_TOOLS = new Set([
@@ -111,7 +114,11 @@ export default defineAgent({
 	// eve docs, Human in the Loop > "Gate every call from one policy".
 	// Ask: confirm every write. Full: no prompts here (memory writes ask through their
 	// own approval). Plan: tools are already hidden; this denial is the backstop.
-	approval: ({ session, toolName }) => {
+	approval: async (ctx) => {
+		const { session, toolName } = ctx;
+		// Routines plug-in: unattended runs save sends/posts/merges as drafts instead.
+		const gate = await routineGate(ctx);
+		if (gate) return gate;
 		const mode = modeOf(session);
 		if (
 			mode === "plan" &&

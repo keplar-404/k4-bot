@@ -2,7 +2,7 @@ import { zValidator } from "@hono/zod-validator";
 import { chatPrefix } from "@repo/shared/files";
 import { deletePrefix } from "@repo/shared/r2";
 import { agentEvent, chat } from "@repo/shared/schema";
-import { and, desc, eq, gt } from "drizzle-orm";
+import { and, desc, eq, gt, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import { type Env, requireUser, webUrl } from "./auth";
@@ -24,7 +24,13 @@ export const chats = new Hono<Env>()
 		const rows = await db
 			.select({ id: chat.id, title: chat.title, updatedAt: chat.updatedAt })
 			.from(chat)
-			.where(eq(chat.userId, c.get("user").id))
+			.where(
+				and(
+					eq(chat.userId, c.get("user").id),
+					// Routine runs have their own history (routines.ts), not Recent.
+					sql`not exists (select 1 from user_routine_run r where r.chat_id = ${chat.id})`,
+				),
+			)
 			.orderBy(desc(chat.updatedAt));
 		return c.json({ chats: rows }, 200);
 	})

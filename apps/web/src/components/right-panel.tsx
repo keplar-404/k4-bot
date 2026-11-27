@@ -2,6 +2,7 @@
 
 import { typeOf } from "@repo/shared/files";
 import {
+	ClockIcon,
 	CompassIcon,
 	FileIcon,
 	FolderIcon,
@@ -26,6 +27,10 @@ import {
 import { Glide } from "@/components/ui/glide";
 import { Kbd } from "@/components/ui/kbd";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+	RoutineEditPanel,
+	RoutineStartCard,
+} from "@/features/routines/edit-panel";
 import { API_URL, api } from "@/lib/api";
 import { getToken } from "@/lib/auth-client";
 import {
@@ -65,6 +70,8 @@ type Tool = keyof typeof TOOLS;
 const TAB = {
 	start: { label: "Start", Icon: CompassIcon },
 	...TOOLS,
+	// Routines plug-in: only opened by a routine run's chat.
+	routine: { label: "Edit routine", Icon: ClockIcon },
 };
 // Browser only (react-doc-viewer docs: Next.js guide).
 const FileViewer = dynamic(() => import("@/components/file-viewer"), {
@@ -98,7 +105,7 @@ export function RightPanel() {
 					{tabs.map((id) => {
 						const { label, Icon } = openFiles[id]
 							? { label: openFiles[id].name, Icon: FileIcon }
-							: TAB[id as Tool | "start"];
+							: TAB[id as keyof typeof TAB];
 						return (
 							// The pill is the wrapper, so × sits inside it without reserving space.
 							<span
@@ -167,6 +174,7 @@ export function RightPanel() {
 							</button>
 						),
 					)}
+					<RoutineStartCard />
 				</div>
 			</TabsContent>
 			<TabsContent value="computer" className="min-h-0">
@@ -177,6 +185,14 @@ export function RightPanel() {
 			</TabsContent>
 			<TabsContent value="terminal" className="min-h-0">
 				<Terminal />
+			</TabsContent>
+			<TabsContent
+				value="routine"
+				// The shell grows with its content: cap at the screen minus the panel header (and
+				// the phone sheet's top bar) so this tab scrolls itself.
+				className="max-h-[calc(100svh-7rem)] min-h-0 min-w-0 overflow-x-hidden overflow-y-auto md:max-h-[calc(100svh-4rem)]"
+			>
+				<RoutineEditPanel />
 			</TabsContent>
 			{Object.entries(openFiles).map(([id, file]) => (
 				<TabsContent key={id} value={id} className="flex min-h-0 overflow-auto">

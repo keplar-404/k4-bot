@@ -4,6 +4,7 @@ import { findVisionModel, pickEffort } from "@repo/shared/models";
 import { resolveModel } from "@repo/shared/providers";
 import { overLimit } from "@repo/shared/rate-limit";
 import { agentEvent, chat } from "@repo/shared/schema";
+import { localTime, validTimezone } from "@repo/shared/time";
 import { and, eq, inArray, isNotNull } from "drizzle-orm";
 import { type AuthFn, ForbiddenError, localDev } from "eve/channels/auth";
 import { defaultEveAuth, eveChannel } from "eve/channels/eve";
@@ -164,8 +165,10 @@ export default eveChannel({
 			reseed,
 			vision,
 			mcp,
+			tz,
 			...rest
 		} = sent as Record<string, unknown>;
+		const zone = typeof tz === "string" && validTimezone(tz) ? tz : undefined;
 		// A new session for a chat whose old session ended or is gone: the model
 		// gets the old conversation back (eve docs: Start from prior history).
 		const history =
@@ -187,10 +190,17 @@ export default eveChannel({
 					// Servers picked with @ (names only; instructions/mcp.ts checks they're the user's).
 					mcp: pickedMcp(mcp),
 					...(effort ? { reasoning: effort } : {}),
+					// The time and calculate tools default to it.
+					...(zone ? { tz: zone } : {}),
 				},
 			},
 			// Mode stays out of the model's context: it is enforced by tools and approval.
-			clientContext: JSON.stringify(rest),
+			// Local time rides with the message, not the instructions, so the cached
+			// prompt prefix stays the same from turn to turn.
+			clientContext: JSON.stringify({
+				...rest,
+				...(zone ? { userLocalTime: localTime(new Date(), zone) } : {}),
+			}),
 			...(history?.length ? { history } : {}),
 		};
 	},
