@@ -15,6 +15,7 @@
 		"./memory": "./src/memory.ts",
 		"./tools": "./src/tools.ts",
 		"./computer": "./src/computer.ts",
+		"./agent-users": "./src/agent-users.ts",
 		"./files": "./src/files.ts",
 		"./r2": "./src/r2.ts",
 		"./skills": "./src/skills.ts",

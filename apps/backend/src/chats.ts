@@ -1,8 +1,9 @@
 import { zValidator } from "@hono/zod-validator";
+import { removeChatUsers, sessionTree } from "@repo/shared/agent-users";
 import { chatPrefix } from "@repo/shared/files";
 import { deletePrefix } from "@repo/shared/r2";
 import { agentEvent, chat } from "@repo/shared/schema";
-import { and, desc, eq, gt, sql } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import { type Env, requireUser, webUrl } from "./auth";
@@ -175,14 +176,18 @@ export const chats = new Hono<Env>()
 					console.error("chat files not deleted", chatId, failed.length);
 			})
 			.catch((error) => console.error("chat files not deleted", chatId, error));
+		// The chat's agent and its helpers (agent-users.ts): read before their rows go.
+		const sessions = row.eveSessionId
+			? await sessionTree(db, userId, row.eveSessionId)
+			: [];
 		// drizzle skill: multi-step writes that must succeed together go in a transaction.
 		await db.transaction(async (tx) => {
-			if (row.eveSessionId) {
+			if (sessions.length) {
 				await tx
 					.delete(agentEvent)
 					.where(
 						and(
-							eq(agentEvent.sessionId, row.eveSessionId),
+							inArray(agentEvent.sessionId, sessions),
 							eq(agentEvent.userId, userId),
 						),
 					);
@@ -193,5 +198,10 @@ export const chats = new Hono<Env>()
 					and(eq(chat.id, c.req.valid("param").id), eq(chat.userId, userId)),
 				);
 		});
+		// Their Linux users go now if the computer is on; a paused one is not woken
+		// (the sweep at its next start removes them). Not awaited: deleting stays quick.
+		void removeChatUsers(db, userId, sessions).catch((error) =>
+			console.error("chat agent users not removed", chatId, error),
+		);
 		return c.json({ ok: true }, 200);
 	});

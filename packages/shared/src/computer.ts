@@ -266,6 +266,9 @@ export async function userDesktop(db: Db, userId: string) {
 		got ??= await create(db, userId);
 		if (!got) continue;
 		await ensureStream(got.sbx, got.streamPassword, got.streamKey);
+		// Linux users of deleted chats (agent-users.ts), at most hourly, in the background.
+		const sbx = got.sbx;
+		void import("./agent-users").then((m) => m.maybeSweep(db, userId, sbx));
 		return got;
 	}
 	throw new Error("Could not start the computer.");

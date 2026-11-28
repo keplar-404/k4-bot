@@ -45,6 +45,7 @@ import {
 } from "@/components/ui/trace";
 import { useManualOpen } from "@/lib/chat-ui";
 import { type StartOrder, type Step, splitTurn } from "./split-turn";
+import { SubagentRow } from "./subagents";
 
 const textOf = (m: EveMessage) =>
 	m.parts.flatMap((p) => (p.type === "text" ? [p.text] : [])).join("");
@@ -289,6 +290,8 @@ function Steps({
 								text={p.text}
 								running={p.state === "streaming"}
 							/>
+						) : p.type === "tool" && p.name === "agent" ? (
+							<SubagentRow key={p.callId} part={p} ToolRow={ToolRow} />
 						) : p.type === "tool" ? (
 							<ToolRow key={p.callId} part={p} />
 						) : p.type === "interaction" ? null : (

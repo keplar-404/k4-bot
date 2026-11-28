@@ -10,6 +10,7 @@ import { userProviderKey } from "@repo/shared/schema";
 import { and, eq } from "drizzle-orm";
 import { defineAgent, defineDynamic } from "eve";
 import { appUserId, db } from "./lib/db";
+import { helperSlot } from "./lib/helpers";
 import { modeOf } from "./lib/mode";
 import { userModel } from "./lib/providers";
 import { routineGate } from "./lib/routine";
@@ -126,6 +127,10 @@ export default defineAgent({
 			!toolName.startsWith("eve__")
 		) {
 			return { type: "denied", reason: "Plan mode only reads the web." };
+		}
+		if (toolName === "agent") {
+			const full = helperSlot(ctx.callId);
+			if (full) return { type: "denied", reason: full };
 		}
 		if (
 			mode === "ask" &&

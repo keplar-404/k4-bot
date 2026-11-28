@@ -87,6 +87,29 @@ function Approval({
 					<p className="text-sm font-medium">Allow this action?</p>
 					<p className="truncate text-sm text-muted-foreground">{action}</p>
 				</div>
+				<div className="flex shrink-0 gap-2">
+					{[...options]
+						.sort((a, b) => Number(yes(a.label)) - Number(yes(b.label)))
+						.map((o) => (
+							<Button
+								key={o.id}
+								size="sm"
+								variant={yes(o.label) ? "default" : "outline"}
+								disabled={!!sending}
+								onClick={() => {
+									setSending(o.id);
+									onAnswer([{ interactionId, optionId: o.id }])?.catch(() =>
+										setSending(undefined),
+									);
+								}}
+							>
+								{sending === o.id && (
+									<LoaderCircleIcon className="animate-spin" />
+								)}
+								{o.label}
+							</Button>
+						))}
+				</div>
 			</div>
 			{input && (
 				<details className="group rounded-lg border bg-muted/40 text-xs">
@@ -99,29 +122,6 @@ function Approval({
 					</pre>
 				</details>
 			)}
-			<div className="flex justify-end gap-2">
-				{[...options]
-					.sort((a, b) => Number(yes(a.label)) - Number(yes(b.label)))
-					.map((o) => (
-						<Button
-							key={o.id}
-							size="sm"
-							variant={yes(o.label) ? "default" : "outline"}
-							disabled={!!sending}
-							onClick={() => {
-								setSending(o.id);
-								onAnswer([{ interactionId, optionId: o.id }])?.catch(() =>
-									setSending(undefined),
-								);
-							}}
-						>
-							{sending === o.id && (
-								<LoaderCircleIcon className="animate-spin" />
-							)}
-							{o.label}
-						</Button>
-					))}
-			</div>
 		</div>
 	);
 }

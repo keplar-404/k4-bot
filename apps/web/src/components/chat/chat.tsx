@@ -42,6 +42,7 @@ import {
 } from "@/components/chat/pickers";
 import { usePromptMenu } from "@/components/chat/prompt-menu";
 import { startOrder } from "@/components/chat/split-turn";
+import { useSubagents } from "@/components/chat/subagents";
 import { useDictation } from "@/components/chat/voice";
 import {
 	Attachment,
@@ -205,6 +206,7 @@ export function Chat({
 	const agent = useEveAgent({
 		// The agent checks this token on every request; it is re-read each time.
 		auth: { bearer: async () => (await getToken()) ?? "" },
+		followAgents: true, // helper agents' live work (subagents.tsx)
 		...(sessionId
 			? {
 					initialSession: session ?? { sessionId, streamIndex: 0 },
@@ -230,6 +232,7 @@ export function Chat({
 			});
 		},
 	});
+	useSubagents(agent);
 	const [input, setInput] = useState("");
 	// A `byok:` model is checked by the agent, which falls back to the free model when
 	// it isn't in the catalog; the key check happens there too.
